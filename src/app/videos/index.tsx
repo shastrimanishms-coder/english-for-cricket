@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { useSafeBack } from '../../lib/useSafeBack';
 
 interface VideoLecture {
   id: string;
@@ -13,6 +14,7 @@ interface VideoLecture {
 }
 
 export default function VideosGallery() {
+  const goBack = useSafeBack();
   const [videos, setVideos] = useState<VideoLecture[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +49,9 @@ export default function VideosGallery() {
     <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="w-full max-w-7xl mx-auto">
+        <Pressable onPress={goBack} className="self-start px-4 py-2 bg-slate-200 rounded-lg mb-4">
+          <Text className="font-bold text-slate-700">← Back</Text>
+        </Pressable>
         <View className="mb-8">
           <Text className="text-4xl font-bold text-text-primary mb-2">Video Library</Text>
           <Text className="text-lg text-text-secondary">Watch and learn at your own pace.</Text>

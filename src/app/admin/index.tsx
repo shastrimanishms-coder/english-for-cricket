@@ -57,6 +57,75 @@ const ADMIN_MENU = [
   { id: 'settings', label: 'System Settings', icon: '⚙️' },
 ];
 
+// Local-date period starts for the overview growth stats. The week
+// starts on Monday.
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function startOfWeek(d: Date): Date {
+  const x = startOfDay(d);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+// Content shortcut cards on the overview: real table counts, each card
+// jumps to the admin section that manages that content.
+const CONTENT_CARDS = [
+  { key: 'modules', label: 'Modules', icon: '📚', table: 'curriculum_modules', tab: 'curriculum' },
+  { key: 'lessons', label: 'Lessons', icon: '📖', table: 'curriculum_lessons', tab: 'curriculum' },
+  { key: 'videos', label: 'Videos', icon: '📺', table: 'video_lectures', tab: 'videos' },
+  { key: 'downloads', label: 'Downloads', icon: '📥', table: 'downloads', tab: 'downloads' },
+  { key: 'games', label: 'Games', icon: '🎮', table: 'games', tab: 'games' },
+  { key: 'badges', label: 'Badges', icon: '🏆', table: 'badges', tab: 'badges' },
+  { key: 'categories', label: 'Categories', icon: '🏷️', table: 'categories', tab: 'categories' },
+  { key: 'faqs', label: 'Support FAQs', icon: '❓', table: 'support_faqs', tab: 'support_faqs' },
+] as const;
+
+// Sidebar parent menu for tabs that live under a collapsible section,
+// so a shortcut can expand the right menu before switching.
+const TAB_PARENT_MENU: Record<string, string> = {
+  curriculum: 'learning_path',
+  slide_builder: 'learning_path',
+  categories: 'taxonomy',
+  downloads: 'assets',
+  games: 'assets',
+  videos: 'assets',
+};
+
+interface PopularActivity {
+  key: string;
+  label: string;
+  sessions: number;
+  minutes: number;
+}
+
+interface OverviewExtra {
+  content: Record<string, number | null>;
+  newToday: number | null;
+  newWeek: number | null;
+  newMonth: number | null;
+  activeToday: number | null;
+  activeWeek: number | null;
+  popular: PopularActivity[] | null;
+  countries: { country: string; count: number }[] | null;
+}
+
+const EMPTY_OVERVIEW_EXTRA: OverviewExtra = {
+  content: {},
+  newToday: null,
+  newWeek: null,
+  newMonth: null,
+  activeToday: null,
+  activeWeek: null,
+  popular: null,
+  countries: null,
+};
+
 export default function SuperAdminDashboard() {
   const router = useRouter();
   // Responsive shell: on phone-width layouts the sidebar stacks above
@@ -99,11 +168,159 @@ export default function SuperAdminDashboard() {
     }
   }, []);
 
+  // Extended overview stats. Every block fails soft on its own: a
+  // failed query leaves its numbers null, which the UI renders as '—'
+  // instead of crashing the dashboard.
+  const [overviewExtra, setOverviewExtra] = useState<OverviewExtra>(EMPTY_OVERVIEW_EXTRA);
+
+  const fetchOverviewExtra = useCallback(async () => {
+    const extra: OverviewExtra = { ...EMPTY_OVERVIEW_EXTRA, content: {} };
+
+    // Content counts (head-count queries against the real tables).
+    await Promise.all(
+      CONTENT_CARDS.map(async card => {
+        try {
+          const { count, error } = await supabase
+            .from(card.table)
+            .select('id', { count: 'exact', head: true });
+          extra.content[card.key] = error ? null : (count ?? null);
+        } catch {
+          extra.content[card.key] = null;
+        }
+      })
+    );
+
+    const now = new Date();
+    const dayStart = startOfDay(now);
+    const weekStart = startOfWeek(now);
+    const monthStart = startOfMonth(now);
+
+    // Growth: new registrations (user_profiles + sub_accounts created_at).
+    try {
+      const [profileRes, subRes] = await Promise.all([
+        supabase.from('user_profiles').select('created_at'),
+        supabase.from('sub_accounts').select('created_at'),
+      ]);
+      if (!profileRes.error && !subRes.error) {
+        const stamps = [...(profileRes.data || []), ...(subRes.data || [])]
+          .map(r => new Date(r.created_at).getTime())
+          .filter(t => !Number.isNaN(t));
+        extra.newToday = stamps.filter(t => t >= dayStart.getTime()).length;
+        extra.newWeek = stamps.filter(t => t >= weekStart.getTime()).length;
+        extra.newMonth = stamps.filter(t => t >= monthStart.getTime()).length;
+      }
+    } catch {
+      // Leave the growth numbers as '—'.
+    }
+
+    // Active learners: distinct student_ids in activity_logs.
+    try {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('student_id, created_at')
+        .gte('created_at', weekStart.toISOString());
+      if (!error && data) {
+        const weekIds = new Set<string>();
+        const todayIds = new Set<string>();
+        data.forEach(r => {
+          weekIds.add(r.student_id);
+          if (new Date(r.created_at).getTime() >= dayStart.getTime()) todayIds.add(r.student_id);
+        });
+        extra.activeWeek = weekIds.size;
+        extra.activeToday = todayIds.size;
+      }
+    } catch {
+      // Leave the activity numbers as '—'.
+    }
+
+    // Most popular activities: group the latest activity records by
+    // type + target, then resolve target ids to content titles.
+    try {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('activity_type, target_id, duration_seconds')
+        .order('created_at', { ascending: false })
+        .limit(5000);
+      if (!error && data) {
+        const groups = new Map<string, { type: string; targetId: string | null; sessions: number; seconds: number }>();
+        data.forEach(r => {
+          const key = `${r.activity_type}:${r.target_id || 'none'}`;
+          const g = groups.get(key) || { type: r.activity_type, targetId: r.target_id, sessions: 0, seconds: 0 };
+          g.sessions += 1;
+          g.seconds += Number(r.duration_seconds) || 0;
+          groups.set(key, g);
+        });
+        const top = [...groups.values()].sort((a, b) => b.sessions - a.sessions).slice(0, 5);
+
+        const titleFor = async (table: string, ids: string[]) => {
+          const map = new Map<string, string>();
+          if (ids.length === 0) return map;
+          const { data: rows, error: titleError } = await supabase.from(table).select('id, title').in('id', ids);
+          if (!titleError) (rows || []).forEach(row => map.set(row.id, row.title));
+          return map;
+        };
+        const [lessonTitles, videoTitles, gameTitles] = await Promise.all([
+          titleFor('curriculum_lessons', top.filter(g => g.type === 'lesson_slide' && g.targetId).map(g => g.targetId as string)),
+          titleFor('video_lectures', top.filter(g => g.type === 'video' && g.targetId).map(g => g.targetId as string)),
+          titleFor('games', top.filter(g => g.type === 'game' && g.targetId).map(g => g.targetId as string)),
+        ]);
+
+        extra.popular = top.map(g => {
+          let label: string;
+          if (g.type === 'lesson_slide') label = `📚 Lesson: ${g.targetId ? lessonTitles.get(g.targetId) || 'Untitled lesson' : 'General'}`;
+          else if (g.type === 'video') label = `📺 Video: ${g.targetId ? videoTitles.get(g.targetId) || 'Untitled video' : 'General'}`;
+          else if (g.type === 'game') label = `🎮 Game: ${g.targetId ? gameTitles.get(g.targetId) || 'Untitled game' : 'General'}`;
+          else label = `${g.type}${g.targetId ? '' : ': General'}`;
+          return {
+            key: `${g.type}:${g.targetId || 'none'}`,
+            label,
+            sessions: g.sessions,
+            minutes: Math.round(g.seconds / 60),
+          };
+        });
+      }
+    } catch {
+      // Leave the popular list as '—'.
+    }
+
+    // Where users are from: country values on registered user profiles.
+    // (sub_accounts has no country column - students sit under their
+    // school/manager account - so this is honestly a profile breakdown.)
+    try {
+      const { data, error } = await supabase.from('user_profiles').select('country');
+      if (!error && data) {
+        const counts = new Map<string, number>();
+        data.forEach(r => {
+          const c = (r.country || '').trim();
+          if (c) counts.set(c, (counts.get(c) || 0) + 1);
+        });
+        extra.countries = [...counts.entries()]
+          .map(([country, count]) => ({ country, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 8);
+      }
+    } catch {
+      // Leave the country list as '—'.
+    }
+
+    setOverviewExtra(extra);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      await fetchOverviewCounts();
+      await Promise.all([fetchOverviewCounts(), fetchOverviewExtra()]);
     })();
-  }, [fetchOverviewCounts]);
+  }, [fetchOverviewCounts, fetchOverviewExtra]);
+
+  // Shortcut navigation: switch tab and expand its sidebar parent menu
+  // when the tab lives under a collapsible section.
+  const goToTab = useCallback((tabId: string) => {
+    const parent = TAB_PARENT_MENU[tabId];
+    if (parent) {
+      setExpandedMenus(prev => ({ ...prev, [parent]: true }));
+    }
+    setActiveTab(tabId);
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -117,26 +334,133 @@ export default function SuperAdminDashboard() {
 
   const renderMainContent = () => {
     switch (activeTab) {
-      case 'overview':
+      case 'overview': {
+        const maxCountryCount = overviewExtra.countries && overviewExtra.countries.length > 0
+          ? overviewExtra.countries[0].count
+          : 0;
         return (
-          <View className="space-y-6">
+          <View className="space-y-6 gap-6">
             <Text className="text-2xl font-bold text-text-primary mb-2">Platform Overview</Text>
+
+            {/* Platform totals - tap through to Users & Organizations */}
             <View className="flex-row flex-wrap gap-4">
-              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Orgs</Text>
                 <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.orgs ?? '—'}</Text>
-              </View>
-              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+                <Text className="text-xs font-semibold text-brand mt-1">Open Users & Organizations →</Text>
+              </Pressable>
+              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Active Students</Text>
                 <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.activeStudents ?? '—'}</Text>
-              </View>
-              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+                <Text className="text-xs font-semibold text-brand mt-1">Open Users & Organizations →</Text>
+              </Pressable>
+              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Users</Text>
                 <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.totalUsers ?? '—'}</Text>
+                <Text className="text-xs font-semibold text-brand mt-1">Open Users & Organizations →</Text>
+              </Pressable>
+            </View>
+
+            {/* Content counts with shortcuts into each admin section */}
+            <View>
+              <Text className="text-lg font-bold text-text-primary mb-3">Content</Text>
+              <View className="flex-row flex-wrap gap-4">
+                {CONTENT_CARDS.map(card => (
+                  <Pressable
+                    key={card.key}
+                    onPress={() => goToTab(card.tab)}
+                    className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]"
+                  >
+                    <Text className="text-2xl mb-1">{card.icon}</Text>
+                    <Text className="text-slate-500 text-xs font-bold uppercase mb-1">{card.label}</Text>
+                    <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.content[card.key] ?? '—'}</Text>
+                    <Text className="text-xs font-semibold text-brand mt-1">Open →</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Growth & recent activity */}
+            <View>
+              <Text className="text-lg font-bold text-text-primary mb-3">Growth & Activity</Text>
+              <View className="flex-row flex-wrap gap-4">
+                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                  <Text className="text-slate-500 text-xs font-bold uppercase mb-1">New Users Today</Text>
+                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.newToday ?? '—'}</Text>
+                </View>
+                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                  <Text className="text-slate-500 text-xs font-bold uppercase mb-1">New Users This Week</Text>
+                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.newWeek ?? '—'}</Text>
+                </View>
+                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                  <Text className="text-slate-500 text-xs font-bold uppercase mb-1">New Users This Month</Text>
+                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.newMonth ?? '—'}</Text>
+                </View>
+                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                  <Text className="text-slate-500 text-xs font-bold uppercase mb-1">Active Learners Today</Text>
+                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.activeToday ?? '—'}</Text>
+                </View>
+                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                  <Text className="text-slate-500 text-xs font-bold uppercase mb-1">Active Learners This Week</Text>
+                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.activeWeek ?? '—'}</Text>
+                </View>
+              </View>
+              <Text className="text-xs text-slate-400 mt-2">
+                New users count registered accounts (user profiles + students) created in the period; active learners are distinct students with recorded activity.
+              </Text>
+            </View>
+
+            {/* Most popular activities + where users are from */}
+            <View className="flex-col lg:flex-row gap-4">
+              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1">
+                <Text className="font-bold text-[#0A192F] text-base">Most Popular Activities</Text>
+                <Text className="text-xs text-slate-400 mt-1 mb-4">Top 5 by recorded sessions (from the latest 5,000 activity records).</Text>
+                {overviewExtra.popular === null ? (
+                  <Text className="text-slate-400">—</Text>
+                ) : overviewExtra.popular.length === 0 ? (
+                  <Text className="text-slate-400 italic">No activity recorded yet.</Text>
+                ) : (
+                  <View className="space-y-3 gap-3">
+                    {overviewExtra.popular.map((item, i) => (
+                      <View key={item.key} className="flex-row items-center justify-between gap-3">
+                        <Text className="text-sm text-text-primary flex-1">{i + 1}. {item.label}</Text>
+                        <Text className="text-sm font-bold text-[#0A192F]">{item.sessions} sessions • {item.minutes} mins</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1">
+                <Text className="font-bold text-[#0A192F] text-base">Where Users Are From</Text>
+                <Text className="text-xs text-slate-400 mt-1 mb-4">Countries recorded on registered user profiles. Students learn under their school&apos;s account, so they are counted through it.</Text>
+                {overviewExtra.countries === null ? (
+                  <Text className="text-slate-400">—</Text>
+                ) : overviewExtra.countries.length === 0 ? (
+                  <Text className="text-slate-400 italic">No countries recorded on profiles yet.</Text>
+                ) : (
+                  <View className="space-y-3 gap-3">
+                    {overviewExtra.countries.map(row => (
+                      <View key={row.country}>
+                        <View className="flex-row items-center justify-between mb-1">
+                          <Text className="text-sm text-text-primary">{row.country}</Text>
+                          <Text className="text-sm font-bold text-[#0A192F]">{row.count}</Text>
+                        </View>
+                        <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <View
+                            className="h-2 bg-[#D4AF37] rounded-full"
+                            style={{ width: `${maxCountryCount > 0 ? Math.round((row.count / maxCountryCount) * 100) : 0}%` }}
+                          />
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             </View>
           </View>
         );
+      }
       
       case 'categories':
         return <CategoriesManager />;

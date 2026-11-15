@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import { useSafeBack } from '../../lib/useSafeBack';
 
 interface DownloadItem {
   id: string;
@@ -12,6 +13,7 @@ interface DownloadItem {
 }
 
 export default function DownloadsGallery() {
+  const goBack = useSafeBack();
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -59,6 +61,9 @@ export default function DownloadsGallery() {
     <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="w-full max-w-5xl mx-auto">
+        <Pressable onPress={goBack} className="self-start px-4 py-2 bg-slate-200 rounded-lg mb-4">
+          <Text className="font-bold text-slate-700">← Back</Text>
+        </Pressable>
         <View className="mb-8">
           <Text className="text-4xl font-bold text-text-primary mb-2">Resources</Text>
           <Text className="text-lg text-text-secondary">Download worksheets, guides, and study materials.</Text>

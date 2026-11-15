@@ -1,5 +1,6 @@
 import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import * as Speech from 'expo-speech';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -281,8 +282,23 @@ export default function LessonPlayer() {
     return () => {
       playerRef.current?.release();
       playerRef.current = null;
+      try {
+        Speech.stop();
+      } catch {
+        // TTS is a nicety, never a blocker.
+      }
     };
   }, []);
+
+  // Never let the device's voice keep talking over the next slide (or
+  // over the completion screen).
+  useEffect(() => {
+    try {
+      Speech.stop();
+    } catch {
+      // TTS is a nicety, never a blocker.
+    }
+  }, [currentIndex, finished]);
 
   const playAudio = useCallback((url: string | null | undefined) => {
     if (!url) return;
@@ -297,6 +313,34 @@ export default function LessonPlayer() {
       console.log('Audio playback error:', error);
     }
   }, []);
+
+  // Text-to-speech fallback: lessons whose slides carry no recorded
+  // audio (every demo lesson, and any admin lesson built without
+  // uploads) would otherwise be completely silent. The device's voice
+  // reads the text aloud instead, in English.
+  const speakText = useCallback((text: string | null | undefined) => {
+    const spoken = (text || '').trim();
+    if (!spoken) return;
+    try {
+      Speech.stop();
+      Speech.speak(spoken, { language: 'en' });
+    } catch (error) {
+      console.log('Speech error:', error);
+    }
+  }, []);
+
+  // Recorded audio wins whenever a slide actually has some; only an
+  // empty audio_url falls back to speaking the text.
+  const playOrSpeak = useCallback(
+    (url: string | null | undefined, text: string | null | undefined) => {
+      if (url) {
+        playAudio(url);
+      } else {
+        speakText(text);
+      }
+    },
+    [playAudio, speakText]
+  );
 
   const feedbackHaptic = useCallback((correct: boolean) => {
     if (Platform.OS === 'web') return;
@@ -472,7 +516,7 @@ export default function LessonPlayer() {
 
   const handlePanelTap = useCallback(
     (slide: Slide, panel: SlidePanel) => {
-      playAudio(panel.audio_url);
+      playOrSpeak(panel.audio_url, panel.text);
       const attempt = attempts[slide.id] || EMPTY_ATTEMPT;
 
       if (slide.slide_type === 'grid_4up') {
@@ -495,7 +539,7 @@ export default function LessonPlayer() {
         });
       }
     },
-    [attempts, playAudio, feedbackHaptic, feedbackAnim, updateAttempt]
+    [attempts, playOrSpeak, feedbackHaptic, feedbackAnim, updateAttempt]
   );
 
   const handleTypingCheck = useCallback(
@@ -577,9 +621,11 @@ export default function LessonPlayer() {
               {slide.correct_answer}
             </Text>
           ) : null}
-          {slide.audio_url ? (
+          {slide.audio_url || slide.correct_answer || slide.prompt_text ? (
             <Pressable
-              onPress={() => playAudio(slide.audio_url)}
+              onPress={() =>
+                playOrSpeak(slide.audio_url, slide.correct_answer || slide.prompt_text)
+              }
               className="px-6 py-3 bg-brand rounded-full"
             >
               <Text className="text-white font-bold text-base">🔊 Listen</Text>
@@ -648,6 +694,16 @@ export default function LessonPlayer() {
           ) : null}
           {slide.prompt_text ? (
             <Text className="text-lg text-slate-500 text-center mb-4">{slide.prompt_text}</Text>
+          ) : null}
+          {slide.audio_url || slide.prompt_text || slide.correct_answer ? (
+            <Pressable
+              onPress={() =>
+                playOrSpeak(slide.audio_url, slide.prompt_text || slide.correct_answer)
+              }
+              className="px-6 py-3 bg-brand rounded-full mb-4"
+            >
+              <Text className="text-white font-bold text-base">🔊 Listen</Text>
+            </Pressable>
           ) : null}
           <TextInput
             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-lg text-slate-800 mb-4"

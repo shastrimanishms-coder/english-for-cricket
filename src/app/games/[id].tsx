@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import Animated, {
@@ -13,6 +13,7 @@ import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
+import { useSafeBack } from '../../lib/useSafeBack';
 
 interface GameDetails {
   id: string;
@@ -77,7 +78,7 @@ function BadgeToast({ badge, onDone }: { badge: AwardedBadge; onDone: () => void
 
 export default function GamePlayer() {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
+  const goBack = useSafeBack();
   const [game, setGame] = useState<GameDetails | null>(null);
   const [loading, setLoading] = useState(true);
   // A failed fetch (network/RLS) is NOT the same as a missing game: the
@@ -167,7 +168,7 @@ export default function GamePlayer() {
         >
           <Text className="font-bold text-slate-900">Try Again</Text>
         </Pressable>
-        <Pressable onPress={() => router.back()} className="px-6 py-3">
+        <Pressable onPress={goBack} className="px-6 py-3">
           <Text className="font-bold text-slate-300">Go Back</Text>
         </Pressable>
       </SafeAreaView>
@@ -178,7 +179,7 @@ export default function GamePlayer() {
     return (
       <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
         <Text className="text-white text-xl font-bold mb-4">Game not found.</Text>
-        <Pressable onPress={() => router.back()} className="px-6 py-3 bg-white rounded-lg">
+        <Pressable onPress={goBack} className="px-6 py-3 bg-white rounded-lg">
           <Text className="font-bold text-slate-900">Go Back</Text>
         </Pressable>
       </SafeAreaView>
@@ -188,7 +189,7 @@ export default function GamePlayer() {
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
       <View className="flex-row items-center justify-between p-4 bg-black/50 z-10 absolute top-0 left-0 right-0">
-        <Pressable onPress={() => router.back()} className="px-4 py-2 bg-white/10 rounded-full border border-white/20">
+        <Pressable onPress={goBack} className="px-4 py-2 bg-white/10 rounded-full border border-white/20">
           <Text className="text-white font-bold text-sm">← Back to Arcade</Text>
         </Pressable>
         <Text className="text-white font-bold text-lg flex-1 text-center mx-2" numberOfLines={1}>{game.title}</Text>
@@ -215,7 +216,7 @@ export default function GamePlayer() {
             <Pressable onPress={retryEmbed} className="px-6 py-3 bg-white rounded-lg mb-3">
               <Text className="font-bold text-slate-900">Retry</Text>
             </Pressable>
-            <Pressable onPress={() => router.back()} className="px-6 py-3">
+            <Pressable onPress={goBack} className="px-6 py-3">
               <Text className="font-bold text-slate-300">Go Back</Text>
             </Pressable>
           </View>

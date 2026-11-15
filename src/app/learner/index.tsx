@@ -79,6 +79,14 @@ const LEARNING_MODULES = [
     icon: '📺',
   },
   {
+    id: 'speaking',
+    title: 'Speaking Practice',
+    description: 'Listen to real cricket English, record your own voice, and practise saying it out loud.',
+    cta: 'start speaking >',
+    imageColor: '#FEF3C7',
+    icon: '🎙️',
+  },
+  {
     id: 'profile',
     title: 'Student Profile',
     description: 'Manage your profile, PIN, see your earned badges, and track your progress.',
@@ -129,6 +137,9 @@ export default function LearnerDashboard() {
         break;
       case 'path':
         router.push('/learner/path');
+        break;
+      case 'speaking':
+        router.push('/learner/speaking');
         break;
       case 'profile':
         router.push('/learner/profile');
