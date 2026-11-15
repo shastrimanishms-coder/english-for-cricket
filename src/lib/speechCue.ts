@@ -75,7 +75,13 @@ export function speakWithCallback(text: string, onDone?: () => void): void {
     onDone?.();
   };
   const words = spoken.split(/\s+/).length;
-  const timeoutMs = Math.min(9000, Math.max(1600, words * 480 + 1000));
+  // Generous on purpose: network voices (Chrome on Linux especially)
+  // can speak much slower than this estimate, and firing early opens
+  // the microphone while the model line is still playing - the
+  // recogniser then hears the app instead of the learner. The real
+  // onDone event wins whenever the platform reports it; this timer
+  // is only the safety net for voices that never report finishing.
+  const timeoutMs = Math.min(12000, Math.max(2200, words * 650 + 1800));
   setTimeout(fire, timeoutMs);
   try {
     Speech.stop();

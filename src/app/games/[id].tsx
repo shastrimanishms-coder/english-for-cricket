@@ -86,6 +86,14 @@ export default function GamePlayer() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [embedStatus, setEmbedStatus] = useState<EmbedStatus>('loading');
   const [embedKey, setEmbedKey] = useState(0);
+  // Uploaded HTML games are rendered from their file CONTENT, not by
+  // pointing the frame at the file URL: an upload stored with a wrong
+  // content type (some browsers report .html files as text/plain, and
+  // the storage server then serves the source as plain text) would
+  // otherwise show the game's code instead of running it. Fetching
+  // the text and handing it to the frame directly is immune to the
+  // stored content type, for this upload and any future one.
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
   // Badges newly earned by opening this game, toasted one at a time.
   const [badgeToasts, setBadgeToasts] = useState<AwardedBadge[]>([]);
 
@@ -140,6 +148,38 @@ export default function GamePlayer() {
     setEmbedStatus('loading');
     setEmbedKey((k) => k + 1);
   }, []);
+
+  // For an uploaded .html game, fetch its content (see htmlContent
+  // above). External embeds (Scratch and friends) keep the plain URL
+  // path. A failed fetch falls back to the URL rather than erroring:
+  // the frame may still manage where the fetch could not.
+  useEffect(() => {
+    if (!game) return;
+    const url = game.game_url || '';
+    if (!/\.html?($|[?#])/i.test(url)) return;
+    let live = true;
+    (async () => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return;
+        const text = await response.text();
+        if (!live || !text) return;
+        // Relative assets inside the game resolve against the
+        // uploaded file's folder, not the app page.
+        const base = url.slice(0, url.lastIndexOf('/') + 1);
+        const withBase = /<head[^>]*>/i.test(text)
+          ? text.replace(/<head[^>]*>/i, (m) => `${m}<base href="${base}">`)
+          : `<base href="${base}">${text}`;
+        setHtmlContent(withBase);
+        setEmbedStatus('ready');
+      } catch {
+        // Fall back to loading by URL.
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [game, embedKey]);
 
   if (loading) {
     return (
@@ -225,19 +265,38 @@ export default function GamePlayer() {
         ) : (
           <>
             {Platform.OS === 'web' ? (
-              <iframe
-                key={embedKey}
-                src={game.game_url}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-                title={game.title}
-                allowFullScreen
-                onLoad={() => setEmbedStatus('ready')}
-                onError={() => setEmbedStatus('error')}
-              />
+              htmlContent !== null ? (
+                <iframe
+                  key={embedKey}
+                  srcDoc={htmlContent}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  title={game.title}
+                  allowFullScreen
+                  onLoad={() => setEmbedStatus('ready')}
+                  onError={() => setEmbedStatus('error')}
+                />
+              ) : (
+                <iframe
+                  key={embedKey}
+                  src={game.game_url}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                  title={game.title}
+                  allowFullScreen
+                  onLoad={() => setEmbedStatus('ready')}
+                  onError={() => setEmbedStatus('error')}
+                />
+              )
             ) : (
               <WebView
                 key={embedKey}
-                source={{ uri: game.game_url }}
+                source={
+                  htmlContent !== null
+                    ? {
+                        html: htmlContent,
+                        baseUrl: game.game_url.slice(0, game.game_url.lastIndexOf('/') + 1),
+                      }
+                    : { uri: game.game_url }
+                }
                 className="flex-1"
                 allowsInlineMediaPlayback
                 bounces={false}

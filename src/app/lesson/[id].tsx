@@ -411,13 +411,19 @@ function GridSpeakSlide({
   );
 
   // Start the sequence on arrival; leaving the slide cancels it.
+  // The token is REPLACED on every run of this effect: if a previous
+  // cleanup has marked the shared token cancelled (an effect re-run,
+  // a dev double-invoke), reusing it would silently kill every
+  // sequence that follows and the microphone would never open.
   useEffect(() => {
-    const token = mountTokenRef.current;
+    const token = { cancelled: false };
+    mountTokenRef.current = token;
     startSequence(0);
     return () => {
       token.cancelled = true;
       clearTimer();
       cancelSpeechCue();
+      speechRef.current.abort();
     };
   }, [startSequence]);
 
@@ -718,6 +724,10 @@ function SpeakRepeatSlide({
       cancelled = true;
       if (timer) clearTimeout(timer);
       cancelSpeechCue();
+      // Never leave a recognition session running into the next
+      // slide: a leftover session makes the next start collide with
+      // it and the new slide hears nothing.
+      speechRef.current.abort();
     };
   }, [visitKey, attempt.answered, playModelThen, slide.audio_url, target]);
 

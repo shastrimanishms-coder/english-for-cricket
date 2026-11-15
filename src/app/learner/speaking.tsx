@@ -94,6 +94,17 @@ export default function SpeakingPractice() {
   const [turnIndex, setTurnIndex] = useState(0);
   const [scenarioDone, setScenarioDone] = useState(false);
   const [scenarioScores, setScenarioScores] = useState<Record<number, number>>({});
+  // The full word-by-word score of the learner's best attempt at
+  // each scenario turn, so the conversation bubbles above can show
+  // their answer colour-coded (green / orange / red per word).
+  const [scenarioWordScores, setScenarioWordScores] = useState<Record<number, SpeechScore>>({});
+  const wordScoresRef = useRef<Record<number, SpeechScore>>({});
+  // Scenario flow is automatic now (no "Your Turn" button): the
+  // partner's line ending advances the conversation, and a passed
+  // line advances after a short pause. scenarioNext is defined
+  // further down; the speech callbacks reach it through this ref.
+  const scenarioNextRef = useRef<(() => Promise<void>) | null>(null);
+  const passTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Recording state for the current item. Recording is strictly
   // best-effort: when the microphone is denied or unsupported,
@@ -291,6 +302,20 @@ export default function SpeakingPractice() {
           ...prev,
           [target.index]: Math.max(prev[target.index] ?? 0, score.accuracy),
         }));
+        const bestSoFar = wordScoresRef.current[target.index];
+        if (!bestSoFar || score.accuracy >= bestSoFar.accuracy) {
+          wordScoresRef.current = { ...wordScoresRef.current, [target.index]: score };
+          setScenarioWordScores(wordScoresRef.current);
+        }
+        if (score.passed) {
+          // A passed line moves the conversation on by itself after
+          // a short pause to enjoy the score; scenarioNext clears
+          // this timer if the learner taps Next first.
+          if (passTimerRef.current) clearTimeout(passTimerRef.current);
+          passTimerRef.current = setTimeout(() => {
+            void scenarioNextRef.current?.();
+          }, 2000);
+        }
       } else {
         setLineScores((prev) => ({
           ...prev,
@@ -371,14 +396,17 @@ export default function SpeakingPractice() {
   }, [mode, index, finished, loading, items, current, cueLearnerTurn]);
 
   // Scenarios: the other person's lines are spoken as their turn
-  // arrives; the learner's turns get the full model-ding-microphone
-  // cue.
+  // arrives and the conversation then moves on BY ITSELF - there is
+  // no "Your Turn" button to tap. The learner's turns get the full
+  // model-ding-microphone cue.
   useEffect(() => {
     if (mode !== 'scenario' || !scenario || scenarioDone) return;
     const turn = scenario.turns[turnIndex];
     if (!turn) return;
     if (turn.speaker === 'other') {
-      speakWithCallback(turn.text);
+      speakWithCallback(turn.text, () => {
+        void scenarioNextRef.current?.();
+      });
       return () => cancelSpeechCue();
     }
     return cueLearnerTurn(turn.text);
@@ -545,6 +573,8 @@ export default function SpeakingPractice() {
       setScenario(next);
       setTurnIndex(0);
       setScenarioScores({});
+      wordScoresRef.current = {};
+      setScenarioWordScores({});
       setScenarioDone(false);
       setMode('scenario');
     },
@@ -566,6 +596,10 @@ export default function SpeakingPractice() {
   }, [resetTurnState, speech]);
 
   const scenarioNext = useCallback(async () => {
+    if (passTimerRef.current) {
+      clearTimeout(passTimerRef.current);
+      passTimerRef.current = null;
+    }
     if (isRecording) await stopRecording();
     if (speech.listening) speech.abort();
     resetTurnState();
@@ -580,8 +614,16 @@ export default function SpeakingPractice() {
     resetTurnState();
     setTurnIndex(0);
     setScenarioScores({});
+    wordScoresRef.current = {};
+    setScenarioWordScores({});
     setScenarioDone(false);
   }, [resetTurnState]);
+
+  // Keep the ref pointed at the latest scenarioNext for the speech
+  // callbacks (auto-advance after the partner speaks / after a pass).
+  useEffect(() => {
+    scenarioNextRef.current = scenarioNext;
+  });
 
   const scenarioScoreValues = Object.values(scenarioScores);
   const scenarioAvg =
@@ -743,7 +785,28 @@ export default function SpeakingPractice() {
                           ? ` • ${scenarioScores[i]}%`
                           : ''}
                       </Text>
-                      <Text className="text-slate-600">{t.text}</Text>
+                      {t.speaker === 'learner' && scenarioWordScores[i] ? (
+                        <View className="flex-row flex-wrap gap-x-1.5">
+                          {scenarioWordScores[i].words.map((w, wi) => (
+                            <Text
+                              key={`${w.word}-${wi}`}
+                              className={`font-bold ${
+                                w.status === 'correct'
+                                  ? 'text-emerald-600'
+                                  : w.status === 'close'
+                                    ? 'text-amber-600'
+                                    : w.status === 'wrong'
+                                      ? 'text-red-500'
+                                      : 'text-red-300'
+                              }`}
+                            >
+                              {w.word}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text className="text-slate-600">{t.text}</Text>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -777,16 +840,10 @@ export default function SpeakingPractice() {
                 ) : null}
 
                 {scenarioTurn.speaker === 'other' ? (
-                  <Pressable
-                    onPress={() => {
-                      (async () => {
-                        await scenarioNext();
-                      })();
-                    }}
-                    className="w-full max-w-md px-6 py-4 bg-[#0A192F] rounded-full items-center mt-3"
-                  >
-                    <Text className="text-white font-bold text-lg">Your Turn →</Text>
-                  </Pressable>
+                  <Text className="text-slate-400 text-sm text-center mt-3 max-w-md">
+                    🎧 Listen… when {scenario.otherName} finishes, it&apos;s your turn
+                    automatically — just wait for the beep.
+                  </Text>
                 ) : (
                   <>
                     {/* Automatic speech check, where the device supports it */}
@@ -811,11 +868,16 @@ export default function SpeakingPractice() {
                           )}
                         </>
                       ) : (
-                        <Pressable onPress={startCheck} className="px-8 py-3 bg-[#0A192F] rounded-full">
-                          <Text className="text-white font-bold text-base">
-                            🎙️ Speak &amp; Check My Voice
+                        <View className="items-center">
+                          <Text className="text-slate-400 text-sm text-center">
+                            🎧 After the beep, just speak — the microphone opens by itself.
                           </Text>
-                        </Pressable>
+                          <Pressable onPress={startCheck} className="px-3 py-2">
+                            <Text className="text-slate-400 font-bold underline text-sm">
+                              Tap to speak now
+                            </Text>
+                          </Pressable>
+                        </View>
                       )
                     ) : null}
                     {checkError && speech.supported ? (
@@ -1024,11 +1086,16 @@ export default function SpeakingPractice() {
                     )}
                   </>
                 ) : (
-                  <Pressable onPress={startCheck} className="px-8 py-3 bg-[#0A192F] rounded-full">
-                    <Text className="text-white font-bold text-base">
-                      🎙️ Speak &amp; Check My Voice
+                  <View className="items-center">
+                    <Text className="text-slate-400 text-sm text-center">
+                      🎧 After the beep, just speak — the microphone opens by itself.
                     </Text>
-                  </Pressable>
+                    <Pressable onPress={startCheck} className="px-3 py-2">
+                      <Text className="text-slate-400 font-bold underline text-sm">
+                        Tap to speak now
+                      </Text>
+                    </Pressable>
+                  </View>
                 )
               ) : null}
               {checkError && speech.supported ? (

@@ -64,6 +64,9 @@ function mapErrorCode(code: string | undefined): SpeechCheckError {
       return 'permission';
     case 'no-speech':
     case 'nomatch':
+    case 'aborted':
+      // An abort we did not ask for (browser stopped the session)
+      // reads to the learner as "nothing was heard".
       return 'no-speech';
     case 'network':
       return 'network';
@@ -106,6 +109,14 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
   const subscriptionsRef = useRef<{ remove: () => void }[]>([]);
   const finalSeenRef = useRef(false);
   const activeRef = useRef(false);
+  // Mic permission is asked once per hook instance: asking again on
+  // every start spams the console on web (requestPermissionsAsync is
+  // a no-op there) and can disturb a session that is about to begin.
+  const permissionRef = useRef<'unknown' | 'granted' | 'denied'>('unknown');
+  // Set when WE stop/abort a session on purpose, so the 'aborted'
+  // error the recogniser then reports is swallowed instead of being
+  // shown to the learner as a failure.
+  const deliberateRef = useRef(false);
 
   const cleanupListeners = useCallback(() => {
     for (const sub of subscriptionsRef.current) {
@@ -147,21 +158,50 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
       return;
     }
 
-    try {
-      if (mod.requestPermissionsAsync) {
-        const permission = await mod.requestPermissionsAsync();
-        if (!permission.granted) {
-          callbacksRef.current.onError('permission');
-          return;
+    if (permissionRef.current === 'denied') {
+      callbacksRef.current.onError('permission');
+      return;
+    }
+    if (permissionRef.current === 'unknown') {
+      try {
+        if (mod.requestPermissionsAsync) {
+          const permission = await mod.requestPermissionsAsync();
+          permissionRef.current = permission.granted ? 'granted' : 'denied';
+          if (!permission.granted) {
+            callbacksRef.current.onError('permission');
+            return;
+          }
+        } else {
+          permissionRef.current = 'granted';
         }
+      } catch {
+        // Permission APIs differ per platform; a failure here usually
+        // surfaces again as a start error, which is mapped below.
+        permissionRef.current = 'granted';
       }
-    } catch {
-      // Permission APIs differ per platform; a failure here usually
-      // surfaces again as a start error, which is mapped below.
+    }
+
+    // Rapid slide flows (lessons especially) can ask for a new
+    // session while the previous one is still tearing down; starting
+    // over the top of it makes Chrome abort BOTH sessions and the
+    // learner hears nothing. Kill the old session first and give it
+    // a beat to die before the new one begins.
+    if (activeRef.current) {
+      deliberateRef.current = true;
+      try {
+        mod.abort();
+      } catch {
+        // Already dead: fine.
+      }
+      activeRef.current = false;
+      setListening(false);
+      cleanupListeners();
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     cleanupListeners();
     finalSeenRef.current = false;
+    deliberateRef.current = false;
     setInterim('');
 
     const addSub = (event: string, listener: (e: any) => void) => {
@@ -194,6 +234,8 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
       setListening(false);
       activeRef.current = false;
       cleanupListeners();
+      // An abort we requested ourselves is not a failure.
+      if (event?.error === 'aborted' && deliberateRef.current) return;
       callbacksRef.current.onError(mapErrorCode(event?.error));
     });
     addSub('end', () => {
@@ -222,6 +264,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
   }, [cleanupListeners]);
 
   const stop = useCallback(() => {
+    deliberateRef.current = true;
     try {
       loadSpeechModule()?.ExpoSpeechRecognitionModule?.stop();
     } catch {
@@ -230,6 +273,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
   }, []);
 
   const abort = useCallback(() => {
+    deliberateRef.current = true;
     try {
       loadSpeechModule()?.ExpoSpeechRecognitionModule?.abort();
     } catch {
