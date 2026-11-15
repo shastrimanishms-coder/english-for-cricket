@@ -5,9 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import AnimatedButton from '../components/ui/AnimatedButton';
 import { supabase } from '../lib/supabase';
+import { useAppLogo } from '../lib/useAppLogo';
 
 export default function LandingPage() {
   const router = useRouter();
+
+  // Header logo: an admin-uploaded logo (Admin → System Settings) when
+  // one is set, otherwise the bundled crest. A remote logo that fails
+  // to load falls back to the crest via onError.
+  const { source: logoSource, onError: logoOnError } = useAppLogo();
 
   // Footer legal links point at CMS pages (/p/<slug>). Only show a
   // legal link once its page actually exists in `pages`, so visitors
@@ -54,7 +60,8 @@ export default function LandingPage() {
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center px-4 py-4 md:p-6">
           <View className="flex-row items-center gap-3">
             <Image
-              source={require('../../assets/images/logo-crest.png')}
+              source={logoSource}
+              onError={logoOnError}
               className="w-11 h-11 rounded-full"
               resizeMode="contain"
             />

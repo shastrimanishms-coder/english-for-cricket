@@ -10,14 +10,20 @@ interface UserProfile {
   created_at: string;
 }
 
+// Bundled default logo (KYCO crest), shown whenever no custom logo is set.
+const BUNDLED_LOGO = require('../../../assets/images/logo-crest.png');
+
 export default function SystemSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Settings State
-  const [logoUrl, setLogoUrl] = useState('');
-  const [selectedLogo, setSelectedLogo] = useState<any>(null);
   const [supportEmail, setSupportEmail] = useState('');
+  // App / Web Logo: public URL stored in site_settings.app_logo_url.
+  // Empty means the app uses the bundled default crest.
+  const [appLogoUrl, setAppLogoUrl] = useState('');
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -28,7 +34,7 @@ export default function SystemSettings() {
 
       const settingsMap: Record<string, string> = {};
       settingsData?.forEach(s => settingsMap[s.key] = s.value);
-      setLogoUrl(settingsMap['site_logo_url'] || '');
+      setAppLogoUrl(settingsMap['app_logo_url'] || '');
       setSupportEmail(settingsMap['support_email'] || 'support@englishforcricket.com');
 
       const { data: usersData, error: usersError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
@@ -44,16 +50,9 @@ export default function SystemSettings() {
     })();
   }, [fetchData]);
 
-  const pickLogo = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true });
-      if (!result.canceled && result.assets) setSelectedLogo(result.assets[0]);
-    } catch (error) { console.log(error); }
-  };
-
-  const uploadLogo = async (file: any) => {
+  const uploadLogoFile = async (file: any) => {
     const fileExt = file.name.split('.').pop();
-    const fileName = `logo_${Date.now()}.${fileExt}`;
+    const fileName = `app-logo_${Date.now()}.${fileExt}`;
     let fileBody;
     if (Platform.OS === 'web') {
       const res = await fetch(file.uri);
@@ -67,18 +66,46 @@ export default function SystemSettings() {
     return data.publicUrl;
   };
 
+  // Pick an image, upload it, and save it as the live app/web logo in
+  // one go — the header picks the new logo up immediately, no rebuild.
+  const handleUploadLogo = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true });
+      if (result.canceled || !result.assets) return;
+      setLogoBusy(true);
+      const publicUrl = await uploadLogoFile(result.assets[0]);
+      const { error } = await supabase.from('site_settings').upsert([{ key: 'app_logo_url', value: publicUrl }]);
+      if (error) throw error;
+      setAppLogoUrl(publicUrl);
+      setLogoPreviewFailed(false);
+      Alert.alert('Success', 'Logo updated. The new logo is now live in the app and website header.');
+    } catch (error: any) { Alert.alert('Logo Upload Failed', error.message); }
+    finally { setLogoBusy(false); }
+  };
+
+  const handleResetLogo = async () => {
+    const doReset = async () => {
+      try {
+        setLogoBusy(true);
+        const { error } = await supabase.from('site_settings').upsert([{ key: 'app_logo_url', value: '' }]);
+        if (error) throw error;
+        setAppLogoUrl('');
+        setLogoPreviewFailed(false);
+        Alert.alert('Success', 'Default logo restored.');
+      } catch (error: any) { Alert.alert('Reset Failed', error.message); }
+      finally { setLogoBusy(false); }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Go back to the bundled default logo?')) doReset();
+    } else {
+      Alert.alert('Use Default Logo?', 'The bundled crest will be shown again.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Yes', onPress: doReset }]);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
-      let finalLogoUrl = logoUrl;
-      if (selectedLogo) {
-        finalLogoUrl = await uploadLogo(selectedLogo);
-        setLogoUrl(finalLogoUrl);
-        setSelectedLogo(null);
-      }
-
       const updates = [
-        { key: 'site_logo_url', value: finalLogoUrl },
         { key: 'support_email', value: supportEmail.trim() }
       ];
 
@@ -105,6 +132,10 @@ export default function SystemSettings() {
     }
   };
 
+  // Effective logo for the previews: the uploaded one when set (and
+  // loadable), otherwise the bundled default crest.
+  const previewLogoSource = appLogoUrl && !logoPreviewFailed ? { uri: appLogoUrl } : BUNDLED_LOGO;
+
   return (
     <View className="space-y-8 gap-8 pb-12">
       <View className="flex-row justify-between items-center">
@@ -127,26 +158,55 @@ export default function SystemSettings() {
             />
           </View>
           
-          <View className="flex-1">
-            <Text className="text-sm font-semibold text-text-secondary mb-2">Site Logo</Text>
-            <View className="flex-row items-center gap-4">
-              <Pressable onPress={pickLogo} className="px-4 py-3 bg-[#0A192F] rounded-lg">
-                <Text className="text-white font-bold text-sm">Upload Logo</Text>
-              </Pressable>
-              <View>
-                {selectedLogo ? <Text className="text-brand font-semibold text-xs" numberOfLines={1}>{selectedLogo.name}</Text>
-                : logoUrl ? <Image source={{ uri: logoUrl }} className="w-24 h-8 object-contain bg-slate-100 rounded" />
-                : <Text className="text-slate-400 text-xs">No logo set</Text>}
-              </View>
-            </View>
-            <Text className="text-xs text-slate-400 mt-2">Upload a transparent PNG for the main navigation bar.</Text>
-          </View>
         </View>
 
         <View className="flex-row justify-end mt-2 pt-4 border-t border-slate-100">
           <View className="w-48">
             <AnimatedButton title={saving ? "Saving Config..." : "Save Configuration"} onPress={handleSaveSettings} disabled={saving} variant="primary" size="sm" />
           </View>
+        </View>
+      </View>
+
+      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
+        <View>
+          <Text className="text-lg font-bold text-[#0A192F]">App / Web Logo</Text>
+          <Text className="text-xs text-slate-400 mt-2">
+            PNG with transparency works best. The logo appears in the website and app header.
+            Festive or seasonal versions can be swapped in anytime and take effect immediately
+            for web and app visitors — no rebuild needed.
+          </Text>
+        </View>
+
+        <View className="flex-col md:flex-row gap-4">
+          <View className="flex-1">
+            <Text className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">On light</Text>
+            <View className="bg-slate-100 border border-slate-200 rounded-xl h-24 items-center justify-center p-3">
+              <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} className="w-full h-full" resizeMode="contain" />
+            </View>
+          </View>
+          <View className="flex-1">
+            <Text className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">On dark</Text>
+            <View className="bg-[#0A192F] border border-slate-200 rounded-xl h-24 items-center justify-center p-3">
+              <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} className="w-full h-full" resizeMode="contain" />
+            </View>
+          </View>
+        </View>
+
+        <Text className="text-sm text-slate-500">
+          {appLogoUrl && !logoPreviewFailed
+            ? 'A custom logo is currently live in the header.'
+            : 'Currently using the bundled default crest.'}
+        </Text>
+
+        <View className="flex-row items-center gap-4 flex-wrap">
+          <View className="w-48">
+            <AnimatedButton title={logoBusy ? "Working..." : "Upload New Logo"} onPress={handleUploadLogo} disabled={logoBusy} variant="primary" size="sm" />
+          </View>
+          {appLogoUrl ? (
+            <Pressable onPress={handleResetLogo} disabled={logoBusy} className="px-3 py-1.5 rounded border bg-slate-100 border-slate-200">
+              <Text className="text-xs font-semibold text-slate-500">Use Default Logo</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
