@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, LayoutAnimation, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
 import BadgesManager from '../../components/admin/BadgesManager';
 import CategoriesManager from '../../components/admin/CategoriesManager';
@@ -68,6 +68,36 @@ export default function SuperAdminDashboard() {
     assets: false,
   });
 
+  // Overview counts - null shows '—' when a count cannot be loaded.
+  const [overviewCounts, setOverviewCounts] = useState<{
+    orgs: number | null;
+    activeStudents: number | null;
+    totalUsers: number | null;
+  }>({ orgs: null, activeStudents: null, totalUsers: null });
+
+  const fetchOverviewCounts = useCallback(async () => {
+    try {
+      const [orgRes, studentRes, userRes] = await Promise.all([
+        supabase.from('organizations').select('id', { count: 'exact', head: true }),
+        supabase.from('sub_accounts').select('id', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
+      ]);
+      setOverviewCounts({
+        orgs: orgRes.error ? null : (orgRes.count ?? null),
+        activeStudents: studentRes.error ? null : (studentRes.count ?? null),
+        totalUsers: userRes.error ? null : (userRes.count ?? null),
+      });
+    } catch {
+      // Counts are decorative on the overview; leave them as '—'.
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchOverviewCounts();
+    })();
+  }, [fetchOverviewCounts]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace('/');
@@ -87,11 +117,15 @@ export default function SuperAdminDashboard() {
             <View className="flex-row flex-wrap gap-4">
               <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Orgs</Text>
-                <Text className="text-3xl font-bold text-[#0A192F]">0</Text>
+                <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.orgs ?? '—'}</Text>
               </View>
               <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Active Students</Text>
-                <Text className="text-3xl font-bold text-[#0A192F]">0</Text>
+                <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.activeStudents ?? '—'}</Text>
+              </View>
+              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+                <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Users</Text>
+                <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.totalUsers ?? '—'}</Text>
               </View>
             </View>
           </View>

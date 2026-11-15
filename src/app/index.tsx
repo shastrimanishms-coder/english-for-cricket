@@ -1,11 +1,39 @@
 import { Link, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEffect, useState } from 'react';
 import { Image, ScrollView, Text, View } from 'react-native';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import { supabase } from '../lib/supabase';
 
 export default function LandingPage() {
   const router = useRouter();
-  
+
+  // Footer legal links point at CMS pages (/p/<slug>). Only show a
+  // legal link once its page actually exists in `pages`, so visitors
+  // never land on "Page Not Found" for content that has not been
+  // created yet. If the check itself fails, keep showing the links
+  // (the previous behaviour).
+  const [existingLegalSlugs, setExistingLegalSlugs] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('pages')
+          .select('slug')
+          .in('slug', ['terms-and-conditions', 'privacy-policy']);
+        if (!error && data) {
+          setExistingLegalSlugs(data.map((row: { slug: string }) => row.slug));
+        }
+      } catch {
+        // Keep the links visible if the check cannot be made.
+      }
+    })();
+  }, []);
+
+  const showLegalLink = (slug: string) =>
+    existingLegalSlugs === null || existingLegalSlugs.includes(slug);
+
   const player = useVideoPlayer('https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4', player => {
     player.loop = true;
     player.muted = true;
@@ -91,17 +119,21 @@ export default function LandingPage() {
       <View className="w-full bg-surface-background border-t border-slate-200">
         <View className="max-w-7xl w-full mx-auto flex-col items-center p-8 md:p-12">
           <View className="flex-row flex-wrap justify-center gap-4 md:gap-8 mb-6">
-            {/* Note the /p/ prefix matching the slug you created in the Page Manager */}
-            <Link href="/p/terms-and-conditions" asChild>
-              <Text className="text-text-secondary font-semibold hover:text-brand">Terms & Conditions</Text>
+            <Link href="/support" asChild>
+              <Text className="text-text-secondary font-semibold hover:text-brand">Support</Text>
             </Link>
-            <Link href="/p/privacy-policy" asChild>
-              <Text className="text-text-secondary font-semibold hover:text-brand">Privacy Policy</Text>
-            </Link>
-            {/* TODO: /support and /contact routes don't exist yet (the code
-                comment here previously linked to them, which typed routes
-                reject). Build a support viewer over `support_faqs` and
-                re-add these links when those routes exist. */}
+            {/* Legal pages live in the CMS (/p/<slug>); each link is
+                shown only once that page exists - see the check above. */}
+            {showLegalLink('terms-and-conditions') && (
+              <Link href="/p/terms-and-conditions" asChild>
+                <Text className="text-text-secondary font-semibold hover:text-brand">Terms & Conditions</Text>
+              </Link>
+            )}
+            {showLegalLink('privacy-policy') && (
+              <Link href="/p/privacy-policy" asChild>
+                <Text className="text-text-secondary font-semibold hover:text-brand">Privacy Policy</Text>
+              </Link>
+            )}
           </View>
           <Text className="text-slate-400 text-sm text-center">
             © 2026 Kansai Youth Cricket Organization. All rights reserved.

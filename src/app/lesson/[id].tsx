@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { awardLessonBadges } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 
@@ -221,6 +222,10 @@ export default function LessonPlayer() {
       if (activityError) {
         console.log('Lesson activity not logged:', activityError.message);
       }
+
+      // Badge awarding v1 (lesson/module conditions). Runs whether the
+      // writes above landed or failed soft, and itself fails soft.
+      await awardLessonBadges(identity, lesson);
     },
     [lesson]
   );

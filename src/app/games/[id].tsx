@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { supabase } from '../../lib/supabase';
+import { useActivityLogger } from '../../lib/useActivityLogger';
 
 interface GameDetails {
   id: string;
@@ -10,71 +11,87 @@ interface GameDetails {
   game_url: string;
 }
 
+type EmbedStatus = 'loading' | 'ready' | 'error';
+
 export default function GamePlayer() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [game, setGame] = useState<GameDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  // Mount timestamp for playtime telemetry. Kept in a ref (set inside the
-  // effect) so no impure call happens during render.
-  const startTimeRef = useRef<number>(0);
+  // A failed fetch (network/RLS) is NOT the same as a missing game: the
+  // two states render differently (retry vs. plain "not found").
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [embedStatus, setEmbedStatus] = useState<EmbedStatus>('loading');
+  const [embedKey, setEmbedKey] = useState(0);
+
+  // Playtime telemetry for both identity kinds (see useActivityLogger).
+  // Starts once the game row is loaded; fails soft until migration
+  // 20261115000008 (log_activity RPC) has been run.
+  useActivityLogger({ activityType: 'game', targetId: game?.id ?? null });
 
   const fetchGameDetails = useCallback(async () => {
     try {
+      setLoading(true);
+      setFetchError(null);
       const { data, error } = await supabase
         .from('games')
         .select('id, title, game_url')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setGame(data);
-    } catch (error) {
+      setEmbedStatus('loading');
+    } catch (error: any) {
       console.error('Error fetching game:', error);
+      setFetchError(error?.message || 'Something went wrong while loading this game.');
+      setGame(null);
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  const logPlaytime = useCallback(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return; // Only log for authenticated users
-
-      // Check if they are a student (sub_account) by looking up their profile
-      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single();
-      if (profile?.role !== 'individual_learner') return;
-
-      const durationSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      if (durationSeconds < 10) return; // Ignore bounces under 10 seconds
-
-      await supabase.from('activity_logs').insert([{
-        student_id: session.user.id,
-        activity_type: 'game',
-        target_id: id,
-        duration_seconds: durationSeconds
-      }]);
-    } catch (error) {
-      console.log('Telemetry error:', error);
-    }
-  }, [id]);
-
   useEffect(() => {
-    startTimeRef.current = Date.now();
     (async () => {
       await fetchGameDetails();
     })();
+  }, [fetchGameDetails]);
 
-    // Telemetry: Log playtime when the component unmounts
-    return () => {
-      logPlaytime();
-    };
-  }, [fetchGameDetails, logPlaytime]);
+  const retryEmbed = useCallback(() => {
+    setEmbedStatus('loading');
+    setEmbedKey((k) => k + 1);
+  }, []);
 
   if (loading) {
     return (
       <View className="flex-1 bg-slate-900 items-center justify-center">
         <ActivityIndicator size="large" color="#ffffff" />
+      </View>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <View className="flex-1 bg-slate-900 items-center justify-center p-6">
+        <Text className="text-white text-xl font-bold mb-2 text-center">
+          Couldn&apos;t load this game
+        </Text>
+        <Text className="text-slate-400 text-center mb-6">
+          Something went wrong while loading. Check your connection and try again.
+        </Text>
+        <Pressable
+          onPress={() => {
+            (async () => {
+              await fetchGameDetails();
+            })();
+          }}
+          className="px-6 py-3 bg-white rounded-lg mb-3"
+        >
+          <Text className="font-bold text-slate-900">Try Again</Text>
+        </Pressable>
+        <Pressable onPress={() => router.back()} className="px-6 py-3">
+          <Text className="font-bold text-slate-300">Go Back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -101,20 +118,52 @@ export default function GamePlayer() {
       </View>
 
       <View className="flex-1 pt-16">
-        {Platform.OS === 'web' ? (
-          <iframe 
-            src={game.game_url} 
-            style={{ width: '100%', height: '100%', border: 'none' }} 
-            title={game.title}
-            allowFullScreen
-          />
+        {embedStatus === 'error' ? (
+          <View className="flex-1 items-center justify-center p-6">
+            <Text className="text-white text-xl font-bold mb-2 text-center">
+              This game couldn&apos;t be loaded
+            </Text>
+            <Text className="text-slate-400 text-center mb-6">
+              The game itself failed to load. You can try again, or pick a different game.
+            </Text>
+            <Pressable onPress={retryEmbed} className="px-6 py-3 bg-white rounded-lg mb-3">
+              <Text className="font-bold text-slate-900">Retry</Text>
+            </Pressable>
+            <Pressable onPress={() => router.back()} className="px-6 py-3">
+              <Text className="font-bold text-slate-300">Go Back</Text>
+            </Pressable>
+          </View>
         ) : (
-          <WebView 
-            source={{ uri: game.game_url }} 
-            className="flex-1"
-            allowsInlineMediaPlayback
-            bounces={false}
-          />
+          <>
+            {Platform.OS === 'web' ? (
+              <iframe
+                key={embedKey}
+                src={game.game_url}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                title={game.title}
+                allowFullScreen
+                onLoad={() => setEmbedStatus('ready')}
+                onError={() => setEmbedStatus('error')}
+              />
+            ) : (
+              <WebView
+                key={embedKey}
+                source={{ uri: game.game_url }}
+                className="flex-1"
+                allowsInlineMediaPlayback
+                bounces={false}
+                onLoadEnd={() => setEmbedStatus('ready')}
+                onError={() => setEmbedStatus('error')}
+                onHttpError={() => setEmbedStatus('error')}
+              />
+            )}
+            {embedStatus === 'loading' ? (
+              <View className="absolute inset-0 items-center justify-center bg-slate-900">
+                <ActivityIndicator size="large" color="#ffffff" />
+                <Text className="text-slate-400 mt-3">Loading game…</Text>
+              </View>
+            ) : null}
+          </>
         )}
       </View>
     </View>

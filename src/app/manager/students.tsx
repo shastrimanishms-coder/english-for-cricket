@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -37,6 +38,15 @@ export default function StudentManagement() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgCode, setOrgCode] = useState<string>('');
   const [students, setStudents] = useState<Student[]>([]);
+
+  // PINs are masked in the list by default; tapping a PIN reveals it
+  // (display-only - the value is already in the fetched row).
+  const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
+  const [showSlips, setShowSlips] = useState(false);
+
+  const togglePinReveal = (id: string) => {
+    setRevealedPins(prev => ({ ...prev, [id]: !prev[id] }));
+  };
   
   // Form State
   const [showForm, setShowForm] = useState(false);
@@ -285,12 +295,23 @@ export default function StudentManagement() {
               Manage student accounts. You can edit their profiles, view their PINs, or copy credentials below.
             </Text>
             {!showForm && (
-              <View className="w-full md:w-48">
-                <AnimatedButton 
-                  title="+ Add New Student" 
-                  onPress={openAddForm} 
-                  variant="primary" 
-                />
+              <View className="flex-row gap-3">
+                {students.length > 0 && (
+                  <View className="w-36 md:w-40">
+                    <AnimatedButton
+                      title="🖨 Print Slips"
+                      onPress={() => setShowSlips(true)}
+                      variant="outline"
+                    />
+                  </View>
+                )}
+                <View className="w-full md:w-48">
+                  <AnimatedButton
+                    title="+ Add New Student"
+                    onPress={openAddForm}
+                    variant="primary"
+                  />
+                </View>
               </View>
             )}
           </View>
@@ -402,9 +423,14 @@ export default function StudentManagement() {
                       <View className="bg-slate-100 px-3 py-1 rounded-md">
                         <Text className="font-mono text-xs text-slate-600">User: {student.username}</Text>
                       </View>
-                      <View className="bg-green-100 px-3 py-1 rounded-md">
-                        <Text className="font-mono text-xs text-green-800 font-bold">PIN: {student.hashed_pin}</Text>
-                      </View>
+                      <Pressable
+                        onPress={() => togglePinReveal(student.id)}
+                        className="bg-green-100 px-3 py-1 rounded-md"
+                      >
+                        <Text className="font-mono text-xs text-green-800 font-bold">
+                          PIN: {revealedPins[student.id] ? student.hashed_pin : '••••'} {revealedPins[student.id] ? '🙈' : '👁'}
+                        </Text>
+                      </Pressable>
                       
                       <Pressable 
                         onPress={() => copyCredentials(student.username, student.hashed_pin)}
@@ -438,6 +464,65 @@ export default function StudentManagement() {
 
         </View>
       </ScrollView>
+
+      {/* Login Slips - one printable card per active student.
+          On web the Print button calls window.print(); the @media
+          print rules in global.css isolate #login-slips so only the
+          slips reach the paper. On native this is a preview only. */}
+      <Modal visible={showSlips} animationType="slide" onRequestClose={() => setShowSlips(false)}>
+        <View className="flex-1 bg-white">
+          <View className="flex-row justify-between items-center p-4 border-b border-slate-200">
+            <Text className="text-lg font-bold text-text-primary">Login Slips ({students.length})</Text>
+            <View className="flex-row gap-3">
+              {Platform.OS === 'web' && (
+                <Pressable onPress={() => window.print()} className="px-4 py-2 bg-brand rounded-lg">
+                  <Text className="text-white font-bold text-sm">Print</Text>
+                </Pressable>
+              )}
+              <Pressable onPress={() => setShowSlips(false)} className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200">
+                <Text className="text-text-secondary font-bold text-sm">Close</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {Platform.OS !== 'web' && (
+            <View className="mx-4 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <Text className="text-amber-800 text-sm">
+                Printing works from the web version — open this page in a browser to print the slips. You can still read every login below.
+              </Text>
+            </View>
+          )}
+
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
+            <View nativeID="login-slips" className="max-w-3xl w-full mx-auto gap-4">
+              {students.map((student) => (
+                <View key={student.id} className="border-2 border-dashed border-slate-300 rounded-2xl p-5 break-inside-avoid bg-white">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-base font-bold tracking-widest uppercase text-text-primary">🏏 English for Cricket</Text>
+                    <Text className="text-xs text-text-secondary">Student Login Slip</Text>
+                  </View>
+                  <Text className="text-2xl font-bold text-text-primary mb-3">{student.display_name}</Text>
+                  <View className="flex-row gap-6 mb-4">
+                    <View>
+                      <Text className="text-xs font-bold text-text-secondary uppercase">Username</Text>
+                      <Text className="font-mono text-lg font-bold text-text-primary">{student.username}</Text>
+                    </View>
+                    <View>
+                      <Text className="text-xs font-bold text-text-secondary uppercase">Secret PIN</Text>
+                      <Text className="font-mono text-lg font-bold text-text-primary tracking-widest">{student.hashed_pin}</Text>
+                    </View>
+                  </View>
+                  <View className="border-t border-slate-100 pt-3">
+                    <Text className="text-sm text-text-secondary">1. Open English for Cricket and tap Log In.</Text>
+                    <Text className="text-sm text-text-secondary">2. Choose the “Student PIN” tab.</Text>
+                    <Text className="text-sm text-text-secondary">3. Type your Username and Secret PIN above. Keep this slip safe!</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

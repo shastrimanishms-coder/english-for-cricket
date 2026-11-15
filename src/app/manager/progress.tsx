@@ -16,6 +16,17 @@ interface StudentProgress {
   gender: string | null;
   avatar_url: string | null;
   badges: StudentBadge[];
+  playtimeSeconds: number;
+  lessonsCompleted: number;
+  accuracyPercent: number | null;
+}
+
+function formatPlaytime(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds} sec`;
+  if (totalSeconds < 3600) return `${Math.floor(totalSeconds / 60)} min`;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours} hrs`;
 }
 
 export default function LearningProgress() {
@@ -77,7 +88,58 @@ export default function LearningProgress() {
           const b = sb?.badges;
           return Array.isArray(b) ? b : b ? [b] : [];
         }) as StudentBadge[],
+        playtimeSeconds: 0,
+        lessonsCompleted: 0,
+        accuracyPercent: null,
       }));
+
+      // Real telemetry aggregates for these students. Each query fails
+      // soft on its own: if a table is unreachable (e.g. its RLS does not
+      // cover this manager), the affected figures simply stay at zero
+      // instead of breaking the whole dashboard.
+      const studentIds = formattedStudents.map((s) => s.id);
+      if (studentIds.length > 0) {
+        try {
+          const { data: logs, error: logsError } = await supabase
+            .from('activity_logs')
+            .select('student_id, duration_seconds')
+            .in('student_id', studentIds);
+          if (logsError) throw logsError;
+          const totals = new Map<string, number>();
+          for (const row of logs || []) {
+            totals.set(row.student_id, (totals.get(row.student_id) || 0) + (row.duration_seconds || 0));
+          }
+          for (const s of formattedStudents) {
+            s.playtimeSeconds = totals.get(s.id) || 0;
+          }
+        } catch (logsErr) {
+          console.log('Playtime totals unavailable:', logsErr);
+        }
+
+        try {
+          const { data: completions, error: completionsError } = await supabase
+            .from('lesson_completions')
+            .select('student_id, score_correct, score_total')
+            .eq('student_kind', 'sub_account')
+            .in('student_id', studentIds);
+          if (completionsError) throw completionsError;
+          const counts = new Map<string, number>();
+          const correct = new Map<string, number>();
+          const total = new Map<string, number>();
+          for (const row of completions || []) {
+            counts.set(row.student_id, (counts.get(row.student_id) || 0) + 1);
+            correct.set(row.student_id, (correct.get(row.student_id) || 0) + (row.score_correct || 0));
+            total.set(row.student_id, (total.get(row.student_id) || 0) + (row.score_total || 0));
+          }
+          for (const s of formattedStudents) {
+            s.lessonsCompleted = counts.get(s.id) || 0;
+            const t = total.get(s.id) || 0;
+            s.accuracyPercent = t > 0 ? Math.round(((correct.get(s.id) || 0) / t) * 100) : null;
+          }
+        } catch (completionsErr) {
+          console.log('Lesson completion totals unavailable:', completionsErr);
+        }
+      }
 
       setStudents(formattedStudents);
     } catch (error) {
@@ -141,15 +203,17 @@ export default function LearningProgress() {
                 <View className="flex-row flex-wrap gap-4 mb-6">
                   <View className="flex-1 min-w-[120px] bg-slate-50 p-4 rounded-xl border border-slate-100 items-center">
                     <Text className="text-xs font-bold text-slate-500 uppercase mb-1">Playtime</Text>
-                    <Text className="text-xl font-bold text-text-primary">0 hrs</Text>
+                    <Text className="text-xl font-bold text-text-primary">{formatPlaytime(student.playtimeSeconds)}</Text>
                   </View>
                   <View className="flex-1 min-w-[120px] bg-emerald-50 p-4 rounded-xl border border-emerald-100 items-center">
                     <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Accuracy</Text>
-                    <Text className="text-xl font-bold text-emerald-800">--%</Text>
+                    <Text className="text-xl font-bold text-emerald-800">
+                      {student.accuracyPercent !== null ? `${student.accuracyPercent}%` : '--%'}
+                    </Text>
                   </View>
                   <View className="flex-1 min-w-[120px] bg-blue-50 p-4 rounded-xl border border-blue-100 items-center">
                     <Text className="text-xs font-bold text-blue-600 uppercase mb-1">Lessons</Text>
-                    <Text className="text-xl font-bold text-blue-800">0</Text>
+                    <Text className="text-xl font-bold text-blue-800">{student.lessonsCompleted}</Text>
                   </View>
                 </View>
 

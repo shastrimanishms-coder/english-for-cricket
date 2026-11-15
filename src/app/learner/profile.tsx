@@ -1,9 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { supabase } from '../../lib/supabase';
+
+interface EarnedBadge {
+  title: string;
+  description: string | null;
+  image_url: string | null;
+}
 
 export default function StudentProfile() {
   const router = useRouter();
@@ -11,9 +17,36 @@ export default function StudentProfile() {
   const [updating, setUpdating] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [isEmailUser, setIsEmailUser] = useState(false);
+  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
   
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
+
+  // Location (email learners only - user_profiles carries the columns;
+  // PIN students' sub_accounts rows have none).
+  const [country, setCountry] = useState('');
+  const [region, setRegion] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+
+  // Earned badges for either identity kind. Fails soft: if the read is
+  // blocked (PIN students hold no session for the table's rules to check),
+  // the badges section simply stays hidden.
+  const loadBadges = useCallback(async (studentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('student_badges')
+        .select('badge_id, badges ( title, description, image_url )')
+        .eq('student_id', studentId);
+      if (error || !data) return;
+      const list: EarnedBadge[] = (data as any[]).flatMap((row) => {
+        const b = Array.isArray(row?.badges) ? row.badges[0] : row?.badges;
+        return b ? [{ title: b.title, description: b.description ?? null, image_url: b.image_url ?? null }] : [];
+      });
+      setEarnedBadges(list);
+    } catch {
+      // Badges are a nice-to-have on this screen; never break the profile.
+    }
+  }, []);
 
   const fetchProfileData = useCallback(async () => {
     try {
@@ -45,6 +78,7 @@ export default function StudentProfile() {
         }
         
         setIsEmailUser(false);
+        await loadBadges(targetId);
         setLoading(false);
         return; // CRITICAL: Stop here. Do not fall through to Email check.
       }
@@ -61,7 +95,10 @@ export default function StudentProfile() {
         if (error) throw error;
         if (data) {
           setProfile({ ...data, display_name: data.display_name || 'Individual Learner' });
+          setCountry(data.country || '');
+          setRegion(data.region || '');
           setIsEmailUser(true);
+          await loadBadges(session.user.id);
           setLoading(false);
           return;
         }
@@ -76,13 +113,31 @@ export default function StudentProfile() {
       console.error('Profile fetch error:', error.message);
       setLoading(false);
     }
-  }, [router]);
+  }, [router, loadBadges]);
 
   useEffect(() => {
     (async () => {
       await fetchProfileData();
     })();
   }, [fetchProfileData]);
+
+  const handleSaveLocation = async () => {
+    if (!profile?.id) return;
+    setSavingLocation(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ country: country.trim() || null, region: region.trim() || null })
+        .eq('id', profile.id);
+      if (error) throw error;
+      setProfile({ ...profile, country: country.trim() || null, region: region.trim() || null });
+      Alert.alert('Success', 'Your location has been saved.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setSavingLocation(false);
+    }
+  };
 
   const handleUpdatePin = async () => {
     if (newPin.length !== 4) {
@@ -168,6 +223,70 @@ export default function StudentProfile() {
             </View>
           </View>
         </View>
+
+        {/* Location (email learners only) */}
+        {isEmailUser && (
+          <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <Text className="text-xl font-bold text-[#0A192F] mb-4">My Location</Text>
+            <View className="space-y-4 gap-4">
+              <View>
+                <Text className="text-sm font-bold text-slate-700 mb-2">Country</Text>
+                <TextInput
+                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary"
+                  placeholder="e.g., Japan"
+                  value={country}
+                  onChangeText={setCountry}
+                  autoCapitalize="words"
+                />
+              </View>
+              <View>
+                <Text className="text-sm font-bold text-slate-700 mb-2">Region</Text>
+                <TextInput
+                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary"
+                  placeholder="e.g., Osaka"
+                  value={region}
+                  onChangeText={setRegion}
+                  autoCapitalize="words"
+                />
+              </View>
+              <View className="mt-2">
+                <AnimatedButton
+                  title={savingLocation ? "Saving..." : "Save Location"}
+                  onPress={handleSaveLocation}
+                  disabled={savingLocation}
+                  variant="primary"
+                />
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Earned Badges (hidden until the student earns one) */}
+        {earnedBadges.length > 0 && (
+          <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <Text className="text-xl font-bold text-[#0A192F] mb-4">My Badges</Text>
+            <View className="flex-row flex-wrap gap-4">
+              {earnedBadges.map((badge, idx) => (
+                <View key={idx} className="items-center w-24">
+                  {badge.image_url && badge.image_url.startsWith('http') ? (
+                    <Image
+                      source={{ uri: badge.image_url }}
+                      className="w-16 h-16 rounded-full border border-amber-200 bg-amber-50"
+                    />
+                  ) : (
+                    <View className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 items-center justify-center">
+                      <Text className="text-3xl">{badge.image_url || '🏆'}</Text>
+                    </View>
+                  )}
+                  <Text className="font-bold text-slate-700 text-sm text-center mt-2">{badge.title}</Text>
+                  {badge.description ? (
+                    <Text className="text-xs text-slate-400 text-center mt-0.5">{badge.description}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Security Settings (Only shown for PIN Students) */}
         {!isEmailUser && (

@@ -21,6 +21,10 @@ export default function RegisterScreen() {
   const [displayName, setDisplayName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
+  // Optional location - the sign-up trigger copies these into the
+  // profile (country/region), where the admin stats read them.
+  const [country, setCountry] = useState('');
+  const [region, setRegion] = useState('');
   
   // UI State
   const [loading, setLoading] = useState(false);
@@ -56,6 +60,8 @@ export default function RegisterScreen() {
             // Safely parse age to prevent NaN database errors
             age: role === 'individual_learner' && age ? parseInt(age, 10) : null,
             gender: role === 'individual_learner' ? gender : null,
+            country: country.trim() || null,
+            region: region.trim() || null,
           },
         },
       });
@@ -194,6 +200,24 @@ export default function RegisterScreen() {
               onChangeText={setPassword}
               secureTextEntry
             />
+            <View className="flex-row gap-4">
+              <TextInput
+                className="flex-1 bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                placeholder="Country (optional)"
+                placeholderTextColor="#94A3B8"
+                value={country}
+                onChangeText={setCountry}
+                autoCapitalize="words"
+              />
+              <TextInput
+                className="flex-1 bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                placeholder="Region (optional)"
+                placeholderTextColor="#94A3B8"
+                value={region}
+                onChangeText={setRegion}
+                autoCapitalize="words"
+              />
+            </View>
 
             {/* CONDITIONAL DEMOGRAPHICS (Only for Students) */}
             {role === 'individual_learner' && (

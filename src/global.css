@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Print: isolate the login slips sheet (manager students screen) so
+   only the slips reach the paper. The slips container carries
+   id="login-slips" via nativeID on web. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #login-slips,
+  #login-slips * {
+    visibility: visible;
+  }
+  #login-slips {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #ffffff;
+  }
+}

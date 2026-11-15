@@ -16,6 +16,7 @@ interface Video {
   category_id: string;
   video_url: string;
   thumbnail_url: string;
+  is_published: boolean;
 }
 
 export default function VideosManager() {
@@ -35,6 +36,7 @@ export default function VideosManager() {
 
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [selectedImage, setSelectedImage] = useState<any>(null);
+  const [isPublished, setIsPublished] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
@@ -53,8 +55,12 @@ export default function VideosManager() {
         setCategoryId(prev => prev || catData[0].id);
       }
 
+      // The learner gallery/player read from `video_lectures` (and
+      // filter on is_published), so the CMS writes there too. Uploaded
+      // files still live in the 'videos' storage bucket - only the
+      // table changed.
       const { data: vidData, error: vidError } = await supabase
-        .from('videos')
+        .from('video_lectures')
         .select('*')
         .order('created_at', { ascending: false });
         
@@ -154,25 +160,27 @@ export default function VideosManager() {
 
       if (editId) {
         const { error } = await supabase
-          .from('videos')
-          .update({ 
-            title: title.trim(), 
+          .from('video_lectures')
+          .update({
+            title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
             video_url: finalVideoUrl,
-            thumbnail_url: finalThumbUrl
+            thumbnail_url: finalThumbUrl,
+            is_published: isPublished
           })
           .eq('id', editId);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('videos')
-          .insert([{ 
-            title: title.trim(), 
+          .from('video_lectures')
+          .insert([{
+            title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
             video_url: finalVideoUrl,
-            thumbnail_url: finalThumbUrl
+            thumbnail_url: finalThumbUrl,
+            is_published: isPublished
           }]);
         if (error) throw error;
       }
@@ -193,8 +201,22 @@ export default function VideosManager() {
     setCategoryId(vid.category_id);
     setVideoUrl(vid.video_url);
     setThumbnailUrl(vid.thumbnail_url || '');
+    setIsPublished(vid.is_published !== false);
     setSelectedImage(null);
     setSelectedVideoFile(null);
+  };
+
+  const togglePublished = async (vid: Video) => {
+    try {
+      const { error } = await supabase
+        .from('video_lectures')
+        .update({ is_published: !vid.is_published })
+        .eq('id', vid.id);
+      if (error) throw error;
+      await fetchData();
+    } catch (error: any) {
+      Alert.alert('Update Failed', error.message);
+    }
   };
 
   const handleDelete = async (id: string, vidTitle: string, currentThumbUrl: string, currentVideoUrl: string) => {
@@ -212,7 +234,7 @@ export default function VideosManager() {
 
   const executeDelete = async (id: string, currentThumbUrl: string, currentVideoUrl: string) => {
     try {
-      const { error: dbError } = await supabase.from('videos').delete().eq('id', id);
+      const { error: dbError } = await supabase.from('video_lectures').delete().eq('id', id);
       if (dbError) throw dbError;
 
       const filesToDelete = [];
@@ -243,6 +265,7 @@ export default function VideosManager() {
     setDescription('');
     setVideoUrl('');
     setThumbnailUrl('');
+    setIsPublished(true);
     setSelectedImage(null);
     setSelectedVideoFile(null);
     if (categories.length > 0) setCategoryId(categories[0].id);
@@ -344,7 +367,7 @@ export default function VideosManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">2. Custom Thumbnail (Optional)</Text>
             <View className="flex-row items-center gap-4">
-              <Pressable 
+              <Pressable
                 onPress={pickImage}
                 className="px-4 py-3 bg-[#0A192F] rounded-lg"
               >
@@ -360,7 +383,31 @@ export default function VideosManager() {
                 )}
               </View>
             </View>
+            <View className="mt-4">
+              <Text className="text-xs text-slate-500 mb-1">...or paste a thumbnail image URL</Text>
+              <TextInput
+                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                placeholder="https://example.com/thumbnail.jpg"
+                value={thumbnailUrl}
+                onChangeText={setThumbnailUrl}
+                autoCapitalize="none"
+              />
+            </View>
           </View>
+        </View>
+
+        {/* Publish state: only published lectures appear in the learner gallery */}
+        <View className="flex-row items-center justify-between border-t border-slate-100 pt-4">
+          <View className="flex-1 pr-4">
+            <Text className="text-sm font-semibold text-text-secondary">Published</Text>
+            <Text className="text-xs text-slate-400 mt-0.5">Published lectures are visible to students. Drafts stay hidden.</Text>
+          </View>
+          <Pressable
+            onPress={() => setIsPublished(prev => !prev)}
+            className={`px-4 py-2.5 rounded-full ${isPublished ? 'bg-emerald-600' : 'bg-slate-300'}`}
+          >
+            <Text className="text-white font-bold text-sm">{isPublished ? '● Published' : '○ Draft'}</Text>
+          </Pressable>
         </View>
 
         <View className="flex-row justify-end gap-4 mt-2 border-t border-slate-100 pt-4">
@@ -407,7 +454,17 @@ export default function VideosManager() {
                   )}
                   <View>
                     <Text className="font-bold text-text-primary text-base">{vid.title}</Text>
-                    <Text className="text-brand text-xs font-bold uppercase tracking-wider mt-1">{catName}</Text>
+                    <View className="flex-row items-center gap-2 mt-1">
+                      <Text className="text-brand text-xs font-bold uppercase tracking-wider">{catName}</Text>
+                      <Pressable
+                        onPress={() => togglePublished(vid)}
+                        className={`px-2 py-0.5 rounded-full ${vid.is_published ? 'bg-emerald-100' : 'bg-slate-200'}`}
+                      >
+                        <Text className={`text-[10px] font-bold uppercase ${vid.is_published ? 'text-emerald-700' : 'text-slate-500'}`}>
+                          {vid.is_published ? 'Published' : 'Draft'}
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
                 
