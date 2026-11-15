@@ -1,0 +1,110 @@
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { supabase } from '../../lib/supabase';
+
+interface DownloadItem {
+  id: string;
+  title: string;
+  description: string;
+  file_url: string;
+  category: string;
+}
+
+export default function DownloadsGallery() {
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDownloads = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('downloads')
+          .select('id, title, description, file_url, categories(name)')
+          .eq('is_published', true)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        const formattedData = data?.map(item => ({
+          ...item,
+          category: item.categories ? (item.categories as any).name : 'Uncategorized'
+        }));
+        
+        setDownloads(formattedData || []);
+      } catch (error) {
+        console.error('Error fetching downloads:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDownloads();
+  }, []);
+
+  const handleDownload = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Error', 'Cannot open this file type on your device.');
+      }
+    } catch (error: any) {
+      Alert.alert('Download Failed', error.message);
+    }
+  };
+
+  return (
+    <View className="flex-1 bg-surface-background">
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
+        <View className="mb-8">
+          <Text className="text-4xl font-bold text-text-primary mb-2">Resources</Text>
+          <Text className="text-lg text-text-secondary">Download worksheets, guides, and study materials.</Text>
+        </View>
+
+        {loading ? (
+          <View className="py-20 items-center justify-center">
+            <ActivityIndicator size="large" color="#0A192F" />
+          </View>
+        ) : downloads.length === 0 ? (
+          <View className="py-20 items-center justify-center bg-white rounded-2xl border border-slate-200">
+            <Text className="text-6xl mb-4">📄</Text>
+            <Text className="text-xl font-bold text-text-primary mb-2">No Files Yet</Text>
+            <Text className="text-text-secondary">Check back soon for new resources!</Text>
+          </View>
+        ) : (
+          <View className="flex-col gap-4">
+            {downloads.map((item) => (
+              <View key={item.id} className="flex-col md:flex-row items-start md:items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm gap-4">
+                <View className="w-16 h-16 bg-blue-50 rounded-xl items-center justify-center border border-blue-100">
+                  <Text className="text-3xl">📥</Text>
+                </View>
+                
+                <View className="flex-1">
+                  {item.category && (
+                    <Text className="text-xs font-bold text-brand uppercase tracking-wider mb-1">
+                      {item.category}
+                    </Text>
+                  )}
+                  <Text className="text-lg font-bold text-text-primary mb-1">
+                    {item.title}
+                  </Text>
+                  <Text className="text-text-secondary text-sm" numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                </View>
+
+                <Pressable 
+                  onPress={() => handleDownload(item.file_url)}
+                  className="w-full md:w-auto px-6 py-3 bg-[#0A192F] rounded-lg items-center justify-center mt-2 md:mt-0"
+                >
+                  <Text className="text-white font-bold text-sm">Download</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}

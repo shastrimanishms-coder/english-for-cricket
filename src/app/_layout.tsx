@@ -1,18 +1,37 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import { View } from 'react-native';
+import '../global.css';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
-
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <View className="flex-1 bg-surface-background">
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#F8FAFC' },
+          animation: 'fade', 
+        }}
+      >
+        {/* Auth Routes */}
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="update-password" />
+        
+        {/* Dashboards */}
+        <Stack.Screen name="admin" />
+        <Stack.Screen name="manager" />
+        <Stack.Screen name="learner" />
+        
+        {/* Global Media Portals (Phase 1) */}
+        <Stack.Screen name="games" />
+        <Stack.Screen name="videos" />
+        <Stack.Screen name="downloads" />
+        
+        {/* Lesson Player (Phase 3) */}
+        <Stack.Screen name="lesson" />
+      </Stack>
+    </View>
   );
 }
