@@ -1,0 +1,165 @@
+-- ============================================================================
+-- 20261115000005_pin_hashing_OPTIONAL.sql
+--
+-- *** OPTIONAL - DO NOT RUN WITHOUT AN EXPLICIT DECISION BY SHASTRI ***
+-- *** This file is a TEMPLATE. Parts B2/B3 contain TODO placeholders    ***
+-- *** that MUST be completed from the live function definitions       ***
+-- *** before anything here is executed. Running it as-is would break  ***
+-- *** student PIN login.                                              ***
+--
+-- WHAT THIS WOULD FIX:
+-- sub_accounts.hashed_pin is a misnomer today: the value stored in it IS
+-- the student's PIN, effectively in plaintext. Evidence from the code:
+--   * src/app/manager/students.tsx inserts/updates hashed_pin with the
+--     raw 4-digit PIN the manager typed, and SELECTs it back (managers can
+--     view/copy each student's PIN - that is how parents get told the PIN).
+--   * The authenticate_student RPC compares the typed PIN against that
+--     stored value and returns the student row (the login payload included
+--     hashed_pin; the app now strips it from the on-device session copy,
+--     but the value still travels in the RPC response).
+-- Anyone who can read sub_accounts (a manager, or anyone if RLS ever
+-- slips) learns every student's working PIN.
+--
+-- WHAT CHANGES IF THIS IS COMPLETED AND RUN:
+--   (i)   Managers will NO LONGER be able to view or copy a student's
+--         existing PIN - only set a new one. (The students screen reads
+--         hashed_pin back; after hashing it would show a bcrypt string,
+--         so that screen should also stop displaying it.)
+--   (ii)  Existing students keep logging in with the SAME PINs - we hash
+--         the stored value; the PIN itself does not change. Nobody needs
+--         a new PIN issued.
+--   (iii) It needs the pgcrypto extension (crypt() / gen_salt()).
+--   (iv)  manager/students.tsx writes hashed_pin directly on insert and
+--         update. Part B4's trigger hashes those writes inside the
+--         database, so that screen keeps working unchanged - the manager
+--         types a PIN, the DB stores only its hash.
+--
+-- WHY THIS IS A TEMPLATE, NOT A FINISHED MIGRATION:
+-- authenticate_student and update_student_pin EXIST and WORK (verified
+-- 2026-11-15 with the real accounts), but their bodies live only in the
+-- hosted database - they are not in this repo, so they cannot be
+-- reconstructed exactly from code. Rewriting them from a guess risks
+-- breaking live PIN login (return shape, is_active checks, username
+-- normalisation, etc.). The safe path is: pull the real definitions
+-- (Part A), edit ONLY the PIN comparison/storage lines to use crypt(),
+-- and paste the edited bodies into Parts B2/B3.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- PART A - DO THIS FIRST (read-only). Run in SQL Editor and save the output:
+--
+--   select p.proname,
+--          pg_get_functiondef(p.oid) as definition
+--   from pg_proc p
+--   join pg_namespace n on n.oid = p.pronamespace
+--   where n.nspname = 'public'
+--     and p.proname in ('authenticate_student', 'update_student_pin');
+--
+-- Known call signatures from the app code (for orientation only):
+--   authenticate_student(p_username text, p_pin text)
+--     called from src/app/login.tsx; the result is used as the student
+--     session object (fields read: id / student_id, display_name,
+--     username, hashed_pin, is_active, created_at).
+--   update_student_pin(p_student_id uuid, p_current_pin text,
+--                      p_new_pin text) returns boolean
+--     called from src/app/learner/profile.tsx; true = PIN changed,
+--     false = current PIN did not match.
+-- ----------------------------------------------------------------------------
+
+-- ----------------------------------------------------------------------------
+-- PART B1 - Extension (safe on its own, but keep with the rest).
+-- ----------------------------------------------------------------------------
+-- create extension if not exists pgcrypto;
+
+-- ----------------------------------------------------------------------------
+-- PART B2 - authenticate_student: TEMPLATE - DO NOT RUN AS-IS.
+-- Take the real body from Part A. The ONLY change needed is the PIN
+-- comparison: replace the equivalent of
+--     hashed_pin = p_pin
+-- with
+--     hashed_pin = crypt(p_pin, hashed_pin)
+-- (crypt with the stored hash as salt extracts the salt and compares in
+-- constant shape.) Keep the return shape EXACTLY as the live function has
+-- it - login.tsx depends on it.
+-- ----------------------------------------------------------------------------
+-- create or replace function public.authenticate_student(
+--   p_username text,
+--   p_pin text
+-- )
+-- returns /* TODO-from-dashboard: copy the live RETURNS clause exactly */
+-- language /* TODO-from-dashboard: copy the live language (plpgsql/sql) */
+-- /* TODO-from-dashboard: copy volatility / security attributes exactly */
+-- as $$
+--   /* TODO-from-dashboard: paste the live body here, with the single
+--      comparison change described above. Do NOT invent a body. */
+-- $$;
+
+-- ----------------------------------------------------------------------------
+-- PART B3 - update_student_pin: TEMPLATE - DO NOT RUN AS-IS.
+-- Take the real body from Part A. The changes needed:
+--   * current-PIN check:  hashed_pin = crypt(p_current_pin, hashed_pin)
+--   * storing the new PIN: either set hashed_pin = p_new_pin and let the
+--     Part B4 trigger hash it, or set it directly:
+--         hashed_pin = crypt(p_new_pin, gen_salt('bf'))
+--     Pick ONE approach and use it consistently.
+-- Keep the boolean return contract: profile.tsx treats false as
+-- "current PIN incorrect".
+-- ----------------------------------------------------------------------------
+-- create or replace function public.update_student_pin(
+--   p_student_id uuid,
+--   p_current_pin text,
+--   p_new_pin text
+-- )
+-- returns boolean
+-- language /* TODO-from-dashboard */
+-- as $$
+--   /* TODO-from-dashboard: paste the live body here, edited as above. */
+-- $$;
+
+-- ----------------------------------------------------------------------------
+-- PART B4 - Hash-on-write trigger (complete; run together with B1-B3).
+-- Guarantees any FUTURE plaintext write to hashed_pin - e.g. the direct
+-- insert/update from manager/students.tsx - is stored hashed, so the app
+-- keeps working after the migration. Values that already look like bcrypt
+-- hashes ($2a$...) are left untouched.
+-- ----------------------------------------------------------------------------
+-- create or replace function public.hash_sub_account_pin()
+-- returns trigger
+-- language plpgsql
+-- as $$
+-- begin
+--   if new.hashed_pin is not null and new.hashed_pin not like '$2a$%' then
+--     new.hashed_pin := crypt(new.hashed_pin, gen_salt('bf'));
+--   end if;
+--   return new;
+-- end;
+-- $$;
+--
+-- drop trigger if exists hash_sub_account_pin on public.sub_accounts;
+-- create trigger hash_sub_account_pin
+--   before insert or update of hashed_pin on public.sub_accounts
+--   for each row
+--   execute function public.hash_sub_account_pin();
+
+-- ----------------------------------------------------------------------------
+-- PART B5 - One-time conversion of existing rows (complete; run ONCE,
+-- together with B1-B4, in the same session/transaction if possible).
+-- Hashes every stored PIN in place. The '$2a$%' guard makes a re-run skip
+-- rows that are already hashed. PINs are 4 digits (enforced by the app:
+-- login PIN field maxLength 4, profile.tsx requires exactly 4), so no real
+-- PIN can be mistaken for a bcrypt hash.
+-- ----------------------------------------------------------------------------
+-- update public.sub_accounts
+-- set hashed_pin = crypt(hashed_pin, gen_salt('bf'))
+-- where hashed_pin is not null
+--   and hashed_pin not like '$2a$%';
+
+-- ----------------------------------------------------------------------------
+-- AFTER RUNNING (verification):
+--   1. Log in as a student with an existing username + PIN -> must succeed.
+--   2. Change that PIN in the learner profile -> old PIN must fail,
+--      new PIN must succeed.
+--   3. As a manager, create a new student with a PIN -> that PIN must log
+--      in, and the hashed_pin column must show a $2a$... value.
+--   4. Confirm no screen shows a readable PIN any more (by design, i).
+-- ============================================================================
