@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { groupStudentsByClass } from '../../lib/studentGroups';
 import { supabase } from '../../lib/supabase';
 
 interface UserProfile {
@@ -32,6 +33,7 @@ interface SubAccount {
   created_at: string;
   marked_for_deletion_at: string | null;
   reminder_level: number;
+  class_name?: string | null; // migration 14 (absent until it is run)
 }
 
 // One row of the get_admin_user_stats() RPC (migration
@@ -106,6 +108,10 @@ export default function UsersManager() {
   // search query is present, matching branches render expanded.
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOrgs, setExpandedOrgs] = useState<Record<string, boolean>>({});
+  // Student rows are collapsed to name + ID by default; class/group
+  // sections inside an org start open and can be collapsed per org.
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
+  const [collapsedClassGroups, setCollapsedClassGroups] = useState<Record<string, boolean>>({});
   const [individualsExpanded, setIndividualsExpanded] = useState(false);
   const [unassignedExpanded, setUnassignedExpanded] = useState(false);
 
@@ -468,7 +474,7 @@ export default function UsersManager() {
   const searching = q.length > 0;
   const matchesText = (...vals: (string | null | undefined)[]) =>
     vals.some(v => !!v && v.toLowerCase().includes(q));
-  const studentMatches = (s: SubAccount) => matchesText(s.display_name, s.username, s.id);
+  const studentMatches = (s: SubAccount) => matchesText(s.display_name, s.username, s.id, s.class_name);
   const profileMatches = (p: UserProfile) =>
     matchesText(p.display_name, p.role, p.country, p.region, p.id, emailById.get(p.id));
 
@@ -512,51 +518,103 @@ export default function UsersManager() {
   const toggleOrg = (orgId: string) =>
     setExpandedOrgs(prev => ({ ...prev, [orgId]: !prev[orgId] }));
 
-  // One student card (stats + status + Archive/Delete), used under its
-  // organization and in the unassigned-students section.
+  const toggleStudent = (studentId: string) =>
+    setExpandedStudents(prev => ({ ...prev, [studentId]: !prev[studentId] }));
+
+  const toggleClassGroup = (key: string) =>
+    setCollapsedClassGroups(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // One student row: collapsed it shows just the name + ID (tap to
+  // expand for stats + status + Archive/Delete); a search auto-expands
+  // every matching row. Used under its organization (grouped by class)
+  // and in the unassigned-students section.
   const renderStudentRow = (student: SubAccount, managerProfile?: UserProfile) => {
     const stats = statsFor('sub_account', student.id);
     const daysInactive = getDaysSince(student.last_login_at);
     const isMarked = !!student.marked_for_deletion_at;
     const orgName = orgNameById.get(student.organization_id);
+    const rowOpen = searching || !!expandedStudents[student.id];
 
     return (
       <View key={student.id} className={`border p-3 rounded-xl ml-2 ${isMarked ? 'bg-red-50 border-red-200' : student.is_archived ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
-        <View className="flex-row items-center justify-between flex-wrap gap-3">
-          <View className="flex-row items-center gap-4">
+        <Pressable onPress={() => toggleStudent(student.id)} className="flex-row items-center justify-between flex-wrap gap-3">
+          <View className="flex-row items-center gap-4 flex-1">
             <Text className="text-slate-400 font-mono">└──</Text>
-            <View>
+            <View className="flex-1">
               <Text className="font-bold text-[#0A192F] text-base">{student.display_name || student.username}</Text>
               <Text className="text-xs text-slate-400 font-mono">{student.username}{orgName ? ` • ${orgName}` : ''}{managerProfile?.country ? ` • 📍 ${managerProfile.region ? managerProfile.region + ', ' : ''}${managerProfile.country}` : ''}</Text>
               {isMarked && <Text className="text-[10px] font-bold text-red-600 uppercase mt-0.5">Marked for Deletion</Text>}
               {student.is_archived && <Text className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">Archived</Text>}
             </View>
           </View>
+          <View className="flex-row items-center gap-2">
+            {daysInactive < 7 ? (
+              <Text className="text-xs font-bold text-emerald-600">Active</Text>
+            ) : (
+              <Text className={`text-xs font-bold ${isMarked ? 'text-red-600' : 'text-amber-600'}`}>{daysInactive}d ago</Text>
+            )}
+            <Text className="text-slate-400 text-sm">{rowOpen ? '▾' : '▸'}</Text>
+          </View>
+        </Pressable>
 
-          <View className="flex-row items-center gap-6 flex-wrap">
-            {renderStatsCells(stats)}
-            <View className="items-end w-20">
-              <Text className="text-xs font-bold text-slate-400 uppercase">Status</Text>
-              {daysInactive < 7 ? (
-                <Text className="text-sm font-bold text-emerald-600">Active</Text>
-              ) : (
-                <Text className={`text-sm font-bold ${isMarked ? 'text-red-600' : 'text-amber-600'}`}>{daysInactive}d ago</Text>
-              )}
+        {rowOpen && (
+          <View>
+            <View className="flex-row items-center gap-6 flex-wrap mt-3">
+              {renderStatsCells(stats)}
+              <View className="items-end w-20">
+                <Text className="text-xs font-bold text-slate-400 uppercase">Status</Text>
+                {daysInactive < 7 ? (
+                  <Text className="text-sm font-bold text-emerald-600">Active</Text>
+                ) : (
+                  <Text className={`text-sm font-bold ${isMarked ? 'text-red-600' : 'text-amber-600'}`}>{daysInactive}d ago</Text>
+                )}
+              </View>
+            </View>
+
+            <View className="flex-row justify-end gap-3 mt-3">
+              <Pressable onPress={() => toggleSubArchive(student)} className="px-3 py-1.5 bg-white rounded-lg border border-slate-200">
+                <Text className="text-text-secondary font-semibold text-xs">{student.is_archived ? 'Unarchive' : 'Archive'}</Text>
+              </Pressable>
+              <Pressable onPress={() => deleteSubAccountNow(student)} className="px-3 py-1.5 bg-red-50 rounded-lg border border-red-100">
+                <Text className="text-red-600 font-semibold text-xs">Delete Now</Text>
+              </Pressable>
             </View>
           </View>
-        </View>
-
-        <View className="flex-row justify-end gap-3 mt-3">
-          <Pressable onPress={() => toggleSubArchive(student)} className="px-3 py-1.5 bg-white rounded-lg border border-slate-200">
-            <Text className="text-text-secondary font-semibold text-xs">{student.is_archived ? 'Unarchive' : 'Archive'}</Text>
-          </Pressable>
-          <Pressable onPress={() => deleteSubAccountNow(student)} className="px-3 py-1.5 bg-red-50 rounded-lg border border-red-100">
-            <Text className="text-red-600 font-semibold text-xs">Delete Now</Text>
-          </Pressable>
-        </View>
+        )}
       </View>
     );
   };
+
+  // The students of one org, grouped under class / group / team
+  // headings (each collapsible; a search forces every group open).
+  const renderClassGroups = (orgId: string, list: SubAccount[], managerProfile?: UserProfile) => (
+    <View className="space-y-3 gap-3">
+      {groupStudentsByClass(list).map(group => {
+        const groupKey = `${orgId}|${group.label}`;
+        const groupOpen = searching || !collapsedClassGroups[groupKey];
+        return (
+          <View key={groupKey}>
+            <Pressable
+              onPress={() => toggleClassGroup(groupKey)}
+              className="flex-row items-center justify-between py-1.5 ml-2"
+            >
+              <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {groupOpen ? '▾' : '▸'} 📚 {group.label}
+              </Text>
+              <Text className="text-xs font-bold text-slate-400">
+                {group.students.length} {group.students.length === 1 ? 'student' : 'students'}
+              </Text>
+            </Pressable>
+            {groupOpen && (
+              <View className="space-y-3 gap-3 mt-1">
+                {group.students.map(student => renderStudentRow(student, managerProfile))}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
 
   // One master-account block (identity, telemetry for standalone
   // learners, Edit/Delete + the inline edit form). Used for an org's
@@ -867,9 +925,7 @@ export default function UsersManager() {
                         {studentsToShow.length === 0 ? (
                           <Text className="text-slate-400 text-sm italic ml-4">└── No students created yet.</Text>
                         ) : (
-                          <View className="space-y-3 gap-3">
-                            {studentsToShow.map(student => renderStudentRow(student, manager))}
-                          </View>
+                          renderClassGroups(org.id, studentsToShow, manager)
                         )}
                       </View>
                     </View>

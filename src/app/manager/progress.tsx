@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
+import { groupStudentsByClass } from '../../lib/studentGroups';
 import { supabase } from '../../lib/supabase';
 
 interface StudentBadge {
@@ -14,6 +15,8 @@ interface StudentBadge {
 interface StudentProgress {
   id: string;
   display_name: string;
+  username: string;
+  class_name: string | null; // migration 14: class / group / team
   gender: string | null;
   avatar_url: string | null;
   badges: StudentBadge[];
@@ -35,6 +38,12 @@ export default function LearningProgress() {
   const guardStatus = useRequireRole(['manager']);
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState<StudentProgress[]>([]);
+
+  // Collapsible class groups + student cards, same organisation as
+  // the Students screen and the admin tree.
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
+  const studentGroups = useMemo(() => groupStudentsByClass(students), [students]);
 
   const getMascot = (gender: string | null, avatar_url: string | null) => {
     if (avatar_url) return avatar_url;
@@ -59,28 +68,41 @@ export default function LearningProgress() {
 
       if (orgError || !org) throw new Error('Organization not found');
 
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('sub_accounts')
-        .select(`
-          id, 
-          display_name, 
-          gender, 
-          avatar_url,
+      // class_name arrives with migration 14; until it is run, fall
+      // back to the select without it so this screen keeps working.
+      const badgesJoin = `
           student_badges (
             badges (
-              title, 
+              title,
               image_url
             )
           )
-        `)
+        `;
+      let studentsData: any[] | null = null;
+      const withClass = await supabase
+        .from('sub_accounts')
+        .select(`id, display_name, username, class_name, gender, avatar_url, ${badgesJoin}`)
         .eq('organization_id', org.id)
         .eq('is_active', true);
-
-      if (studentsError) throw studentsError;
+      if (withClass.error && /class_name/.test(withClass.error.message)) {
+        const fallback = await supabase
+          .from('sub_accounts')
+          .select(`id, display_name, username, gender, avatar_url, ${badgesJoin}`)
+          .eq('organization_id', org.id)
+          .eq('is_active', true);
+        if (fallback.error) throw fallback.error;
+        studentsData = fallback.data;
+      } else if (withClass.error) {
+        throw withClass.error;
+      } else {
+        studentsData = withClass.data;
+      }
 
       const formattedStudents: StudentProgress[] = (studentsData || []).map((s) => ({
         id: s.id,
         display_name: s.display_name,
+        username: s.username || '',
+        class_name: s.class_name ?? null,
         gender: s.gender,
         avatar_url: s.avatar_url,
         badges: ((s.student_badges || []) as any[]).flatMap((sb: any) => {
@@ -189,54 +211,89 @@ export default function LearningProgress() {
               <Text className="text-text-secondary mt-2">Add students in the &apos;My Students&apos; tab to see their progress.</Text>
             </View>
           ) : (
-            students.map((student) => (
-              <View key={student.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6">
-                
-                {/* Header: Mascot & Name */}
-                <View className="flex-row items-center gap-4 mb-6 border-b border-slate-100 pb-4">
-                  <View className="w-16 h-16 bg-brand/10 rounded-full items-center justify-center border border-brand/20">
-                    <Text className="text-4xl">{getMascot(student.gender, student.avatar_url)}</Text>
-                  </View>
-                  <Text className="text-2xl font-bold text-[#0A192F]">{student.display_name}</Text>
-                </View>
-
-                {/* Telemetry Stats */}
-                <View className="flex-row flex-wrap gap-4 mb-6">
-                  <View className="flex-1 min-w-[120px] bg-slate-50 p-4 rounded-xl border border-slate-100 items-center">
-                    <Text className="text-xs font-bold text-slate-500 uppercase mb-1">Playtime</Text>
-                    <Text className="text-xl font-bold text-text-primary">{formatPlaytime(student.playtimeSeconds)}</Text>
-                  </View>
-                  <View className="flex-1 min-w-[120px] bg-emerald-50 p-4 rounded-xl border border-emerald-100 items-center">
-                    <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Accuracy</Text>
-                    <Text className="text-xl font-bold text-emerald-800">
-                      {student.accuracyPercent !== null ? `${student.accuracyPercent}%` : '--%'}
+            studentGroups.map((group) => {
+              const groupOpen = !collapsedGroups[group.label];
+              return (
+                <View key={group.label} className="mb-6">
+                  {/* Class / group / team header - tap to collapse */}
+                  <Pressable
+                    onPress={() => setCollapsedGroups(prev => ({ ...prev, [group.label]: !prev[group.label] }))}
+                    className="flex-row items-center justify-between py-2"
+                  >
+                    <Text className="font-bold text-[#0A192F]">
+                      {groupOpen ? '▾' : '▸'} 📚 {group.label}
                     </Text>
-                  </View>
-                  <View className="flex-1 min-w-[120px] bg-blue-50 p-4 rounded-xl border border-blue-100 items-center">
-                    <Text className="text-xs font-bold text-blue-600 uppercase mb-1">Lessons</Text>
-                    <Text className="text-xl font-bold text-blue-800">{student.lessonsCompleted}</Text>
-                  </View>
-                </View>
+                    <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      {group.students.length} {group.students.length === 1 ? 'student' : 'students'}
+                    </Text>
+                  </Pressable>
 
-                {/* Badges Section */}
-                <Text className="text-sm font-bold text-text-secondary uppercase mb-3">Earned Badges</Text>
-                {student.badges.length === 0 ? (
-                  <View className="bg-slate-50 py-6 rounded-xl border border-slate-100 items-center border-dashed">
-                    <Text className="text-slate-400">No badges earned yet.</Text>
-                  </View>
-                ) : (
-                  <View className="flex-row flex-wrap gap-3">
-                    {student.badges.map((badge, idx) => (
-                      <View key={idx} className="bg-amber-50 px-4 py-2 rounded-lg border border-amber-200 flex-row items-center gap-2">
-                        <Text className="text-lg">{badge.image_url || '🏆'}</Text>
-                        <Text className="font-bold text-amber-800 text-sm">{badge.title}</Text>
+                  {groupOpen && group.students.map((student) => {
+                    const rowOpen = !!expandedStudents[student.id];
+                    return (
+                      <View key={student.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+                        {/* Collapsed header: name + ID + headline figures */}
+                        <Pressable
+                          onPress={() => setExpandedStudents(prev => ({ ...prev, [student.id]: !prev[student.id] }))}
+                          className="flex-row items-center gap-4 p-5"
+                        >
+                          <View className="w-12 h-12 bg-brand/10 rounded-full items-center justify-center border border-brand/20">
+                            <Text className="text-2xl">{getMascot(student.gender, student.avatar_url)}</Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-lg font-bold text-[#0A192F]">{student.display_name}</Text>
+                            <Text className="text-xs text-slate-400 font-mono">{student.username}</Text>
+                          </View>
+                          <Text className="text-sm font-bold text-slate-500">
+                            {student.lessonsCompleted} lessons • {student.accuracyPercent !== null ? `${student.accuracyPercent}%` : '--%'}
+                          </Text>
+                          <Text className="text-slate-400">{rowOpen ? '▾' : '▸'}</Text>
+                        </Pressable>
+
+                        {rowOpen && (
+                          <View className="px-6 pb-6">
+                            {/* Telemetry Stats */}
+                            <View className="flex-row flex-wrap gap-4 mb-6">
+                              <View className="flex-1 min-w-[120px] bg-slate-50 p-4 rounded-xl border border-slate-100 items-center">
+                                <Text className="text-xs font-bold text-slate-500 uppercase mb-1">Playtime</Text>
+                                <Text className="text-xl font-bold text-text-primary">{formatPlaytime(student.playtimeSeconds)}</Text>
+                              </View>
+                              <View className="flex-1 min-w-[120px] bg-emerald-50 p-4 rounded-xl border border-emerald-100 items-center">
+                                <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Accuracy</Text>
+                                <Text className="text-xl font-bold text-emerald-800">
+                                  {student.accuracyPercent !== null ? `${student.accuracyPercent}%` : '--%'}
+                                </Text>
+                              </View>
+                              <View className="flex-1 min-w-[120px] bg-blue-50 p-4 rounded-xl border border-blue-100 items-center">
+                                <Text className="text-xs font-bold text-blue-600 uppercase mb-1">Lessons</Text>
+                                <Text className="text-xl font-bold text-blue-800">{student.lessonsCompleted}</Text>
+                              </View>
+                            </View>
+
+                            {/* Badges Section */}
+                            <Text className="text-sm font-bold text-text-secondary uppercase mb-3">Earned Badges</Text>
+                            {student.badges.length === 0 ? (
+                              <View className="bg-slate-50 py-6 rounded-xl border border-slate-100 items-center border-dashed">
+                                <Text className="text-slate-400">No badges earned yet.</Text>
+                              </View>
+                            ) : (
+                              <View className="flex-row flex-wrap gap-3">
+                                {student.badges.map((badge, idx) => (
+                                  <View key={idx} className="bg-amber-50 px-4 py-2 rounded-lg border border-amber-200 flex-row items-center gap-2">
+                                    <Text className="text-lg">{badge.image_url || '🏆'}</Text>
+                                    <Text className="font-bold text-amber-800 text-sm">{badge.title}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                        )}
                       </View>
-                    ))}
-                  </View>
-                )}
-
-              </View>
-            ))
+                    );
+                  })}
+                </View>
+              );
+            })
           )}
         </View>
       </ScrollView>

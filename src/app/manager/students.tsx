@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,16 +16,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
+import {
+  distinctClassNames,
+  groupStudentsByClass,
+} from '../../lib/studentGroups';
 import { supabase } from '../../lib/supabase';
 
 interface Student {
   id: string;
   display_name: string;
   username: string;
-  hashed_pin: string; 
+  hashed_pin: string;
   date_of_birth: string; // UPDATED from age
   gender: string;
   avatar_url?: string;   // NEW
+  class_name: string | null; // migration 14: class / group / team
   created_at: string;
 }
 
@@ -48,6 +53,13 @@ export default function StudentManagement() {
   const togglePinReveal = (id: string) => {
     setRevealedPins(prev => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // Students organised by class / group / team for the list below.
+  const studentGroups = useMemo(() => groupStudentsByClass(students), [students]);
+  const toggleGroup = (label: string) =>
+    setCollapsedGroups(prev => ({ ...prev, [label]: !prev[label] }));
+  const toggleStudentExpanded = (id: string) =>
+    setExpandedStudents(prev => ({ ...prev, [id]: !prev[id] }));
   
   // Form State
   const [showForm, setShowForm] = useState(false);
@@ -56,6 +68,11 @@ export default function StudentManagement() {
   const [newDob, setNewDob] = useState(''); // UPDATED
   const [newGender, setNewGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
   const [customPin, setCustomPin] = useState('');
+  const [newClassName, setNewClassName] = useState('');
+
+  // Collapsible class groups + student rows in the list below.
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
 
   // Helper function to dynamically calculate age
   const calculateAge = (dob: string) => {
@@ -124,15 +141,32 @@ export default function StudentManagement() {
       setOrgId(org.id);
       setOrgCode(org.org_code);
 
-      const { data: studentsData, error: studentsError } = await supabase
+      // class_name arrives with migration 14; until it is run, fall
+      // back to the old column list so this screen keeps working.
+      const baseColumns =
+        'id, display_name, username, hashed_pin, date_of_birth, gender, avatar_url, created_at';
+      let studentsData: any[] | null = null;
+      const withClass = await supabase
         .from('sub_accounts')
-        .select('id, display_name, username, hashed_pin, date_of_birth, gender, avatar_url, created_at')
+        .select(`${baseColumns}, class_name`)
         .eq('organization_id', org.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
-
-      if (studentsError) throw studentsError;
-      setStudents(studentsData || []);
+      if (withClass.error && /class_name/.test(withClass.error.message)) {
+        const fallback = await supabase
+          .from('sub_accounts')
+          .select(baseColumns)
+          .eq('organization_id', org.id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+        if (fallback.error) throw fallback.error;
+        studentsData = (fallback.data || []).map((row: any) => ({ ...row, class_name: null }));
+      } else if (withClass.error) {
+        throw withClass.error;
+      } else {
+        studentsData = withClass.data;
+      }
+      setStudents((studentsData || []) as Student[]);
       
     } catch (error: any) {
       console.error('Error fetching students:', error.message);
@@ -160,6 +194,7 @@ export default function StudentManagement() {
     setNewDob('');
     setNewGender('');
     setCustomPin(Math.floor(1000 + Math.random() * 9000).toString());
+    setNewClassName('');
     setShowForm(true);
   };
 
@@ -169,6 +204,7 @@ export default function StudentManagement() {
     setNewDob(student.date_of_birth || '');
     setNewGender(student.gender as any);
     setCustomPin(student.hashed_pin);
+    setNewClassName(student.class_name || '');
     setShowForm(true);
   };
 
@@ -197,34 +233,50 @@ export default function StudentManagement() {
 
     setSaving(true);
     try {
+      const username = editId ? null : generateUsername(newName, orgCode);
+      // One save attempt; includeClass=false is the pre-migration-14
+      // shape, used as an automatic fallback so saving a student never
+      // breaks just because the class column is not there yet.
+      const attemptSave = async (includeClass: boolean) => {
+        const classField = includeClass ? { class_name: newClassName.trim() || null } : {};
+        if (editId) {
+          return supabase
+            .from('sub_accounts')
+            .update({
+              display_name: newName.trim(),
+              date_of_birth: newDob.trim(),
+              gender: newGender,
+              hashed_pin: customPin.trim(),
+              ...classField,
+            })
+            .eq('id', editId);
+        }
+        return supabase.from('sub_accounts').insert({
+          organization_id: orgId,
+          display_name: newName.trim(),
+          username: username,
+          hashed_pin: customPin.trim(),
+          date_of_birth: newDob.trim(),
+          gender: newGender,
+          ...classField,
+        });
+      };
+
+      let { error } = await attemptSave(true);
+      let classDropped = false;
+      if (error && /class_name/.test(error.message)) {
+        classDropped = true;
+        ({ error } = await attemptSave(false));
+      }
+      if (error) throw error;
+
+      const classNote = classDropped
+        ? '\n\nNote: the Class / Group field needs a one-time database update (migration 14) before it can be saved.'
+        : '';
       if (editId) {
-        const { error } = await supabase
-          .from('sub_accounts')
-          .update({
-            display_name: newName.trim(),
-            date_of_birth: newDob.trim(),
-            gender: newGender,
-            hashed_pin: customPin.trim()
-          })
-          .eq('id', editId);
-
-        if (error) throw error;
-        Alert.alert('Success', 'Student profile updated!');
+        Alert.alert('Success', 'Student profile updated!' + classNote);
       } else {
-        const username = generateUsername(newName, orgCode);
-        const { error } = await supabase
-          .from('sub_accounts')
-          .insert({
-            organization_id: orgId,
-            display_name: newName.trim(),
-            username: username,
-            hashed_pin: customPin.trim(),
-            date_of_birth: newDob.trim(),
-            gender: newGender,
-          });
-
-        if (error) throw error;
-        Alert.alert('Success', `Student added!\nUsername: ${username}\nPIN: ${customPin}`);
+        Alert.alert('Success', `Student added!\nUsername: ${username}\nPIN: ${customPin}` + classNote);
       }
 
       await fetchStudentsData();
@@ -374,6 +426,30 @@ export default function StudentManagement() {
                 </View>
               </View>
 
+              <View>
+                <Text className="text-sm font-semibold text-text-secondary mb-2">Class / Group / Team (optional)</Text>
+                <TextInput
+                  className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary"
+                  placeholder="e.g. Class 3-A, U12 Team, Saturday Group…"
+                  value={newClassName}
+                  onChangeText={setNewClassName}
+                />
+                {distinctClassNames(students).length > 0 && (
+                  <View className="flex-row flex-wrap gap-2 mt-2">
+                    <Text className="text-xs text-text-secondary py-1.5">Tap to reuse:</Text>
+                    {distinctClassNames(students).map((name) => (
+                      <Pressable
+                        key={name}
+                        onPress={() => setNewClassName(name)}
+                        className={`px-3 py-1.5 rounded-full border ${newClassName === name ? 'bg-brand border-brand' : 'bg-white border-slate-200'}`}
+                      >
+                        <Text className={`text-xs font-semibold ${newClassName === name ? 'text-white' : 'text-text-secondary'}`}>{name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               <View className="flex-row justify-end gap-4 mt-4">
                 <View className="w-32">
                   <AnimatedButton title="Cancel" onPress={closeForm} variant="outline" size="sm" />
@@ -403,62 +479,93 @@ export default function StudentManagement() {
               </View>
             ) : (
               <View>
-                {students.map((student) => (
-                  <View key={student.id} className="flex-col md:flex-row p-4 border-b border-slate-50 md:items-center justify-between gap-4 hover:bg-slate-50">
-                    
-                    {/* Name & Mascot Avatar */}
-                    <View className="flex-row items-center gap-3 min-w-[200px]">
-                      <View className="w-12 h-12 bg-slate-100 rounded-full items-center justify-center border border-slate-200">
-                        <Text className="text-2xl">{getMascot(student.gender, student.avatar_url)}</Text>
-                      </View>
-                      <View>
-                        <Text className="font-bold text-text-primary text-base">{student.display_name}</Text>
-                        <Text className="text-text-secondary text-xs">
-                          {calculateAge(student.date_of_birth)} yrs • {student.gender}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Credentials */}
-                    <View className="flex-row items-center flex-wrap gap-2">
-                      <View className="bg-slate-100 px-3 py-1 rounded-md">
-                        <Text className="font-mono text-xs text-slate-600">User: {student.username}</Text>
-                      </View>
+                {studentGroups.map((group) => {
+                  const groupOpen = !collapsedGroups[group.label];
+                  return (
+                    <View key={group.label}>
+                      {/* Class / group / team header - tap to collapse */}
                       <Pressable
-                        onPress={() => togglePinReveal(student.id)}
-                        className="bg-green-100 px-3 py-1 rounded-md"
+                        onPress={() => toggleGroup(group.label)}
+                        className="flex-row items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100"
                       >
-                        <Text className="font-mono text-xs text-green-800 font-bold">
-                          PIN: {revealedPins[student.id] ? student.hashed_pin : '••••'} {revealedPins[student.id] ? '🙈' : '👁'}
+                        <Text className="font-bold text-[#0A192F] text-sm">
+                          {groupOpen ? '▾' : '▸'} 📚 {group.label}
+                        </Text>
+                        <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          {group.students.length} {group.students.length === 1 ? 'student' : 'students'}
                         </Text>
                       </Pressable>
-                      
-                      <Pressable 
-                        onPress={() => copyCredentials(student.username, student.hashed_pin)}
-                        className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-md"
-                      >
-                        <Text className="text-blue-600 font-bold text-xs">Copy Login</Text>
-                      </Pressable>
-                    </View>
 
-                    {/* Actions */}
-                    <View className="flex-row gap-3">
-                      <Pressable 
-                        onPress={() => openEditForm(student)}
-                        className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200"
-                      >
-                        <Text className="text-text-secondary font-semibold text-sm">Edit</Text>
-                      </Pressable>
-                      <Pressable 
-                        onPress={() => handleDelete(student.id, student.display_name)}
-                        className="px-4 py-2 bg-red-50 rounded-lg border border-red-100"
-                      >
-                        <Text className="text-red-600 font-semibold text-sm">Delete</Text>
-                      </Pressable>
-                    </View>
+                      {groupOpen && group.students.map((student) => {
+                        const rowOpen = !!expandedStudents[student.id];
+                        return (
+                          <View key={student.id} className="border-b border-slate-50">
+                            {/* Collapsed row: name + ID only */}
+                            <Pressable
+                              onPress={() => toggleStudentExpanded(student.id)}
+                              className="flex-row items-center gap-3 px-4 py-3 hover:bg-slate-50"
+                            >
+                              <View className="w-10 h-10 bg-slate-100 rounded-full items-center justify-center border border-slate-200">
+                                <Text className="text-xl">{getMascot(student.gender, student.avatar_url)}</Text>
+                              </View>
+                              <View className="flex-1">
+                                <Text className="font-bold text-text-primary text-base">{student.display_name}</Text>
+                                <Text className="text-text-secondary text-xs font-mono">{student.username}</Text>
+                              </View>
+                              <Text className="text-slate-400 text-sm">{rowOpen ? '▾' : '▸'}</Text>
+                            </Pressable>
 
-                  </View>
-                ))}
+                            {/* Expanded detail: age/gender, credentials, actions */}
+                            {rowOpen && (
+                              <View className="flex-col md:flex-row px-4 pb-4 md:items-center justify-between gap-4">
+                                <Text className="text-text-secondary text-xs min-w-[200px]">
+                                  {calculateAge(student.date_of_birth)} yrs • {student.gender}
+                                </Text>
+
+                                {/* Credentials */}
+                                <View className="flex-row items-center flex-wrap gap-2">
+                                  <View className="bg-slate-100 px-3 py-1 rounded-md">
+                                    <Text className="font-mono text-xs text-slate-600">User: {student.username}</Text>
+                                  </View>
+                                  <Pressable
+                                    onPress={() => togglePinReveal(student.id)}
+                                    className="bg-green-100 px-3 py-1 rounded-md"
+                                  >
+                                    <Text className="font-mono text-xs text-green-800 font-bold">
+                                      PIN: {revealedPins[student.id] ? student.hashed_pin : '••••'} {revealedPins[student.id] ? '🙈' : '👁'}
+                                    </Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => copyCredentials(student.username, student.hashed_pin)}
+                                    className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-md"
+                                  >
+                                    <Text className="text-blue-600 font-bold text-xs">Copy Login</Text>
+                                  </Pressable>
+                                </View>
+
+                                {/* Actions */}
+                                <View className="flex-row gap-3">
+                                  <Pressable
+                                    onPress={() => openEditForm(student)}
+                                    className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200"
+                                  >
+                                    <Text className="text-text-secondary font-semibold text-sm">Edit</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => handleDelete(student.id, student.display_name)}
+                                    className="px-4 py-2 bg-red-50 rounded-lg border border-red-100"
+                                  >
+                                    <Text className="text-red-600 font-semibold text-sm">Delete</Text>
+                                  </Pressable>
+                                </View>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -512,6 +619,12 @@ export default function StudentManagement() {
                       <Text className="text-xs font-bold text-text-secondary uppercase">Secret PIN</Text>
                       <Text className="font-mono text-lg font-bold text-text-primary tracking-widest">{student.hashed_pin}</Text>
                     </View>
+                    {student.class_name ? (
+                      <View>
+                        <Text className="text-xs font-bold text-text-secondary uppercase">Class / Group</Text>
+                        <Text className="text-lg font-bold text-text-primary">{student.class_name}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   <View className="border-t border-slate-100 pt-3">
                     <Text className="text-sm text-text-secondary">1. Open English for Cricket and tap Log In.</Text>
