@@ -1,6 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 
 // Define the content modules based on the new architecture
@@ -51,8 +53,22 @@ export default function LearnerDashboard() {
   const router = useRouter();
   const [studentName, setStudentName] = useState('Champion');
 
+  // Greet the actual student: PIN students carry their display name in the
+  // local session blob, email learners in user_profiles. Falls back to the
+  // generic greeting when no identity resolves.
+  useEffect(() => {
+    (async () => {
+      const identity = await getStudentIdentity();
+      if (identity?.displayName) setStudentName(identity.displayName);
+    })();
+  }, []);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    // PIN students have no Supabase session - their session lives in
+    // AsyncStorage, so it must be cleared explicitly or "logout" would
+    // leave them effectively still signed in on this device.
+    await AsyncStorage.removeItem('student_session');
     router.replace('/');
   };
 
@@ -69,9 +85,7 @@ export default function LearnerDashboard() {
         router.push('/downloads');
         break;
       case 'path':
-        // We will update this once we build the curriculum tree screen
-        if (Platform.OS === 'web') window.alert('Learning Path coming soon!');
-        else Alert.alert('Coming Soon', 'Learning Path module is under construction.');
+        router.push('/learner/path');
         break;
       case 'profile':
         router.push('/learner/profile');
