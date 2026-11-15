@@ -239,6 +239,34 @@ const burstStyles = StyleSheet.create({
  * all, the slide falls back to say-it-out-loud self-marking so the
  * student is never blocked by their hardware.
  */
+/**
+ * An image that hides itself when its file is missing or fails to
+ * load. Curriculum slides reference their picture URLs before the
+ * actual files are uploaded to storage; a broken-image frame would
+ * look like a bug, while no picture at all just looks like a plain
+ * slide - so pictures simply appear as they get uploaded.
+ */
+function FallbackImage({
+  uri,
+  className,
+  fallback = null,
+}: {
+  uri: string;
+  className?: string;
+  fallback?: ReactNode;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <>{fallback}</>;
+  return (
+    <Image
+      source={{ uri }}
+      className={className}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function SpeakRepeatSlide({
   slide,
   attempt,
@@ -354,11 +382,7 @@ function SpeakRepeatSlide({
   return (
     <View className="items-center">
       {slide.media_url ? (
-        <Image
-          source={{ uri: slide.media_url }}
-          className="w-full h-52 rounded-2xl mb-6"
-          resizeMode="cover"
-        />
+        <FallbackImage uri={slide.media_url} className="w-full h-52 rounded-2xl mb-6" />
       ) : null}
       {instruction ? (
         <Text className="text-lg text-slate-500 text-center mb-2">{instruction}</Text>
@@ -974,10 +998,15 @@ export default function LessonPlayer() {
         className={`w-[48%] rounded-2xl border-2 ${borderClass} ${bgClass} p-3 items-center`}
       >
         {panel.media_url ? (
-          <Image
-            source={{ uri: panel.media_url }}
+          <FallbackImage
+            key={panel.media_url}
+            uri={panel.media_url}
             className="w-full h-28 rounded-xl mb-2"
-            resizeMode="cover"
+            fallback={
+              <View className="w-full h-28 rounded-xl mb-2 bg-slate-200 items-center justify-center">
+                <Text className="text-3xl">🔊</Text>
+              </View>
+            }
           />
         ) : (
           <View className="w-full h-28 rounded-xl mb-2 bg-slate-200 items-center justify-center">
@@ -998,10 +1027,10 @@ export default function LessonPlayer() {
       return (
         <View className="items-center">
           {slide.media_url ? (
-            <Image
-              source={{ uri: slide.media_url }}
+            <FallbackImage
+              key={slide.media_url}
+              uri={slide.media_url}
               className="w-full h-64 rounded-2xl mb-6"
-              resizeMode="cover"
             />
           ) : null}
           {slide.prompt_text ? (
@@ -1092,10 +1121,10 @@ export default function LessonPlayer() {
       return (
         <View className="items-center">
           {slide.media_url ? (
-            <Image
-              source={{ uri: slide.media_url }}
+            <FallbackImage
+              key={slide.media_url}
+              uri={slide.media_url}
               className="w-full h-52 rounded-2xl mb-6"
-              resizeMode="cover"
             />
           ) : null}
           {slide.prompt_text ? (
