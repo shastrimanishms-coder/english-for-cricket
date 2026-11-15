@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
 interface FAQ {
@@ -64,7 +65,7 @@ export default function SupportScreen() {
   });
 
   return (
-    <View className="flex-1 bg-surface-background">
+    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="max-w-3xl w-full mx-auto">
           <View className="flex-row items-center justify-between mb-2">
@@ -141,6 +142,6 @@ export default function SupportScreen() {
           )}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

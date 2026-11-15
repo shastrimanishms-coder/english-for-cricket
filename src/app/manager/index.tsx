@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
@@ -31,7 +32,7 @@ export default function ManagerDashboard() {
   return (
     <View className="flex-1 bg-surface-background">
       {/* Dashboard Header */}
-      <View className="w-full bg-surface shadow-sm border-b border-slate-200">
+      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-6">
           <View>
             <Text className="text-xl font-bold text-text-primary tracking-widest uppercase">
@@ -49,7 +50,7 @@ export default function ManagerDashboard() {
             <Text className="text-text-secondary font-bold">Log Out</Text>
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
 
       {/* Main Dashboard Content */}
       <ScrollView contentContainerStyle={{ padding: 24 }}>
@@ -70,7 +71,7 @@ export default function ManagerDashboard() {
             {/* Manage Students Card */}
             <Pressable 
               onPress={() => router.push('/manager/students')}
-              className="flex-1 min-w-[300px] bg-white p-6 rounded-2xl shadow-sm border border-slate-100"
+              className="flex-1 min-w-[260px] md:min-w-[300px] bg-white p-6 rounded-2xl shadow-sm border border-slate-100"
             >
               <Text className="text-4xl mb-4">👨‍🎓</Text>
               <Text className="text-xl font-bold text-text-primary mb-2">My Students</Text>
@@ -82,7 +83,7 @@ export default function ManagerDashboard() {
             {/* Learning Progress Card - UPDATED ROUTE */}
             <Pressable 
               onPress={() => router.push('/manager/progress')}
-              className="flex-1 min-w-[300px] bg-white p-6 rounded-2xl shadow-sm border border-slate-100"
+              className="flex-1 min-w-[260px] md:min-w-[300px] bg-white p-6 rounded-2xl shadow-sm border border-slate-100"
             >
               <Text className="text-4xl mb-4">📊</Text>
               <Text className="text-xl font-bold text-text-primary mb-2">Learning Progress</Text>
@@ -94,7 +95,7 @@ export default function ManagerDashboard() {
             {/* Settings Card */}
             <Pressable 
               onPress={() => router.push('/manager/settings')}
-              className="flex-1 min-w-[300px] bg-white p-6 rounded-2xl shadow-sm border border-slate-100"
+              className="flex-1 min-w-[260px] md:min-w-[300px] bg-white p-6 rounded-2xl shadow-sm border border-slate-100"
             >
               <Text className="text-4xl mb-4">⚙️</Text>
               <Text className="text-xl font-bold text-text-primary mb-2">Organization Settings</Text>

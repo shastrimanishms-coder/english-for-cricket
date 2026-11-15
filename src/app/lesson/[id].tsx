@@ -1,20 +1,38 @@
-import { useAudioPlayer } from 'expo-audio';
+import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { awardLessonBadges } from '../../lib/badgeAwards';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Celebration from '../../components/ui/Celebration';
+import NewBadgeCard from '../../components/ui/NewBadgeCard';
+import {
+  awardLessonBadges,
+  evaluateStreakBadges,
+  type AwardedBadge,
+} from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 
@@ -77,10 +95,133 @@ function formatDuration(totalSeconds: number): string {
   return seconds > 0 ? `${minutes} min ${seconds} sec` : `${minutes} min`;
 }
 
+/** Springs its children in with a scale pop, optionally delayed. */
+function PopIn({ delay = 0, children }: { delay?: number; children: ReactNode }) {
+  const scale = useSharedValue(0.5);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    scale.set(withDelay(delay, withSpring(1, { damping: 11, stiffness: 240 })));
+    opacity.set(withDelay(delay, withTiming(1, { duration: 250 })));
+  }, [delay, scale, opacity]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+/** The completion screen's 1-3 star rating, stars popping in staggered. */
+function StarsRow({ count }: { count: number }) {
+  return (
+    <View className="flex-row justify-center gap-2 mb-4">
+      {[0, 1, 2].map((i) => (
+        <PopIn key={i} delay={200 + i * 160}>
+          {i < count ? (
+            <Text className="text-4xl">⭐</Text>
+          ) : (
+            <Text className="text-4xl text-slate-300">☆</Text>
+          )}
+        </PopIn>
+      ))}
+    </View>
+  );
+}
+
+const BURST_STARS = Array.from({ length: 8 }, (_, i) => ({
+  angle: (i / 8) * Math.PI * 2 + 0.4,
+  distance: 46 + (i % 3) * 18,
+  size: 15 + (i % 3) * 4,
+}));
+
+function BurstStar({
+  config,
+  progress,
+}: {
+  config: (typeof BURST_STARS)[number];
+  progress: SharedValue<number>;
+}) {
+  const style = useAnimatedStyle(() => {
+    const p = progress.value;
+    const out = 1 - Math.pow(1 - p, 3);
+    return {
+      opacity: interpolate(p, [0, 0.6, 1], [1, 1, 0]),
+      transform: [
+        { translateX: Math.cos(config.angle) * config.distance * out },
+        { translateY: Math.sin(config.angle) * config.distance * out + 36 * p * p },
+        { scale: interpolate(p, [0, 0.3, 1], [0.4, 1.15, 0.9]) },
+      ],
+    };
+  });
+  return (
+    <Animated.Text
+      style={[
+        burstStyles.particle,
+        {
+          left: '50%',
+          top: '50%',
+          marginLeft: -config.size / 2,
+          marginTop: -config.size / 2,
+          fontSize: config.size,
+        },
+        style,
+      ]}
+    >
+      ⭐
+    </Animated.Text>
+  );
+}
+
+/**
+ * AnswerBurst - a quick ⭐ burst over the slide card when an answer is
+ * judged correct. Retriggers whenever `burstKey` increments; before the
+ * first correct answer it renders nothing, and between bursts the stars
+ * rest at opacity 0.
+ */
+function AnswerBurst({ burstKey }: { burstKey: number }) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    if (burstKey === 0) return;
+    progress.set(0);
+    progress.set(withTiming(1, { duration: 650, easing: Easing.out(Easing.quad) }));
+  }, [burstKey, progress]);
+
+  if (burstKey === 0) return null;
+  return (
+    <View pointerEvents="none" style={burstStyles.overlay}>
+      {BURST_STARS.map((config, i) => (
+        <BurstStar key={i} config={config} progress={progress} />
+      ))}
+    </View>
+  );
+}
+
+const burstStyles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 30,
+  },
+  particle: {
+    position: 'absolute',
+  },
+});
+
 export default function LessonPlayer() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const player = useAudioPlayer(null);
+  // The audio player is created lazily on the first tap (see playAudio):
+  // the useAudioPlayer hook constructs a web Audio object during render,
+  // which crashes server-side rendering ("Audio is not defined").
+  const playerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,6 +231,12 @@ export default function LessonPlayer() {
   const [attempts, setAttempts] = useState<Record<string, SlideAttempt>>({});
   const [finished, setFinished] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
+  // Badges newly earned by this completion, shown one at a time on the
+  // completion screen (badgeIndex walks the queue).
+  const [earnedBadges, setEarnedBadges] = useState<AwardedBadge[]>([]);
+  const [badgeIndex, setBadgeIndex] = useState(0);
+  // Increments on every correct answer to retrigger the star burst.
+  const [answerBurstKey, setAnswerBurstKey] = useState(0);
 
   const startTimeRef = useRef<number>(0); // set on mount in the effect below
   const recordedRef = useRef(false);
@@ -128,18 +275,28 @@ export default function LessonPlayer() {
     })();
   }, [fetchLessonData]);
 
-  const playAudio = useCallback(
-    (url: string | null | undefined) => {
-      if (!url) return;
-      try {
-        player.replace({ uri: url });
-        player.play();
-      } catch (error) {
-        console.log('Audio playback error:', error);
+  // Release the lazily created player when the screen unmounts
+  // (createAudioPlayer does not manage the lifecycle for us).
+  useEffect(() => {
+    return () => {
+      playerRef.current?.release();
+      playerRef.current = null;
+    };
+  }, []);
+
+  const playAudio = useCallback((url: string | null | undefined) => {
+    if (!url) return;
+    try {
+      if (!playerRef.current) {
+        playerRef.current = createAudioPlayer({ uri: url });
+      } else {
+        playerRef.current.replace({ uri: url });
       }
-    },
-    [player]
-  );
+      playerRef.current.play();
+    } catch (error) {
+      console.log('Audio playback error:', error);
+    }
+  }, []);
 
   const feedbackHaptic = useCallback((correct: boolean) => {
     if (Platform.OS === 'web') return;
@@ -162,6 +319,48 @@ export default function LessonPlayer() {
   const currentSlide: Slide | undefined = slides[currentIndex];
   const currentAttempt: SlideAttempt =
     (currentSlide && attempts[currentSlide.id]) || EMPTY_ATTEMPT;
+
+  // Animated progress bar: the fill glides to the new width (~400ms)
+  // instead of jumping when the student moves between slides.
+  const progressPct = slides.length > 0 ? ((currentIndex + 1) / slides.length) * 100 : 0;
+  const progressSV = useSharedValue(0);
+  useEffect(() => {
+    progressSV.set(withTiming(progressPct, { duration: 400 }));
+  }, [progressPct, progressSV]);
+  const progressStyle = useAnimatedStyle(() => ({ width: `${progressSV.value}%` }));
+
+  // Slide-card answer feedback: a happy scale pulse (+ star burst) when
+  // an answer is correct, a gentle shake when it is wrong. Purely visual -
+  // scoring lives in the attempt state and is untouched by this.
+  const cardScale = useSharedValue(1);
+  const cardShakeX = useSharedValue(0);
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: cardShakeX.value }, { scale: cardScale.value }],
+  }));
+  const feedbackAnim = useCallback(
+    (correct: boolean) => {
+      if (correct) {
+        cardScale.set(
+          withSequence(
+            withSpring(1.02, { damping: 10, stiffness: 300 }),
+            withSpring(1, { damping: 12, stiffness: 260 })
+          )
+        );
+        setAnswerBurstKey((k) => k + 1);
+      } else {
+        cardShakeX.set(
+          withSequence(
+            withTiming(-8, { duration: 55 }),
+            withTiming(8, { duration: 55 }),
+            withTiming(-6, { duration: 55 }),
+            withTiming(6, { duration: 55 }),
+            withTiming(0, { duration: 60 })
+          )
+        );
+      }
+    },
+    [cardScale, cardShakeX]
+  );
 
   const scoreFor = useCallback(
     (slideList: Slide[], attemptMap: Record<string, SlideAttempt>) => {
@@ -223,9 +422,21 @@ export default function LessonPlayer() {
         console.log('Lesson activity not logged:', activityError.message);
       }
 
-      // Badge awarding v1 (lesson/module conditions). Runs whether the
-      // writes above landed or failed soft, and itself fails soft.
-      await awardLessonBadges(identity, lesson);
+      // Badge awarding (lesson/module conditions). Runs whether the
+      // writes above landed or failed soft, and itself fails soft. The
+      // evaluators return any badges that were genuinely NEW so the
+      // completion screen can celebrate them.
+      const lessonBadges = await awardLessonBadges(identity, lesson);
+
+      // A finished lesson is also a day of activity: re-evaluate streak
+      // badges against the now-updated activity days. Fails soft.
+      const streakBadges = await evaluateStreakBadges(identity);
+
+      const freshBadges = [...lessonBadges, ...streakBadges];
+      if (freshBadges.length > 0) {
+        setEarnedBadges(freshBadges);
+        setBadgeIndex(0);
+      }
     },
     [lesson]
   );
@@ -276,6 +487,7 @@ export default function LessonPlayer() {
       if (slide.slide_type === 'quiz_4up' && !attempt.answered) {
         const correct = panel.is_correct === true;
         feedbackHaptic(correct);
+        feedbackAnim(correct);
         updateAttempt(slide.id, {
           answered: true,
           wasCorrect: correct,
@@ -283,7 +495,7 @@ export default function LessonPlayer() {
         });
       }
     },
-    [attempts, playAudio, feedbackHaptic, updateAttempt]
+    [attempts, playAudio, feedbackHaptic, feedbackAnim, updateAttempt]
   );
 
   const handleTypingCheck = useCallback(
@@ -293,9 +505,10 @@ export default function LessonPlayer() {
       const correct =
         normalizeAnswer(attempt.typingValue) === normalizeAnswer(slide.correct_answer || '');
       feedbackHaptic(correct);
+      feedbackAnim(correct);
       updateAttempt(slide.id, { answered: true, wasCorrect: correct });
     },
-    [attempts, feedbackHaptic, updateAttempt]
+    [attempts, feedbackHaptic, feedbackAnim, updateAttempt]
   );
 
   // ---- Render helpers -------------------------------------------------------
@@ -518,6 +731,8 @@ export default function LessonPlayer() {
   if (finished) {
     const { correct, total } = scoreFor(slides, attempts);
     const percentage = total > 0 ? Math.round((correct / total) * 100) : null;
+    const starCount = percentage === null ? 0 : percentage >= 90 ? 3 : percentage >= 60 ? 2 : 1;
+    const currentBadge = earnedBadges[badgeIndex];
     return (
       <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
         <Text className="text-6xl mb-4">🏆</Text>
@@ -525,14 +740,24 @@ export default function LessonPlayer() {
         <Text className="text-lg text-slate-500 text-center mb-2">
           {lesson?.title}
         </Text>
-        {percentage !== null ? (
-          <Text className="text-xl font-bold text-brand mb-2">
-            You got {correct} out of {total} correct ({percentage}%)
-          </Text>
-        ) : (
-          <Text className="text-xl font-bold text-brand mb-2">Great listening practice!</Text>
-        )}
-        <Text className="text-slate-400 mb-10">Time: {formatDuration(durationSeconds)}</Text>
+        <PopIn>
+          {percentage !== null ? (
+            <Text className="text-xl font-bold text-brand mb-2">
+              You got {correct} out of {total} correct ({percentage}%)
+            </Text>
+          ) : (
+            <Text className="text-xl font-bold text-brand mb-2">Great listening practice!</Text>
+          )}
+        </PopIn>
+        {percentage !== null ? <StarsRow count={starCount} /> : null}
+        <Text className="text-slate-400 mb-6">Time: {formatDuration(durationSeconds)}</Text>
+        {currentBadge ? (
+          <NewBadgeCard
+            key={currentBadge.id}
+            badge={currentBadge}
+            onDismiss={() => setBadgeIndex((i) => i + 1)}
+          />
+        ) : null}
         <Pressable
           onPress={() => router.replace('/learner/path')}
           className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
@@ -545,6 +770,7 @@ export default function LessonPlayer() {
         >
           <Text className="text-slate-600 font-bold text-base">Learner Home</Text>
         </Pressable>
+        <Celebration visible />
       </SafeAreaView>
     );
   }
@@ -565,14 +791,13 @@ export default function LessonPlayer() {
     );
   }
 
-  const progressPercentage = slides.length > 0 ? ((currentIndex + 1) / slides.length) * 100 : 0;
   const isScored = SCORED_TYPES.includes(currentSlide.slide_type);
   const canContinue = !isScored || currentAttempt.answered;
   const isLast = currentIndex === slides.length - 1;
 
   return (
     <SafeAreaView className="flex-1 bg-surface-background">
-      <View className="flex-1 px-4 py-2 md:px-8">
+      <View className="flex-1 w-full max-w-3xl mx-auto px-4 py-2 md:px-8">
         {/* Top Navigation & Progress Bar */}
         <View className="flex-row items-center justify-between mb-2 pt-2">
           <Pressable onPress={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100">
@@ -580,9 +805,11 @@ export default function LessonPlayer() {
           </Pressable>
 
           <View className="flex-1 h-4 bg-slate-200 rounded-full mx-4 overflow-hidden">
-            <View
-              className="h-full bg-brand rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${progressPercentage}%` }}
+            <Animated.View
+              style={[
+                progressStyle,
+                { height: '100%', borderRadius: 9999, backgroundColor: '#2E7D32' },
+              ]}
             />
           </View>
 
@@ -597,13 +824,17 @@ export default function LessonPlayer() {
           <Text className="text-center text-sm font-bold text-slate-400 mb-4">{lesson.title}</Text>
         ) : null}
 
-        {/* Slide Container */}
-        <ScrollView
-          className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm"
-          contentContainerStyle={{ padding: 20, flexGrow: 1, justifyContent: 'center' }}
-        >
-          {renderSlide(currentSlide)}
-        </ScrollView>
+        {/* Slide Container - wrapped in an Animated.View so a correct
+            answer can pulse the card and a wrong one can shake it. */}
+        <Animated.View style={[{ flex: 1 }, cardStyle]}>
+          <ScrollView
+            className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm"
+            contentContainerStyle={{ padding: 20, flexGrow: 1, justifyContent: 'center' }}
+          >
+            {renderSlide(currentSlide)}
+          </ScrollView>
+          <AnswerBurst burstKey={answerBurstKey} />
+        </Animated.View>
 
         {/* Footer Navigation */}
         <View className="py-4 items-center">

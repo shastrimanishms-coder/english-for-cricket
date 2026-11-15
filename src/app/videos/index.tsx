@@ -1,6 +1,7 @@
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 
 interface VideoLecture {
@@ -43,8 +44,9 @@ export default function VideosGallery() {
   }, []);
 
   return (
-    <View className="flex-1 bg-surface-background">
+    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
+        <View className="w-full max-w-7xl mx-auto">
         <View className="mb-8">
           <Text className="text-4xl font-bold text-text-primary mb-2">Video Library</Text>
           <Text className="text-lg text-text-secondary">Watch and learn at your own pace.</Text>
@@ -90,7 +92,8 @@ export default function VideosGallery() {
             ))}
           </View>
         )}
+        </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

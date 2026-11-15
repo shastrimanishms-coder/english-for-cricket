@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { supabase } from '../../lib/supabase';
 
@@ -190,7 +191,8 @@ export default function StudentProfile() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-surface-background" contentContainerStyle={{ padding: 24 }}>
+    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       <View className="max-w-2xl w-full mx-auto space-y-6">
         
         <View className="flex-row items-center justify-between mb-4">
@@ -335,5 +337,6 @@ export default function StudentProfile() {
 
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }

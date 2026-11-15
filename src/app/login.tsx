@@ -11,6 +11,7 @@ import {
   TextInput,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../components/ui/AnimatedButton';
 import { supabase } from '../lib/supabase';
 
@@ -155,6 +156,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-surface-background"
     >
+      <SafeAreaView edges={['top']} className="flex-1">
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <View className="w-full max-w-lg mx-auto">
           
@@ -289,6 +291,7 @@ export default function LoginScreen() {
 
         </View>
       </ScrollView>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

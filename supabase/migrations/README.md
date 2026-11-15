@@ -11,7 +11,7 @@ for you to run when you're ready.
    into the query editor.
 3. Click **Run**. Watch for a success message; if there's an error, copy
    the error text and send it to Muse before running anything else.
-4. Run the files **in number order** (000001 → 000008).
+4. Run the files **in number order** (000001 → 000009).
 
 ## Run order and what each file does
 
@@ -25,6 +25,7 @@ for you to run when you're ready.
 | 6 | `20261115000006_lesson_completions.sql` | Required for Phase 1 | Creates the `lesson_completions` table the new Lesson Player writes to when a student finishes a lesson (score, time taken), with safety rules: students see their own completions, their manager sees their students', and the admin sees all. The player works without it (it just can't record yet), so run it when convenient — but ticks on the Learning Path only appear after it exists. |
 | 7 | `20261115000007_fix_signup_trigger_role_cast.sql` | **Required — run ASAP** | Fixes file 3: the `role` column is an enum type, and file 3's trigger inserted plain text, which made **every new registration fail** with a database error. This file replaces the trigger's function with a version that casts the role properly. Run it, then test by registering a new account in the app. |
 | 8 | `20261115000008_activity_and_stats.sql` | Required for Phase 2 | Three things: (1) a `log_activity` function so **PIN students' game/video playtime finally gets recorded** (until now only email learners' time was logged; the function checks the student exists and is active, the same trust model as student PIN login); (2) the sign-up trigger now also saves **country and region** into the new profile when the register form sends them; (3) a `get_admin_user_stats` function that gives the admin one row per learner — total time on the app, the game/video/lesson split, lessons completed, average accuracy, last active — and returns nothing to anyone who isn't the admin. The app keeps working if this file hasn't been run yet; recording for PIN students just stays off until it is. |
+| 9 | `20261115000009_badge_progress_rpcs.sql` | **Optional — recommended** | Two small read functions the badge system uses: `get_activity_days` (which days a student was active — feeds **Daily Login Streak** badges) and `get_module_progress` (how many of a module's lessons a student has finished — feeds **Complete a Module** badges). They exist because PIN students have no login session, so the normal safety rules give them no way to read their own progress back; the functions check a PIN student exists and is active first (the same trust model as student PIN login), and a signed-in email learner can only be asked about themselves. **The app works without this file** — email learners' badges still evaluate from direct reads — but PIN students' module and streak badges evaluate less completely until it is run. |
 
 ## One thing these files cannot do
 

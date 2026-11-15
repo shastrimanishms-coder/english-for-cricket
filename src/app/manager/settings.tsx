@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
@@ -130,7 +131,7 @@ export default function OrganizationSettings() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-surface-background">
       {/* Header */}
-      <View className="w-full bg-surface shadow-sm border-b border-slate-200">
+      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
         <View className="max-w-4xl w-full mx-auto flex-row justify-between items-center p-6">
           <Text className="text-xl md:text-2xl font-bold text-text-primary">Organization Settings</Text>
           
@@ -144,7 +145,7 @@ export default function OrganizationSettings() {
             />
           </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="max-w-3xl w-full mx-auto space-y-8 gap-8">

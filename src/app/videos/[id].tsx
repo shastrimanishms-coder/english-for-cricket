@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -28,6 +29,12 @@ export default function VideoPlayer() {
   // Starts once the video row is loaded; fails soft until migration
   // 20261115000008 (log_activity RPC) has been run.
   useActivityLogger({ activityType: 'video', targetId: video?.id ?? null });
+
+  // Layout: portrait keeps the video in a 16:9 frame at the top of the
+  // screen (with the title beneath it); landscape gives the video the
+  // full available area, like a fullscreen player.
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
   const fetchVideoDetails = useCallback(async () => {
     try {
@@ -75,15 +82,15 @@ export default function VideoPlayer() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-slate-900 items-center justify-center">
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center">
         <ActivityIndicator size="large" color="#ffffff" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (fetchError) {
     return (
-      <View className="flex-1 bg-slate-900 items-center justify-center p-6">
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
         <Text className="text-white text-xl font-bold mb-2 text-center">
           Couldn&apos;t load this video
         </Text>
@@ -103,28 +110,64 @@ export default function VideoPlayer() {
         <Pressable onPress={() => router.back()} className="px-6 py-3">
           <Text className="font-bold text-slate-300">Go Back</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!video) {
     return (
-      <View className="flex-1 bg-slate-900 items-center justify-center p-6">
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
         <Text className="text-white text-xl font-bold mb-4">Video not found.</Text>
         <Pressable onPress={() => router.back()} className="px-6 py-3 bg-white rounded-lg">
           <Text className="font-bold text-slate-900">Go Back</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 
+  // The embed itself (web iframe / native WebView) plus its loading
+  // overlay - shared by the portrait and landscape layouts below.
+  const embed = (
+    <>
+      {Platform.OS === 'web' ? (
+        <iframe
+          key={embedKey}
+          src={getEmbedUrl(video.video_url)}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          title={video.title}
+          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          onLoad={() => setEmbedStatus('ready')}
+          onError={() => setEmbedStatus('error')}
+        />
+      ) : (
+        <WebView
+          key={embedKey}
+          source={{ uri: getEmbedUrl(video.video_url) }}
+          className="flex-1"
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          onLoadEnd={() => setEmbedStatus('ready')}
+          onError={() => setEmbedStatus('error')}
+          onHttpError={() => setEmbedStatus('error')}
+        />
+      )}
+      {embedStatus === 'loading' ? (
+        <View className="absolute inset-0 items-center justify-center bg-slate-900">
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text className="text-slate-400 mt-3">Loading video…</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
   return (
-    <View className="flex-1 bg-slate-900">
+    <SafeAreaView className="flex-1 bg-slate-900">
       <View className="flex-row items-center justify-between p-4 bg-black/50 z-10 absolute top-0 left-0 right-0">
         <Pressable onPress={() => router.back()} className="px-4 py-2 bg-white/10 rounded-full border border-white/20">
           <Text className="text-white font-bold text-sm">← Back to Library</Text>
         </Pressable>
-        <Text className="text-white font-bold text-lg" numberOfLines={1}>{video.title}</Text>
+        <Text className="text-white font-bold text-lg flex-1 text-center mx-2" numberOfLines={1}>{video.title}</Text>
         <View className="w-24" />
       </View>
 
@@ -144,40 +187,22 @@ export default function VideoPlayer() {
               <Text className="font-bold text-slate-300">Go Back</Text>
             </Pressable>
           </View>
+        ) : isLandscape ? (
+          <View className="flex-1">{embed}</View>
         ) : (
-          <>
-            {Platform.OS === 'web' ? (
-              <iframe
-                key={embedKey}
-                src={getEmbedUrl(video.video_url)}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-                title={video.title}
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                onLoad={() => setEmbedStatus('ready')}
-                onError={() => setEmbedStatus('error')}
-              />
-            ) : (
-              <WebView
-                key={embedKey}
-                source={{ uri: getEmbedUrl(video.video_url) }}
-                className="flex-1"
-                allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={false}
-                onLoadEnd={() => setEmbedStatus('ready')}
-                onError={() => setEmbedStatus('error')}
-                onHttpError={() => setEmbedStatus('error')}
-              />
-            )}
-            {embedStatus === 'loading' ? (
-              <View className="absolute inset-0 items-center justify-center bg-slate-900">
-                <ActivityIndicator size="large" color="#ffffff" />
-                <Text className="text-slate-400 mt-3">Loading video…</Text>
-              </View>
-            ) : null}
-          </>
+          <View>
+            <View style={{ width: '100%', aspectRatio: 16 / 9 }} className="bg-black">
+              {embed}
+            </View>
+            <View className="p-6">
+              <Text className="text-white text-xl font-bold mb-2">{video.title}</Text>
+              <Text className="text-slate-400">
+                Rotate your phone sideways to watch in fullscreen.
+              </Text>
+            </View>
+          </View>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }

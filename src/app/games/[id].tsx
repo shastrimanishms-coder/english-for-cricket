@@ -1,7 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
+import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 
@@ -13,6 +22,59 @@ interface GameDetails {
 
 type EmbedStatus = 'loading' | 'ready' | 'error';
 
+/**
+ * BadgeToast - a small pill that slides in under the header when opening
+ * a game earns a badge, then fades away on its own (~3.5s). The parent
+ * queues multiple badges by rendering one toast at a time, keyed by
+ * badge id.
+ */
+function BadgeToast({ badge, onDone }: { badge: AwardedBadge; onDone: () => void }) {
+  const translateY = useSharedValue(-28);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.set(withSpring(0, { damping: 14, stiffness: 220 }));
+    opacity.set(withTiming(1, { duration: 250 }));
+    const hideTimer = setTimeout(() => {
+      opacity.set(withTiming(0, { duration: 250 }));
+      translateY.set(withTiming(-16, { duration: 250 }));
+    }, 3250);
+    const doneTimer = setTimeout(onDone, 3550);
+    return () => {
+      clearTimeout(hideTimer);
+      clearTimeout(doneTimer);
+    };
+    // Fresh mount per badge (parent keys by badge id); run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: 'absolute',
+          top: 76,
+          left: 0,
+          right: 0,
+          alignItems: 'center',
+          zIndex: 20,
+        },
+        style,
+      ]}
+    >
+      <View className="bg-[#0A192F]/95 border border-[#D4AF37] rounded-full px-5 py-2.5 shadow-lg">
+        <Text className="text-white font-bold text-sm">🏆 Badge earned: {badge.title}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function GamePlayer() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -23,11 +85,27 @@ export default function GamePlayer() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [embedStatus, setEmbedStatus] = useState<EmbedStatus>('loading');
   const [embedKey, setEmbedKey] = useState(0);
+  // Badges newly earned by opening this game, toasted one at a time.
+  const [badgeToasts, setBadgeToasts] = useState<AwardedBadge[]>([]);
 
   // Playtime telemetry for both identity kinds (see useActivityLogger).
   // Starts once the game row is loaded; fails soft until migration
   // 20261115000008 (log_activity RPC) has been run.
   useActivityLogger({ activityType: 'game', targetId: game?.id ?? null });
+
+  // "Play a Game" badges (v1 semantics): opening the game earns its
+  // badge. Evaluated once the game row has loaded - the same moment the
+  // activity logger above starts - because embedded games expose no
+  // completion signal to award against. Fails soft.
+  useEffect(() => {
+    if (!game) return;
+    (async () => {
+      const identity = await getStudentIdentity();
+      if (!identity) return;
+      const awarded = await evaluateGameBadge(identity, game.id);
+      if (awarded.length > 0) setBadgeToasts(awarded);
+    })();
+  }, [game]);
 
   const fetchGameDetails = useCallback(async () => {
     try {
@@ -64,15 +142,15 @@ export default function GamePlayer() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-slate-900 items-center justify-center">
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center">
         <ActivityIndicator size="large" color="#ffffff" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (fetchError) {
     return (
-      <View className="flex-1 bg-slate-900 items-center justify-center p-6">
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
         <Text className="text-white text-xl font-bold mb-2 text-center">
           Couldn&apos;t load this game
         </Text>
@@ -92,30 +170,38 @@ export default function GamePlayer() {
         <Pressable onPress={() => router.back()} className="px-6 py-3">
           <Text className="font-bold text-slate-300">Go Back</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!game) {
     return (
-      <View className="flex-1 bg-slate-900 items-center justify-center p-6">
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
         <Text className="text-white text-xl font-bold mb-4">Game not found.</Text>
         <Pressable onPress={() => router.back()} className="px-6 py-3 bg-white rounded-lg">
           <Text className="font-bold text-slate-900">Go Back</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View className="flex-1 bg-slate-900">
+    <SafeAreaView className="flex-1 bg-slate-900">
       <View className="flex-row items-center justify-between p-4 bg-black/50 z-10 absolute top-0 left-0 right-0">
         <Pressable onPress={() => router.back()} className="px-4 py-2 bg-white/10 rounded-full border border-white/20">
           <Text className="text-white font-bold text-sm">← Back to Arcade</Text>
         </Pressable>
-        <Text className="text-white font-bold text-lg">{game.title}</Text>
+        <Text className="text-white font-bold text-lg flex-1 text-center mx-2" numberOfLines={1}>{game.title}</Text>
         <View className="w-24" /> {/* Spacer for centering */}
       </View>
+
+      {badgeToasts[0] ? (
+        <BadgeToast
+          key={badgeToasts[0].id}
+          badge={badgeToasts[0]}
+          onDone={() => setBadgeToasts((queue) => queue.slice(1))}
+        />
+      ) : null}
 
       <View className="flex-1 pt-16">
         {embedStatus === 'error' ? (
@@ -166,6 +252,6 @@ export default function GamePlayer() {
           </>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }

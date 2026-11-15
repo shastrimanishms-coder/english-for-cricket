@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
@@ -166,14 +167,14 @@ export default function LearningProgress() {
 
   return (
     <View className="flex-1 bg-surface-background">
-      <View className="w-full bg-surface shadow-sm border-b border-slate-200">
+      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
         <View className="max-w-5xl w-full mx-auto flex-row justify-between items-center p-6">
           <Text className="text-xl md:text-2xl font-bold text-text-primary">Learning Progress</Text>
           <View className="w-40 md:w-48">
             <AnimatedButton title="Back to Dashboard" onPress={() => router.push('/manager')} variant="outline" size="sm" />
           </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="max-w-5xl w-full mx-auto space-y-6">

@@ -13,6 +13,7 @@ import {
   TextInput,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
@@ -273,7 +274,7 @@ export default function StudentManagement() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-surface-background">
-      <View className="w-full bg-surface shadow-sm border-b border-slate-200">
+      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
         <View className="max-w-5xl w-full mx-auto flex-row justify-between items-center p-6">
           <Text className="text-xl md:text-2xl font-bold text-text-primary">My Students</Text>
           <View className="w-40 md:w-48">
@@ -285,7 +286,7 @@ export default function StudentManagement() {
             />
           </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="max-w-5xl w-full mx-auto space-y-8 gap-8">
@@ -470,7 +471,7 @@ export default function StudentManagement() {
           print rules in global.css isolate #login-slips so only the
           slips reach the paper. On native this is a preview only. */}
       <Modal visible={showSlips} animationType="slide" onRequestClose={() => setShowSlips(false)}>
-        <View className="flex-1 bg-white">
+        <SafeAreaView className="flex-1 bg-white">
           <View className="flex-row justify-between items-center p-4 border-b border-slate-200">
             <Text className="text-lg font-bold text-text-primary">Login Slips ({students.length})</Text>
             <View className="flex-row gap-3">
@@ -502,7 +503,7 @@ export default function StudentManagement() {
                     <Text className="text-xs text-text-secondary">Student Login Slip</Text>
                   </View>
                   <Text className="text-2xl font-bold text-text-primary mb-3">{student.display_name}</Text>
-                  <View className="flex-row gap-6 mb-4">
+                  <View className="flex-row flex-wrap gap-6 mb-4">
                     <View>
                       <Text className="text-xs font-bold text-text-secondary uppercase">Username</Text>
                       <Text className="font-mono text-lg font-bold text-text-primary">{student.username}</Text>
@@ -521,7 +522,7 @@ export default function StudentManagement() {
               ))}
             </View>
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
     </KeyboardAvoidingView>
   );

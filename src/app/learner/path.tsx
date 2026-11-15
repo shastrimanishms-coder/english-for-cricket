@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 
@@ -158,7 +159,7 @@ export default function LearningPath() {
   return (
     <View className="flex-1 bg-white">
       {/* Top Navigation Bar - Dark Navy (matches learner home) */}
-      <View className="w-full bg-[#0A192F] shadow-sm">
+      <SafeAreaView edges={['top']} className="w-full bg-[#0A192F] shadow-sm">
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-4 md:p-6">
           <View className="flex-row items-center gap-3">
             <Pressable onPress={() => router.back()} className="px-3 py-2 bg-white/10 rounded-lg border border-white/20">
@@ -169,7 +170,7 @@ export default function LearningPath() {
             </Text>
           </View>
         </View>
-      </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
         <View className="max-w-4xl w-full mx-auto">

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, LayoutAnimation, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
+import { ActivityIndicator, LayoutAnimation, Platform, Pressable, ScrollView, Text, UIManager, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BadgesManager from '../../components/admin/BadgesManager';
 import CategoriesManager from '../../components/admin/CategoriesManager';
 import CurriculumManager from '../../components/admin/CurriculumManager';
@@ -58,6 +59,12 @@ const ADMIN_MENU = [
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  // Responsive shell: on phone-width layouts the sidebar stacks above
+  // the content, so its menu must not swallow the whole screen; the top
+  // inset keeps the sidebar header clear of the notch on native.
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isNarrowLayout = windowWidth < 768;
   // Defense-in-depth: only super_admin sessions may see the CMS at all.
   // (RLS on the tables remains the real enforcement.)
   const guardStatus = useRequireRole(['super_admin']);
@@ -192,8 +199,8 @@ export default function SuperAdminDashboard() {
     <View className="flex-1 flex-col md:flex-row bg-slate-50">
       
       {/* LEFT SIDEBAR */}
-      <View className="w-full md:w-72 bg-[#0A192F] flex-col justify-between border-r border-slate-800">
-        <ScrollView>
+      <View style={{ paddingTop: insets.top }} className="w-full md:w-72 bg-[#0A192F] flex-col justify-between border-r border-slate-800">
+        <ScrollView style={isNarrowLayout ? { maxHeight: windowHeight * 0.38 } : undefined}>
           <View className="p-6 border-b border-slate-800 mb-4">
             <Text className="text-xl font-bold text-white tracking-wider">KYCO</Text>
             <Text className="text-[#D4AF37] text-xs font-bold tracking-widest uppercase mt-1">Super Admin CMS</Text>

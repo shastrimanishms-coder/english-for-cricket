@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../components/ui/AnimatedButton';
 import { supabase } from '../lib/supabase';
 
@@ -49,7 +50,7 @@ export default function UpdatePassword() {
   };
 
   return (
-    <View className="flex-1 bg-surface-background justify-center px-6 py-12 md:px-12">
+    <SafeAreaView className="flex-1 bg-surface-background justify-center px-6 py-12 md:px-12">
       <View className="max-w-md w-full mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
         <View className="mb-2">
           <Text className="text-3xl font-bold text-[#0A192F] mb-2">Create New Password</Text>
@@ -89,6 +90,6 @@ export default function UpdatePassword() {
           />
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }

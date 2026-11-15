@@ -1,9 +1,11 @@
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
 
 export default function RootLayout() {
   return (
+    <SafeAreaProvider>
     <View className="flex-1 bg-surface-background">
       <Stack
         screenOptions={{
@@ -33,5 +35,6 @@ export default function RootLayout() {
         <Stack.Screen name="lesson/[id]" />
       </Stack>
     </View>
+    </SafeAreaProvider>
   );
 }

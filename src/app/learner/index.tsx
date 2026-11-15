@@ -2,8 +2,47 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { evaluateStreakBadges } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
+
+/**
+ * The one gently looping animation on this screen: a cricket ball that
+ * bounces ~6px on a slow 1.6s ease loop beside the greeting.
+ */
+function BouncingBall() {
+  const bounce = useSharedValue(0);
+
+  useEffect(() => {
+    bounce.set(
+      withRepeat(
+        withSequence(
+          withTiming(-6, { duration: 800, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 800, easing: Easing.inOut(Easing.quad) })
+        ),
+        -1,
+        false
+      )
+    );
+  }, [bounce]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: bounce.value }],
+  }));
+
+  return <Animated.Text style={[{ fontSize: 34 }, style]}>🏏</Animated.Text>;
+}
 
 // Define the content modules based on the new architecture
 const LEARNING_MODULES = [
@@ -60,6 +99,10 @@ export default function LearnerDashboard() {
     (async () => {
       const identity = await getStudentIdentity();
       if (identity?.displayName) setStudentName(identity.displayName);
+      // Streak badges accrue from ANY recorded activity (games, videos,
+      // lessons), not just lesson completions - re-evaluate whenever the
+      // learner lands on their home screen. Fails soft.
+      if (identity) await evaluateStreakBadges(identity);
     })();
   }, []);
 
@@ -98,7 +141,7 @@ export default function LearnerDashboard() {
   return (
     <View className="flex-1 bg-white">
       {/* Top Navigation Bar - Dark Navy */}
-      <View className="w-full bg-[#0A192F] shadow-sm">
+      <SafeAreaView edges={['top']} className="w-full bg-[#0A192F] shadow-sm">
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-4 md:p-6">
           <View className="flex-row items-center gap-3">
             <Text className="text-3xl">🏏</Text>
@@ -114,53 +157,65 @@ export default function LearnerDashboard() {
             <Text className="text-white font-bold text-sm">Log Out</Text>
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
         <View className="max-w-7xl w-full mx-auto">
           
           {/* Welcome Header */}
-          <View className="mb-10">
-            <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] mb-2">
-              Welcome back, {studentName}!
-            </Text>
-            <Text className="text-slate-500 text-lg">
-              Choose a section below to continue your journey.
-            </Text>
-          </View>
+          <Animated.View entering={FadeIn.duration(400)} style={{ marginBottom: 40 }}>
+            <View className="flex-row items-start gap-4">
+              <BouncingBall />
+              <View className="flex-1">
+                <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] mb-2">
+                  Welcome back, {studentName}!
+                </Text>
+                <Text className="text-slate-500 text-lg">
+                  Choose a section below to continue your journey.
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
 
-          {/* Feature Grid */}
+          {/* Feature Grid - cards fade and rise in, staggered ~60ms apart */}
           <View className="flex-row flex-wrap justify-between gap-y-8">
-            {LEARNING_MODULES.map((module) => (
-              <View 
-                key={module.id} 
-                className="w-full md:w-[48%] lg:w-[31%] flex-col"
+            {LEARNING_MODULES.map((module, index) => (
+              <View
+                key={module.id}
+                className="w-full md:w-[48%] lg:w-[31%]"
               >
-                {/* Image Area - Using colored blocks with emojis until real assets are added */}
-                <View 
-                  style={{ backgroundColor: module.imageColor }} 
-                  className="w-full h-48 rounded-t-xl items-center justify-center"
+                <Animated.View
+                  entering={FadeInDown.delay(index * 60).duration(500)}
+                  style={{ flex: 1 }}
                 >
-                  <Text className="text-7xl">{module.icon}</Text>
-                </View>
+                  <View className="flex-col flex-1">
+                    {/* Image Area - Using colored blocks with emojis until real assets are added */}
+                    <View
+                      style={{ backgroundColor: module.imageColor }}
+                      className="w-full h-48 rounded-t-xl items-center justify-center"
+                    >
+                      <Text className="text-7xl">{module.icon}</Text>
+                    </View>
 
-                {/* Content Area */}
-                <View className="pt-4 pb-2 px-1 flex-1 justify-between">
-                  <View>
-                    <Text className="text-2xl font-bold text-[#D4AF37] mb-3 capitalize">
-                      {module.title}
-                    </Text>
-                    <Text className="text-slate-600 text-base leading-relaxed mb-6">
-                      {module.description}
-                    </Text>
+                    {/* Content Area */}
+                    <View className="pt-4 pb-2 px-1 flex-1 justify-between">
+                      <View>
+                        <Text className="text-2xl font-bold text-[#D4AF37] mb-3 capitalize">
+                          {module.title}
+                        </Text>
+                        <Text className="text-slate-600 text-base leading-relaxed mb-6">
+                          {module.description}
+                        </Text>
+                      </View>
+
+                      <Pressable onPress={() => navigateToModule(module.id)}>
+                        <Text className="text-[#D4AF37] font-bold text-base uppercase tracking-wider">
+                          {module.cta}
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  
-                  <Pressable onPress={() => navigateToModule(module.id)}>
-                    <Text className="text-[#D4AF37] font-bold text-base uppercase tracking-wider">
-                      {module.cta}
-                    </Text>
-                  </Pressable>
-                </View>
+                </Animated.View>
               </View>
             ))}
           </View>
