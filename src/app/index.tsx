@@ -11,7 +11,7 @@ export default function LandingPage() {
   const router = useRouter();
 
   // Header logo: an admin-uploaded logo (Admin → System Settings) when
-  // one is set, otherwise the bundled crest. A remote logo that fails
+  // one is set, otherwise the bundled default logo. A remote logo that fails
   // to load falls back to the crest via onError.
   const { source: logoSource, onError: logoOnError } = useAppLogo();
 
@@ -58,21 +58,13 @@ export default function LandingPage() {
       {/* HEADER - Upgraded with Animated Buttons */}
       <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm">
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center px-4 py-4 md:p-6">
-          <View className="flex-row items-center gap-3">
+          <View className="flex-row items-center">
             <Image
               source={logoSource}
               onError={logoOnError}
-              className="w-11 h-11 rounded-full"
+              style={{ width: 76, height: 56 }}
               resizeMode="contain"
             />
-            <View className="flex-col">
-              <Text className="text-xl font-bold text-text-primary tracking-widest uppercase">
-                English
-              </Text>
-              <Text className="text-sm font-semibold text-text-secondary tracking-widest uppercase">
-                For Cricket
-              </Text>
-            </View>
           </View>
           <View className="flex-row items-center space-x-4 gap-4">
             <View className="w-24">

@@ -10,8 +10,9 @@ interface UserProfile {
   created_at: string;
 }
 
-// Bundled default logo (KYCO crest), shown whenever no custom logo is set.
-const BUNDLED_LOGO = require('../../../assets/images/logo-crest.png');
+// Bundled default logo (full English for Cricket lockup), shown whenever
+// no custom logo is set.
+const BUNDLED_LOGO = require('../../../assets/images/logo-full.png');
 
 export default function SystemSettings() {
   const [loading, setLoading] = useState(true);
@@ -20,7 +21,7 @@ export default function SystemSettings() {
   // Settings State
   const [supportEmail, setSupportEmail] = useState('');
   // App / Web Logo: public URL stored in site_settings.app_logo_url.
-  // Empty means the app uses the bundled default crest.
+  // Empty means the app uses the bundled default logo.
   const [appLogoUrl, setAppLogoUrl] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
@@ -98,7 +99,7 @@ export default function SystemSettings() {
     if (Platform.OS === 'web') {
       if (window.confirm('Go back to the bundled default logo?')) doReset();
     } else {
-      Alert.alert('Use Default Logo?', 'The bundled crest will be shown again.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Yes', onPress: doReset }]);
+      Alert.alert('Use Default Logo?', 'The bundled default logo will be shown again.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Yes', onPress: doReset }]);
     }
   };
 
@@ -133,7 +134,7 @@ export default function SystemSettings() {
   };
 
   // Effective logo for the previews: the uploaded one when set (and
-  // loadable), otherwise the bundled default crest.
+  // loadable), otherwise the bundled default logo.
   const previewLogoSource = appLogoUrl && !logoPreviewFailed ? { uri: appLogoUrl } : BUNDLED_LOGO;
 
   return (
@@ -181,13 +182,13 @@ export default function SystemSettings() {
           <View className="flex-1">
             <Text className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">On light</Text>
             <View className="bg-slate-100 border border-slate-200 rounded-xl h-24 items-center justify-center p-3">
-              <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} className="w-full h-full" resizeMode="contain" />
+              <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             </View>
           </View>
           <View className="flex-1">
             <Text className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">On dark</Text>
             <View className="bg-[#0A192F] border border-slate-200 rounded-xl h-24 items-center justify-center p-3">
-              <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} className="w-full h-full" resizeMode="contain" />
+              <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             </View>
           </View>
         </View>
@@ -195,7 +196,7 @@ export default function SystemSettings() {
         <Text className="text-sm text-slate-500">
           {appLogoUrl && !logoPreviewFailed
             ? 'A custom logo is currently live in the header.'
-            : 'Currently using the bundled default crest.'}
+            : 'Currently using the bundled default logo.'}
         </Text>
 
         <View className="flex-row items-center gap-4 flex-wrap">

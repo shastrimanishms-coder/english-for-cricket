@@ -2,21 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 import { supabase } from './supabase';
 
-// The bundled default logo (KYCO crest), used whenever no custom logo
-// has been uploaded in Admin → System Settings.
-export const DEFAULT_APP_LOGO: ImageSourcePropType = require('../../assets/images/logo-crest.png');
+// The bundled default logo (the full English for Cricket lockup), used
+// whenever no custom logo has been uploaded in Admin → System Settings.
+export const DEFAULT_APP_LOGO: ImageSourcePropType = require('../../assets/images/logo-full.png');
 
 /**
  * Resolves the effective app/web logo.
  *
  * Admins can upload a replacement logo in System Settings; its public
  * URL is stored in site_settings under `app_logo_url`. When that setting
- * is empty — or the remote image fails to load — the bundled crest is
+ * is empty — or the remote image fails to load — the bundled default logo is
  * used instead, so the header never shows a broken image.
  *
  * Returns the Image `source` to render plus an `onError` handler that
  * must be attached to the same <Image> so a dead remote URL falls back
- * to the bundled crest.
+ * to the bundled default logo.
  */
 export function useAppLogo() {
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
