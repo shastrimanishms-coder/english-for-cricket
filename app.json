@@ -1,1 +1,51 @@
-{"expo":{"android":{"adaptiveIcon":{"backgroundColor":"#E6F4FE","backgroundImage":"./assets/images/android-icon-background.png","foregroundImage":"./assets/images/android-icon-foreground.png","monochromeImage":"./assets/images/android-icon-monochrome.png"},"package":"com.englishforcricket.app","predictiveBackGestureEnabled":false},"experiments":{"reactCompiler":true,"typedRoutes":true},"icon":"./assets/images/icon.png","ios":{"bundleIdentifier":"com.englishforcricket.app","icon":"./assets/expo.icon","supportsTablet":true},"name":"English for Cricket","orientation":"default","plugins":["expo-router",["expo-splash-screen",{"backgroundColor":"#0A192F","image":"./assets/images/splash-icon.png","imageWidth":76}],"expo-secure-store","expo-video","expo-status-bar","expo-web-browser","expo-audio","expo-document-picker"],"scheme":"englishforcricket","slug":"english-for-cricket","userInterfaceStyle":"light","version":"1.0.0","web":{"favicon":"./assets/images/favicon.png","output":"server"}}}
+{
+  "expo": {
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A192F",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "package": "com.englishforcricket.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "experiments": {
+      "reactCompiler": true,
+      "typedRoutes": true
+    },
+    "icon": "./assets/images/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.englishforcricket.app",
+      "icon": "./assets/images/icon.png",
+      "supportsTablet": true
+    },
+    "name": "English for Cricket",
+    "orientation": "default",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A192F",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-secure-store",
+      "expo-video",
+      "expo-status-bar",
+      "expo-web-browser",
+      "expo-audio",
+      "expo-document-picker"
+    ],
+    "scheme": "englishforcricket",
+    "slug": "english-for-cricket",
+    "userInterfaceStyle": "light",
+    "version": "1.0.0",
+    "web": {
+      "favicon": "./assets/images/favicon.png",
+      "output": "server"
+    }
+  }
+}
