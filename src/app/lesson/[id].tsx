@@ -39,6 +39,12 @@ import { getStudentIdentity } from '../../lib/studentIdentity';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
 import {
+  cancelSpeechCue,
+  playDing,
+  probeVoicesAvailable,
+  speakWithCallback,
+} from '../../lib/speechCue';
+import {
   speechErrorMessage,
   useSpeechCheck,
   type SpeechCheckError,
@@ -237,12 +243,20 @@ function SpeakRepeatSlide({
   slide,
   attempt,
   playOrSpeak,
+  playModelThen,
+  visitKey,
   onAnswered,
   onRetry,
 }: {
   slide: Slide;
   attempt: SlideAttempt;
   playOrSpeak: (url: string | null | undefined, text: string | null | undefined) => void;
+  playModelThen: (
+    url: string | null | undefined,
+    text: string | null | undefined,
+    onDone: () => void
+  ) => void;
+  visitKey: number;
   onAnswered: (
     slide: Slide,
     correct: boolean,
@@ -274,6 +288,69 @@ function SpeakRepeatSlide({
     void speech.start();
   };
 
+  // The latest speech-check state, readable from timers without
+  // making the auto-flow effect depend on the hook object's identity.
+  const speechRef = useRef(speech);
+  useEffect(() => {
+    speechRef.current = speech;
+  });
+
+  // Hands-free flow: when the slide arrives, the model line plays by
+  // itself; a ding then marks the learner's turn and the microphone
+  // opens on its own (it closes by itself when they finish speaking).
+  // Everything fails soft - Listen and Tap to Speak stay as the
+  // manual path, and leaving the slide cancels the whole sequence.
+  useEffect(() => {
+    if (attempt.answered) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    playModelThen(slide.audio_url, target, () => {
+      if (cancelled) return;
+      playDing();
+      const tryStart = (attemptsLeft: number) => {
+        if (cancelled) return;
+        const current = speechRef.current;
+        if (current.supported) {
+          timer = setTimeout(() => {
+            if (cancelled) return;
+            setError(null);
+            try {
+              Speech.stop();
+            } catch {
+              // TTS is a nicety, never a blocker.
+            }
+            void speechRef.current.start();
+          }, 450);
+        } else if (current.supported === null && attemptsLeft > 0) {
+          // The recogniser is still reporting whether it exists.
+          timer = setTimeout(() => tryStart(attemptsLeft - 1), 500);
+        }
+      };
+      tryStart(4);
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      cancelSpeechCue();
+    };
+  }, [visitKey, attempt.answered, playModelThen, slide.audio_url, target]);
+
+  // When the line can only be heard through the device voice (no
+  // recorded audio), find out whether this browser has a voice at
+  // all - with none installed, Listen is silent and the learner
+  // deserves to know why.
+  const [noVoices, setNoVoices] = useState(false);
+  useEffect(() => {
+    if (slide.audio_url) return;
+    let alive = true;
+    void probeVoicesAvailable().then((ok) => {
+      if (alive) setNoVoices(!ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [slide.audio_url]);
+
   return (
     <View className="items-center">
       {slide.media_url ? (
@@ -295,6 +372,13 @@ function SpeakRepeatSlide({
       >
         <Text className="text-white font-bold text-base">🔊 Listen</Text>
       </Pressable>
+
+      {noVoices ? (
+        <Text className="text-amber-600 text-xs text-center max-w-md mb-6 -mt-3">
+          🔇 This browser has no voice installed, so Listen may stay silent. Chrome, or
+          the phone app, can read the line aloud.
+        </Text>
+      ) : null}
 
       {attempt.answered && attempt.speechResult ? (
         <View className="w-full items-center">
@@ -507,6 +591,55 @@ export default function LessonPlayer() {
       }
     },
     [playAudio, speakText]
+  );
+
+  // Hands-free variant of playOrSpeak for speaking slides: plays the
+  // model line and calls onDone when the line is over, so the slide
+  // can ding and open the microphone at exactly the right moment.
+  // Recorded audio is watched via the player until it stops; the
+  // device voice reports its own completion. A generous cap keeps a
+  // stuck player from ever stalling the flow.
+  const playModelThen = useCallback(
+    (
+      url: string | null | undefined,
+      text: string | null | undefined,
+      onDone: () => void
+    ) => {
+      if (!url) {
+        speakWithCallback(text || '', onDone);
+        return;
+      }
+      playAudio(url);
+      const player = playerRef.current;
+      if (!player) {
+        onDone();
+        return;
+      }
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        onDone();
+      };
+      let started = false;
+      const poll = setInterval(() => {
+        try {
+          if (player.playing || player.currentTime > 0) started = true;
+          if (started && !player.playing) {
+            clearInterval(poll);
+            finish();
+          }
+        } catch {
+          clearInterval(poll);
+          finish();
+        }
+      }, 250);
+      setTimeout(() => {
+        clearInterval(poll);
+        finish();
+      }, 15000);
+    },
+    [playAudio]
   );
 
   const feedbackHaptic = useCallback((correct: boolean) => {
@@ -947,6 +1080,8 @@ export default function LessonPlayer() {
           slide={slide}
           attempt={attempt}
           playOrSpeak={playOrSpeak}
+          playModelThen={playModelThen}
+          visitKey={queuePos}
           onAnswered={handleSpeechAnswered}
           onRetry={handleSpeechRetry}
         />

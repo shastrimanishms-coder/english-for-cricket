@@ -79,7 +79,7 @@ export function speechErrorMessage(error: SpeechCheckError): string {
     case 'no-speech':
       return "I couldn't hear anything that time — try again a little louder.";
     case 'network':
-      return 'The speech checker needs an internet connection on this device.';
+      return 'The speech checker could not run in this browser — it needs an internet speech service, which some browsers (like Brave) block. Chrome works best. You can still record your voice or say the line out loud.';
     case 'unsupported':
       return "This device or browser can't check speech automatically.";
     default:

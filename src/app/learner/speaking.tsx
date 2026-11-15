@@ -17,6 +17,12 @@ import Celebration from '../../components/ui/Celebration';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import {
+  cancelSpeechCue,
+  playDing,
+  probeVoicesAvailable,
+  speakWithCallback,
+} from '../../lib/speechCue';
+import {
   SPEAKING_SCENARIOS,
   learnerLineCount,
   type SpeakingScenario,
@@ -203,20 +209,6 @@ export default function SpeakingPractice() {
     }
   }, [index, finished]);
 
-  // In a scenario, the other person speaks their line out loud as
-  // their turn arrives (the learner can replay it with Listen).
-  useEffect(() => {
-    if (mode !== 'scenario' || !scenario || scenarioDone) return;
-    const turn = scenario.turns[turnIndex];
-    if (!turn || turn.speaker !== 'other') return;
-    try {
-      Speech.stop();
-      Speech.speak(turn.text, { language: 'en' });
-    } catch {
-      // TTS is a nicety, never a blocker.
-    }
-  }, [mode, scenario, turnIndex, scenarioDone]);
-
   // Recording timer (display only; the counter itself is reset by the
   // record/stop handlers).
   useEffect(() => {
@@ -328,6 +320,82 @@ export default function SpeakingPractice() {
       console.log('Speech error:', error);
     }
   }, [current]);
+
+  // ---- Hands-free speaking flow -------------------------------------
+  // When a line (or the learner's dialogue turn) arrives, the app
+  // reads it aloud by itself; a ding then marks the learner's turn
+  // and the microphone opens on its own, closing when they finish
+  // speaking. The buttons all stay as the manual path, and leaving
+  // the line cancels the sequence. Refs keep the timers pointed at
+  // the latest recogniser state without retriggering the effects.
+  const supportedRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    supportedRef.current = speech.supported;
+  }, [speech.supported]);
+  const startCheckRef = useRef(startCheck);
+  useEffect(() => {
+    startCheckRef.current = startCheck;
+  });
+
+  const cueLearnerTurn = useCallback((text: string) => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    speakWithCallback(text, () => {
+      if (cancelled) return;
+      playDing();
+      const tryStart = (attemptsLeft: number) => {
+        if (cancelled) return;
+        if (supportedRef.current) {
+          timer = setTimeout(() => {
+            if (!cancelled) startCheckRef.current();
+          }, 450);
+        } else if (supportedRef.current === null && attemptsLeft > 0) {
+          // The recogniser is still reporting whether it exists.
+          timer = setTimeout(() => tryStart(attemptsLeft - 1), 500);
+        }
+      };
+      tryStart(4);
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      cancelSpeechCue();
+    };
+  }, []);
+
+  // Lesson lines: cue each line as it arrives.
+  useEffect(() => {
+    if (mode !== 'lines' || loading || finished || !current) return;
+    return cueLearnerTurn(current.text);
+  }, [mode, index, finished, loading, items, current, cueLearnerTurn]);
+
+  // Scenarios: the other person's lines are spoken as their turn
+  // arrives; the learner's turns get the full model-ding-microphone
+  // cue.
+  useEffect(() => {
+    if (mode !== 'scenario' || !scenario || scenarioDone) return;
+    const turn = scenario.turns[turnIndex];
+    if (!turn) return;
+    if (turn.speaker === 'other') {
+      speakWithCallback(turn.text);
+      return () => cancelSpeechCue();
+    }
+    return cueLearnerTurn(turn.text);
+  }, [mode, scenario, turnIndex, scenarioDone, cueLearnerTurn]);
+
+  // Whether this browser has any voice at all: with none installed
+  // (common on Linux desktops), Listen is silent and the learner
+  // deserves to know why.
+  const [noVoices, setNoVoices] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void probeVoicesAvailable().then((ok) => {
+      if (alive) setNoVoices(!ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const stopPlayback = useCallback(() => {
     try {
@@ -700,6 +768,13 @@ export default function SpeakingPractice() {
                   <Text className="text-white font-bold text-base">🔊 Listen</Text>
                 </Pressable>
 
+                {noVoices ? (
+                  <Text className="text-amber-600 text-xs text-center max-w-md">
+                    🔇 This browser has no voice installed, so Listen may stay silent.
+                    Chrome, or the phone app, can read the line aloud.
+                  </Text>
+                ) : null}
+
                 {scenarioTurn.speaker === 'other' ? (
                   <Pressable
                     onPress={() => {
@@ -918,6 +993,13 @@ export default function SpeakingPractice() {
               <Pressable onPress={listen} className="px-8 py-3 bg-brand rounded-full">
                 <Text className="text-white font-bold text-base">🔊 Listen</Text>
               </Pressable>
+
+              {noVoices ? (
+                <Text className="text-amber-600 text-xs text-center max-w-md">
+                  🔇 This browser has no voice installed, so Listen may stay silent.
+                  Chrome, or the phone app, can read the line aloud.
+                </Text>
+              ) : null}
 
               {/* Automatic speech check, where the device supports it */}
               {speech.supported ? (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { contentTypeForFileName } from '../../lib/fileTypes';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -107,7 +108,9 @@ export default function DownloadsManager() {
 
     const { error: uploadError } = await supabase.storage
       .from('downloads')
-      .upload(filePath, fileBody);
+      .upload(filePath, fileBody, {
+        contentType: contentTypeForFileName(file.name, file.mimeType),
+      });
 
     if (uploadError) throw uploadError;
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { contentTypeForFileName } from '../../lib/fileTypes';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 
@@ -126,7 +127,7 @@ export default function VideosManager() {
     const { error: uploadError } = await supabase.storage
       .from('videos')
       .upload(fileName, fileBody, {
-        contentType: file.mimeType || (prefix === 'vid' ? 'video/mp4' : 'image/jpeg')
+        contentType: contentTypeForFileName(file.name, file.mimeType)
       });
 
     if (uploadError) throw uploadError;

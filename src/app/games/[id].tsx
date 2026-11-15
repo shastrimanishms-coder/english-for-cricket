@@ -193,7 +193,9 @@ export default function GamePlayer() {
           <Text className="text-white font-bold text-sm">← Back to Arcade</Text>
         </Pressable>
         <Text className="text-white font-bold text-lg flex-1 text-center mx-2" numberOfLines={1}>{game.title}</Text>
-        <View className="w-24" /> {/* Spacer for centering */}
+        {/* Spacer for centering (comment on its own line: a same-line
+            comment after an element leaves a stray " " text node) */}
+        <View className="w-24" />
       </View>
 
       {badgeToasts[0] ? (
