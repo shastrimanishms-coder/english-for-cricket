@@ -108,7 +108,7 @@ export default function RegisterScreen() {
             Check Your Inbox
           </Text>
           <Text className="text-text-secondary text-center mb-8 leading-relaxed text-lg">
-            We've sent a verification link to <Text className="font-bold text-text-primary">{email}</Text>. 
+            We&apos;ve sent a verification link to <Text className="font-bold text-text-primary">{email}</Text>. 
             Please verify your email address to activate your account.
           </Text>
           <Link href="/login" asChild>
@@ -146,7 +146,7 @@ export default function RegisterScreen() {
             >
               <Text className="text-2xl mb-2">🎓</Text>
               <Text className={`font-bold text-center ${role === 'individual_learner' ? 'text-brand' : 'text-text-secondary'}`}>
-                I'm a Student
+                I&apos;m a Student
               </Text>
               <Text className={`text-xs text-center mt-1 ${role === 'individual_learner' ? 'text-brand' : 'text-slate-400'}`}>
                 (for individual account)

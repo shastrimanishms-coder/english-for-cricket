@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { supabase } from '../../lib/supabase';
@@ -15,18 +15,11 @@ export default function VideoPlayer() {
   const router = useRouter();
   const [video, setVideo] = useState<VideoDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [startTime] = useState<number>(Date.now());
+  // Mount timestamp for watch-time telemetry. Kept in a ref (set inside the
+  // effect) so no impure call happens during render.
+  const startTimeRef = useRef<number>(0);
 
-  useEffect(() => {
-    fetchVideoDetails();
-    
-    // Telemetry: Log watch time when the component unmounts
-    return () => {
-      logWatchTime();
-    };
-  }, [id]);
-
-  const fetchVideoDetails = async () => {
+  const fetchVideoDetails = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('video_lectures')
@@ -41,9 +34,9 @@ export default function VideoPlayer() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const logWatchTime = async () => {
+  const logWatchTime = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return; 
@@ -51,7 +44,7 @@ export default function VideoPlayer() {
       const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single();
       if (profile?.role !== 'individual_learner') return;
 
-      const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
+      const durationSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
       if (durationSeconds < 10) return; // Ignore quick bounces
 
       await supabase.from('activity_logs').insert([{
@@ -63,7 +56,19 @@ export default function VideoPlayer() {
     } catch (error) {
       console.log('Telemetry error:', error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+    (async () => {
+      await fetchVideoDetails();
+    })();
+
+    // Telemetry: Log watch time when the component unmounts
+    return () => {
+      logWatchTime();
+    };
+  }, [fetchVideoDetails, logWatchTime]);
 
   // Helper to convert standard YouTube URLs to embed URLs for the WebView/iframe
   const getEmbedUrl = (url: string) => {

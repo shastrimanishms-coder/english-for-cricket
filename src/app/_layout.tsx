@@ -30,7 +30,7 @@ export default function RootLayout() {
         <Stack.Screen name="downloads" />
         
         {/* Lesson Player (Phase 3) */}
-        <Stack.Screen name="lesson" />
+        <Stack.Screen name="lesson/[id]" />
       </Stack>
     </View>
   );

@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -52,15 +52,7 @@ export default function SlideBuilder() {
     { id: 3, text: '', mediaUrl: '', audioUrl: '', localImage: null as any, localAudio: null as any, isCorrect: false },
   ]);
 
-  useEffect(() => { fetchModules(); }, []);
-  useEffect(() => { 
-    if (selectedModuleId) { fetchLessons(selectedModuleId); setSelectedLessonId(''); setSlides([]); }
-  }, [selectedModuleId]);
-  useEffect(() => { 
-    if (selectedLessonId) fetchSlides(selectedLessonId);
-  }, [selectedLessonId]);
-
-  const fetchModules = async () => {
+  const fetchModules = useCallback(async () => {
     try {
       const { data, error } = await supabase.from('curriculum_modules').select('*').order('order_index');
       if (error) throw error;
@@ -68,17 +60,17 @@ export default function SlideBuilder() {
       if (data && data.length > 0) setSelectedModuleId(data[0].id);
     } catch (error: any) { Alert.alert('Error', error.message); } 
     finally { setLoading(false); }
-  };
+  }, []);
 
-  const fetchLessons = async (modId: string) => {
+  const fetchLessons = useCallback(async (modId: string) => {
     try {
       const { data, error } = await supabase.from('curriculum_lessons').select('*').eq('module_id', modId).order('order_index');
       if (error) throw error;
       setLessons(data || []);
     } catch (error: any) { Alert.alert('Error', error.message); }
-  };
+  }, []);
 
-  const fetchSlides = async (lesId: string) => {
+  const fetchSlides = useCallback(async (lesId: string) => {
     try {
       setLoading(true);
       const { data, error } = await supabase.from('lesson_slides').select('*').eq('lesson_id', lesId).order('order_index');
@@ -87,6 +79,39 @@ export default function SlideBuilder() {
       setOrderIndex(data ? data.length.toString() : '0');
     } catch (error: any) { Alert.alert('Error', error.message); } 
     finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchModules();
+    })();
+  }, [fetchModules]);
+
+  useEffect(() => {
+    if (selectedModuleId) {
+      (async () => {
+        await fetchLessons(selectedModuleId);
+      })();
+    }
+  }, [selectedModuleId, fetchLessons]);
+
+  useEffect(() => {
+    if (selectedLessonId) {
+      (async () => {
+        await fetchSlides(selectedLessonId);
+      })();
+    }
+  }, [selectedLessonId, fetchSlides]);
+
+  // Switching modules invalidates the lesson/slide selection. Doing the
+  // reset here, in the event handler, instead of in an effect avoids the
+  // setState-in-effect cascade. The initial module chosen by fetchModules
+  // needs no reset because the selection starts empty anyway.
+  const handleSelectModule = (modId: string) => {
+    if (modId === selectedModuleId) return;
+    setSelectedModuleId(modId);
+    setSelectedLessonId('');
+    setSlides([]);
   };
 
   const updatePanel = (index: number, field: string, value: any) => {
@@ -280,7 +305,7 @@ export default function SlideBuilder() {
         <Text className="text-white font-bold whitespace-nowrap">Editing Target:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 max-h-12 bg-white/10 rounded-lg p-1">
           {modules.map(mod => (
-            <Pressable key={mod.id} onPress={() => setSelectedModuleId(mod.id)} className={`px-3 py-1.5 rounded-md ${selectedModuleId === mod.id ? 'bg-brand' : 'hover:bg-white/10'}`}>
+            <Pressable key={mod.id} onPress={() => handleSelectModule(mod.id)} className={`px-3 py-1.5 rounded-md ${selectedModuleId === mod.id ? 'bg-brand' : 'hover:bg-white/10'}`}>
               <Text className={`text-sm ${selectedModuleId === mod.id ? 'text-white font-bold' : 'text-slate-300'}`}>{mod.title}</Text>
             </Pressable>
           ))}

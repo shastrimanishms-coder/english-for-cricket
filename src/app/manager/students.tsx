@@ -1,6 +1,6 @@
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
   View
 } from 'react-native';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
 interface Student {
@@ -28,7 +29,8 @@ interface Student {
 
 export default function StudentManagement() {
   const router = useRouter();
-  
+  const guardStatus = useRequireRole(['manager']);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -69,10 +71,6 @@ export default function StudentManagement() {
     Alert.alert('Copied!', 'Student credentials copied to clipboard.');
   };
 
-  useEffect(() => {
-    fetchStudentsData();
-  }, []);
-
   const handleDobFormat = (text: string) => {
   // Remove any non-numeric characters
   const cleaned = text.replace(/\D/g, '');
@@ -89,7 +87,7 @@ export default function StudentManagement() {
   setNewDob(formatted);
 };
 
-  const fetchStudentsData = async () => {
+  const fetchStudentsData = useCallback(async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -131,7 +129,13 @@ export default function StudentManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    (async () => {
+      await fetchStudentsData();
+    })();
+  }, [fetchStudentsData]);
 
   const generateUsername = (name: string, code: string) => {
     const firstName = name.trim().split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -249,7 +253,7 @@ export default function StudentManagement() {
     }
   };
 
-  if (loading) {
+  if (loading || guardStatus !== 'authorized') {
     return (
       <View className="flex-1 bg-surface-background justify-center items-center">
         <ActivityIndicator size="large" color="#047857" />
@@ -372,7 +376,7 @@ export default function StudentManagement() {
                 <Text className="text-6xl mb-4">🎒</Text>
                 <Text className="text-lg font-bold text-text-primary mb-2">No Students Yet</Text>
                 <Text className="text-text-secondary text-center">
-                  Click the "Add New Student" button above to generate your first sub-account.
+                  Click the &quot;Add New Student&quot; button above to generate your first sub-account.
                 </Text>
               </View>
             ) : (

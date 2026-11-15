@@ -1,26 +1,37 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
+
+interface StudentBadge {
+  title: string;
+  image_url: string | null;
+}
+
+interface StudentProgress {
+  id: string;
+  display_name: string;
+  gender: string | null;
+  avatar_url: string | null;
+  badges: StudentBadge[];
+}
 
 export default function LearningProgress() {
   const router = useRouter();
+  const guardStatus = useRequireRole(['manager']);
   const [loading, setLoading] = useState(true);
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState<StudentProgress[]>([]);
 
-  const getMascot = (gender, avatar_url) => {
+  const getMascot = (gender: string | null, avatar_url: string | null) => {
     if (avatar_url) return avatar_url;
     if (gender === 'Male') return '👦';
     if (gender === 'Female') return '👧';
     return '🏏';
   };
 
-  useEffect(() => {
-    fetchProgressData();
-  }, []);
-
-  const fetchProgressData = async () => {
+  const fetchProgressData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -55,21 +66,35 @@ export default function LearningProgress() {
 
       if (studentsError) throw studentsError;
 
-      const formattedStudents = (studentsData || []).map((s) => ({
-        ...s,
-        badges: s.student_badges?.map((sb) => sb.badges) || []
+      const formattedStudents: StudentProgress[] = (studentsData || []).map((s) => ({
+        id: s.id,
+        display_name: s.display_name,
+        gender: s.gender,
+        avatar_url: s.avatar_url,
+        badges: ((s.student_badges || []) as any[]).flatMap((sb: any) => {
+          // PostgREST returns the joined `badges` row as an object (many-to-one)
+          // or an array (one-to-many) depending on the relationship shape.
+          const b = sb?.badges;
+          return Array.isArray(b) ? b : b ? [b] : [];
+        }) as StudentBadge[],
       }));
 
       setStudents(formattedStudents);
     } catch (error) {
-      console.error('Error fetching progress:', error.message);
+      console.error('Error fetching progress:', error instanceof Error ? error.message : error);
       Alert.alert('Error', 'Could not load learning progress.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  if (loading) {
+  useEffect(() => {
+    (async () => {
+      await fetchProgressData();
+    })();
+  }, [fetchProgressData]);
+
+  if (loading || guardStatus !== 'authorized') {
     return (
       <View className="flex-1 bg-surface-background justify-center items-center">
         <ActivityIndicator size="large" color="#0A192F" />
@@ -98,7 +123,7 @@ export default function LearningProgress() {
             <View className="bg-white p-12 rounded-2xl border border-slate-200 items-center">
               <Text className="text-5xl mb-4">📊</Text>
               <Text className="text-xl font-bold text-text-primary">No Students Yet</Text>
-              <Text className="text-text-secondary mt-2">Add students in the 'My Students' tab to see their progress.</Text>
+              <Text className="text-text-secondary mt-2">Add students in the &apos;My Students&apos; tab to see their progress.</Text>
             </View>
           ) : (
             students.map((student) => (

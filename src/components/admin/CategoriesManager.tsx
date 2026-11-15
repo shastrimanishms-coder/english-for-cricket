@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -28,11 +28,7 @@ export default function CategoriesManager() {
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState('curriculum');
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -48,7 +44,13 @@ export default function CategoriesManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchCategories();
+    })();
+  }, [fetchCategories]);
 
   const handleSave = async () => {
     if (!name.trim()) {

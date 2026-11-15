@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -22,11 +22,7 @@ export default function PageManager() {
   const [slug, setSlug] = useState('');
   const [content, setContent] = useState('');
 
-  useEffect(() => {
-    fetchPages();
-  }, []);
-
-  const fetchPages = async () => {
+  const fetchPages = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -41,7 +37,13 @@ export default function PageManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchPages();
+    })();
+  }, [fetchPages]);
 
   // Auto-generate a URL-friendly slug from the title if the user hasn't typed one
   const handleTitleChange = (text: string) => {

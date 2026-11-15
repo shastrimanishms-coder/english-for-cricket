@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -32,7 +33,6 @@ export default function LoginScreen() {
     if (Platform.OS === 'web') {
       window.alert(`${title}\n\n${message}`);
     } else {
-      const { Alert } = require('react-native');
       Alert.alert(title, message);
     }
   };
@@ -61,6 +61,10 @@ export default function LoginScreen() {
       }
 
       if (authData?.user) {
+        // An email login supersedes any PIN-student session left on this
+        // device; drop it so the two session types can never be confused.
+        await AsyncStorage.removeItem('student_session');
+
         const { data: profileData, error: profileError } = await supabase
           .from('user_profiles')
           .select('role')
@@ -110,13 +114,19 @@ export default function LoginScreen() {
       }
 
       if (data) {
-    // Save the student session locally before routing
-    await AsyncStorage.setItem('student_session', JSON.stringify(data));
-    
-    showAlert('Welcome!', `Hi ${data.display_name}! Routing to Learner Dashboard...`);
-    router.replace('/learner');
-  }
-    } catch (err: any) {
+        // Save the student session locally before routing - but strip the
+        // PIN value from what gets persisted. The authenticate_student RPC
+        // returns it, yet nothing ever reads it back (changing a PIN asks
+        // the student to type the current one), so storing it would only
+        // leave a working credential sitting on the device.
+        const sessionData = { ...data };
+        delete sessionData.hashed_pin;
+        await AsyncStorage.setItem('student_session', JSON.stringify(sessionData));
+
+        showAlert('Welcome!', `Hi ${data.display_name}! Routing to Learner Dashboard...`);
+        router.replace('/learner');
+      }
+    } catch {
       setLoading(false);
       showAlert('Network Error', 'Could not connect to the server.');
     }
@@ -268,7 +278,7 @@ export default function LoginScreen() {
               {/* --- END GOOGLE AUTH BUTTON SECTION --- */}
 
               <View className="flex-row justify-center mt-6">
-                <Text className="text-text-secondary text-base">Don't have an account? </Text>
+                <Text className="text-text-secondary text-base">Don&apos;t have an account? </Text>
                 <Link href="/register" asChild>
                   <Text className="text-brand font-bold text-base">Register here</Text>
                 </Link>

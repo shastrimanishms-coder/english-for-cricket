@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 
@@ -34,11 +34,7 @@ export default function CurriculumManager() {
   const [description, setDescription] = useState('');
   const [orderIndex, setOrderIndex] = useState('0');
 
-  useEffect(() => {
-    fetchModules();
-  }, []);
-
-  const fetchModules = async () => {
+  const fetchModules = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -52,7 +48,13 @@ export default function CurriculumManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchModules();
+    })();
+  }, [fetchModules]);
 
   const fetchLessons = async (moduleId: string) => {
     try {

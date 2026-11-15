@@ -1,12 +1,14 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
 export default function OrganizationSettings() {
   const router = useRouter();
-  
+  const guardStatus = useRequireRole(['manager']);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -19,11 +21,7 @@ export default function OrganizationSettings() {
   const [orgName, setOrgName] = useState('');
   const [orgCode, setOrgCode] = useState('');
 
-  useEffect(() => {
-    fetchSettingsData();
-  }, []);
-
-  const fetchSettingsData = async () => {
+  const fetchSettingsData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
@@ -54,7 +52,13 @@ export default function OrganizationSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchSettingsData();
+    })();
+  }, [fetchSettingsData]);
 
   const generateOrgCode = (name: string) => {
     const cleanName = name.replace(/[^a-zA-Z0-9]/g, '');
@@ -115,7 +119,7 @@ export default function OrganizationSettings() {
     }
   };
 
-  if (loading) {
+  if (loading || guardStatus !== 'authorized') {
     return (
       <View className="flex-1 bg-surface-background justify-center items-center">
         <ActivityIndicator size="large" color="#047857" />

@@ -18,7 +18,7 @@ export default function UpdatePassword() {
         router.replace('/forgot-password');
       }
     });
-  }, []);
+  }, [router]);
 
   const handleUpdate = async () => {
     if (password.length < 6) {
@@ -54,7 +54,7 @@ export default function UpdatePassword() {
         <View className="mb-2">
           <Text className="text-3xl font-bold text-[#0A192F] mb-2">Create New Password</Text>
           <Text className="text-slate-500 text-sm">
-            Please enter your new password below. Make sure it's secure.
+            Please enter your new password below. Make sure it&apos;s secure.
           </Text>
         </View>
 

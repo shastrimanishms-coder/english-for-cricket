@@ -56,7 +56,7 @@ export default function LandingPage() {
               English for Cricket
             </Text>
             <Text className="text-lg text-slate-300 mb-10 leading-relaxed">
-              An introduction text of our English for cricket program here, that it's an initiative of KYCO and it's completely free and always will be.
+              An introduction text of our English for cricket program here, that it&apos;s an initiative of KYCO and it&apos;s completely free and always will be.
             </Text>
             <View className="w-full max-w-xs">
               <AnimatedButton 
@@ -98,13 +98,10 @@ export default function LandingPage() {
             <Link href="/p/privacy-policy" asChild>
               <Text className="text-text-secondary font-semibold hover:text-brand">Privacy Policy</Text>
             </Link>
-            {/* We will build the dedicated support viewer page later */}
-            <Link href="/support" asChild>
-              <Text className="text-text-secondary font-semibold hover:text-brand">Support Center</Text>
-            </Link>
-            <Link href="/contact" asChild>
-              <Text className="text-text-secondary font-semibold hover:text-brand">Contact us</Text>
-            </Link>
+            {/* TODO: /support and /contact routes don't exist yet (the code
+                comment here previously linked to them, which typed routes
+                reject). Build a support viewer over `support_faqs` and
+                re-add these links when those routes exist. */}
           </View>
           <Text className="text-slate-400 text-sm text-center">
             © 2026 Kansai Youth Cricket Organization. All rights reserved.

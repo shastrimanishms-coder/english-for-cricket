@@ -26,10 +26,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Initialize the Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: Platform.OS === 'web' ? typeof window !== 'undefined' ? window.localStorage : null : ExpoSecureStoreAdapter,
+    storage: Platform.OS === 'web' ? (typeof window !== 'undefined' ? window.localStorage : undefined) : ExpoSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Web must parse the session out of the redirect URL, otherwise
+    // password-recovery links and OAuth returns land without a session
+    // (update-password then bounces to /forgot-password as "invalid").
+    // On native, deep links are handled by the app, so keep it off there.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 

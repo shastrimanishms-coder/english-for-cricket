@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../../lib/supabase';
@@ -36,11 +36,7 @@ export default function GamesManager() {
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [selectedImage, setSelectedImage] = useState<any>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const { data: catData, error: catError } = await supabase
@@ -51,8 +47,10 @@ export default function GamesManager() {
       
       if (catError) throw catError;
       setCategories(catData || []);
-      if (catData && catData.length > 0 && !categoryId) {
-        setCategoryId(catData[0].id);
+      if (catData && catData.length > 0) {
+        // Default to the first category only when none is selected yet.
+        // The functional update keeps fetchData free of reactive deps.
+        setCategoryId(prev => prev || catData[0].id);
       }
 
       const { data: gameData, error: gameError } = await supabase
@@ -67,7 +65,13 @@ export default function GamesManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchData();
+    })();
+  }, [fetchData]);
 
   const pickImage = async () => {
     try {
@@ -272,7 +276,7 @@ export default function GamesManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Category</Text>
             {categories.length === 0 ? (
-              <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a 'Games' category first.</Text>
+              <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a &apos;Games&apos; category first.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                 {categories.map((cat) => (

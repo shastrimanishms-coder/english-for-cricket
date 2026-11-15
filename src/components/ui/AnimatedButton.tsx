@@ -36,11 +36,14 @@ export default function AnimatedButton({
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    scale.value = withSpring(0.95, { damping: 10, stiffness: 400 });
+    // Use the SharedValue setter API (Reanimated 4) instead of assigning to
+    // `.value` directly - same behaviour, and it is the mutation path the
+    // React Compiler recognises as safe for shared values.
+    scale.set(withSpring(0.95, { damping: 10, stiffness: 400 }));
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 10, stiffness: 400 });
+    scale.set(withSpring(1, { damping: 10, stiffness: 400 }));
   };
 
   let bgClass = '';

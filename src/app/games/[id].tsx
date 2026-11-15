@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { supabase } from '../../lib/supabase';
@@ -15,18 +15,11 @@ export default function GamePlayer() {
   const router = useRouter();
   const [game, setGame] = useState<GameDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [startTime] = useState<number>(Date.now());
+  // Mount timestamp for playtime telemetry. Kept in a ref (set inside the
+  // effect) so no impure call happens during render.
+  const startTimeRef = useRef<number>(0);
 
-  useEffect(() => {
-    fetchGameDetails();
-    
-    // Telemetry: Log playtime when the component unmounts
-    return () => {
-      logPlaytime();
-    };
-  }, [id]);
-
-  const fetchGameDetails = async () => {
+  const fetchGameDetails = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('games')
@@ -41,9 +34,9 @@ export default function GamePlayer() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const logPlaytime = async () => {
+  const logPlaytime = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return; // Only log for authenticated users
@@ -52,7 +45,7 @@ export default function GamePlayer() {
       const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', session.user.id).single();
       if (profile?.role !== 'individual_learner') return;
 
-      const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
+      const durationSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
       if (durationSeconds < 10) return; // Ignore bounces under 10 seconds
 
       await supabase.from('activity_logs').insert([{
@@ -64,7 +57,19 @@ export default function GamePlayer() {
     } catch (error) {
       console.log('Telemetry error:', error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+    (async () => {
+      await fetchGameDetails();
+    })();
+
+    // Telemetry: Log playtime when the component unmounts
+    return () => {
+      logPlaytime();
+    };
+  }, [fetchGameDetails, logPlaytime]);
 
   if (loading) {
     return (

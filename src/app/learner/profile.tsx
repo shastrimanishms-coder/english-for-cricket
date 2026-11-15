@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { supabase } from '../../lib/supabase';
@@ -15,11 +15,7 @@ export default function StudentProfile() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
 
-  useEffect(() => {
-    fetchProfileData();
-  }, []);
-
-  const fetchProfileData = async () => {
+  const fetchProfileData = useCallback(async () => {
     try {
       const studentStr = await AsyncStorage.getItem('student_session');
       
@@ -45,7 +41,6 @@ export default function StudentProfile() {
             display_name: sessionData.display_name || 'Student',
             is_active: true,
             created_at: sessionData.created_at || new Date().toISOString(),
-            hashed_pin: sessionData.hashed_pin || sessionData.pin || '',
           });
         }
         
@@ -81,7 +76,13 @@ export default function StudentProfile() {
       console.error('Profile fetch error:', error.message);
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    (async () => {
+      await fetchProfileData();
+    })();
+  }, [fetchProfileData]);
 
   const handleUpdatePin = async () => {
     if (newPin.length !== 4) {
@@ -107,8 +108,12 @@ export default function StudentProfile() {
       
       Alert.alert('Success', 'Your PIN has been updated successfully!');
       
-      // Update local storage so the new PIN reflects immediately
-      const newSession = { ...profile, hashed_pin: newPin };
+      // Refresh the locally stored session, but never persist the PIN value
+      // itself: nothing reads it back (changing the PIN always asks the
+      // student to type the current one), so keeping it on the device would
+      // only expose the credential.
+      const newSession = { ...profile };
+      delete newSession.hashed_pin;
       await AsyncStorage.setItem('student_session', JSON.stringify(newSession));
       
       setCurrentPin('');

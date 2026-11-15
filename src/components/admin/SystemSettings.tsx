@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -20,9 +20,7 @@ export default function SystemSettings() {
   const [supportEmail, setSupportEmail] = useState('');
   const [users, setUsers] = useState<UserProfile[]>([]);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const { data: settingsData, error: settingsError } = await supabase.from('site_settings').select('*');
@@ -38,7 +36,13 @@ export default function SystemSettings() {
       setUsers(usersData || []);
     } catch (error: any) { Alert.alert('Error', error.message); } 
     finally { setLoading(false); }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchData();
+    })();
+  }, [fetchData]);
 
   const pickLogo = async () => {
     try {

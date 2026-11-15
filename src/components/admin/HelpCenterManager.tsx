@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -26,11 +26,7 @@ export default function HelpCenterManager() {
   const [videoUrl, setVideoUrl] = useState('');
   const [orderIndex, setOrderIndex] = useState('0');
 
-  useEffect(() => {
-    fetchFaqs();
-  }, []);
-
-  const fetchFaqs = async () => {
+  const fetchFaqs = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -53,7 +49,13 @@ export default function HelpCenterManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchFaqs();
+    })();
+  }, [fetchFaqs]);
 
   const handleSave = async () => {
     if (!sectionName.trim() || !question.trim() || !answer.trim()) {

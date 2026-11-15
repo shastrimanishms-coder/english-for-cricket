@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
+import { ActivityIndicator, LayoutAnimation, Platform, Pressable, ScrollView, Text, UIManager, View } from 'react-native';
 import BadgesManager from '../../components/admin/BadgesManager';
 import CategoriesManager from '../../components/admin/CategoriesManager';
 import CurriculumManager from '../../components/admin/CurriculumManager';
@@ -12,6 +12,7 @@ import SlideBuilder from '../../components/admin/SlideBuilder';
 import SystemSettings from '../../components/admin/SystemSettings';
 import UsersManager from '../../components/admin/UsersManager';
 import VideosManager from '../../components/admin/VideosManager';
+import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
 // Enable LayoutAnimation for Android
@@ -57,6 +58,9 @@ const ADMIN_MENU = [
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  // Defense-in-depth: only super_admin sessions may see the CMS at all.
+  // (RLS on the tables remains the real enforcement.)
+  const guardStatus = useRequireRole(['super_admin']);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     learning_path: false,
@@ -139,6 +143,16 @@ export default function SuperAdminDashboard() {
         );
     }
   };
+
+  // Until the guard authorizes, render only a spinner - no CMS shell or
+  // data is shown to logged-out or wrong-role visitors.
+  if (guardStatus !== 'authorized') {
+    return (
+      <View className="flex-1 items-center justify-center bg-slate-50">
+        <ActivityIndicator size="large" color="#0A192F" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 flex-col md:flex-row bg-slate-50">

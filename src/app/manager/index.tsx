@@ -1,9 +1,14 @@
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
 export default function ManagerDashboard() {
   const router = useRouter();
+  // Defense-in-depth: manager area is for the manager role only, matching
+  // the one-home-per-role routing in login.tsx. (RLS remains the real
+  // enforcement on the data.)
+  const guardStatus = useRequireRole(['manager']);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -14,6 +19,14 @@ export default function ManagerDashboard() {
       router.replace('/');
     }
   };
+
+  if (guardStatus !== 'authorized') {
+    return (
+      <View className="flex-1 bg-surface-background justify-center items-center">
+        <ActivityIndicator size="large" color="#0A192F" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-surface-background">

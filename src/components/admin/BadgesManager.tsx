@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
@@ -39,11 +39,7 @@ export default function BadgesManager() {
   const [imageUrl, setImageUrl] = useState('');
   const [selectedImage, setSelectedImage] = useState<any>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       // Fetch the target lookups
@@ -65,7 +61,13 @@ export default function BadgesManager() {
       setBadges(badRes.data || []);
     } catch (error: any) { Alert.alert('Error', error.message); } 
     finally { setLoading(false); }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchData();
+    })();
+  }, [fetchData]);
 
   const pickImage = async () => {
     try {

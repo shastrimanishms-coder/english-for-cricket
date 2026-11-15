@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '../../lib/supabase';
@@ -31,11 +31,7 @@ export default function DownloadsManager() {
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<any>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       // Fetch categories meant for downloads
@@ -47,8 +43,10 @@ export default function DownloadsManager() {
       
       if (catError) throw catError;
       setCategories(catData || []);
-      if (catData && catData.length > 0 && !categoryId) {
-        setCategoryId(catData[0].id);
+      if (catData && catData.length > 0) {
+        // Default to the first category only when none is selected yet.
+        // The functional update keeps fetchData free of reactive deps.
+        setCategoryId(prev => prev || catData[0].id);
       }
 
       // Fetch downloads
@@ -64,7 +62,13 @@ export default function DownloadsManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      await fetchData();
+    })();
+  }, [fetchData]);
 
   const pickDocument = async () => {
     try {
@@ -238,7 +242,7 @@ export default function DownloadsManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Category</Text>
             {categories.length === 0 ? (
-              <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a 'Downloads' category first.</Text>
+              <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a &apos;Downloads&apos; category first.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                 {categories.map((cat) => (

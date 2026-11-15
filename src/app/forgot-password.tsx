@@ -46,7 +46,7 @@ export default function ForgotPassword() {
             <Text className="text-4xl mb-2">✉️</Text>
             <Text className="text-emerald-800 font-bold text-lg mb-1">Check your inbox</Text>
             <Text className="text-emerald-700 text-sm text-center">
-              We've sent a password reset link to {email}. It may take a few minutes to arrive.
+              We&apos;ve sent a password reset link to {email}. It may take a few minutes to arrive.
             </Text>
             <View className="w-full mt-6">
               <Link href="/login" asChild>
