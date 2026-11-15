@@ -16,6 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import {
+  SPEAKING_SCENARIOS,
+  learnerLineCount,
+  type SpeakingScenario,
+} from '../../lib/speakingScenarios';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSafeBack } from '../../lib/useSafeBack';
@@ -73,6 +78,15 @@ export default function SpeakingPractice() {
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [finished, setFinished] = useState(false);
+
+  // The screen opens on a menu: practise lines from your lessons, or
+  // role-play a speaking scenario (interview / small talk) where the
+  // app plays the other person.
+  const [mode, setMode] = useState<'menu' | 'lines' | 'scenario'>('menu');
+  const [scenario, setScenario] = useState<SpeakingScenario | null>(null);
+  const [turnIndex, setTurnIndex] = useState(0);
+  const [scenarioDone, setScenarioDone] = useState(false);
+  const [scenarioScores, setScenarioScores] = useState<Record<number, number>>({});
 
   // Recording state for the current item. Recording is strictly
   // best-effort: when the microphone is denied or unsupported,
@@ -147,6 +161,39 @@ export default function SpeakingPractice() {
     })();
   }, []);
 
+  // Speaking scenarios: the admin-managed table wins when it has
+  // published rows; the built-in starter library is the fallback so
+  // the menu is never empty (e.g. before migration 15 is run).
+  const [dbScenarios, setDbScenarios] = useState<SpeakingScenario[] | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('speaking_scenarios')
+          .select('id, title, category, emoji, description, other_name, turns')
+          .eq('is_published', true)
+          .order('order_index', { ascending: true })
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        const rows: SpeakingScenario[] = (data || [])
+          .map((row: any) => ({
+            id: row.id,
+            title: row.title,
+            category: row.category === 'Small Talk' ? ('Small Talk' as const) : ('Interview' as const),
+            emoji: row.emoji || '🎙️',
+            description: row.description || '',
+            otherName: row.other_name || 'Partner',
+            turns: Array.isArray(row.turns) ? row.turns : [],
+          }))
+          .filter((s: SpeakingScenario) => s.turns.length > 0);
+        if (rows.length > 0) setDbScenarios(rows);
+      } catch (error) {
+        console.log('Speaking scenarios failed to load, using built-ins:', error);
+      }
+    })();
+  }, []);
+  const scenarios = dbScenarios ?? SPEAKING_SCENARIOS;
+
   // The voice must never talk over the next line.
   useEffect(() => {
     try {
@@ -155,6 +202,20 @@ export default function SpeakingPractice() {
       // TTS is a nicety, never a blocker.
     }
   }, [index, finished]);
+
+  // In a scenario, the other person speaks their line out loud as
+  // their turn arrives (the learner can replay it with Listen).
+  useEffect(() => {
+    if (mode !== 'scenario' || !scenario || scenarioDone) return;
+    const turn = scenario.turns[turnIndex];
+    if (!turn || turn.speaker !== 'other') return;
+    try {
+      Speech.stop();
+      Speech.speak(turn.text, { language: 'en' });
+    } catch {
+      // TTS is a nicety, never a blocker.
+    }
+  }, [mode, scenario, turnIndex, scenarioDone]);
 
   // Recording timer (display only; the counter itself is reset by the
   // record/stop handlers).
@@ -203,21 +264,46 @@ export default function SpeakingPractice() {
   // Best score per line, for the completion summary.
   const [lineScores, setLineScores] = useState<Record<number, number>>({});
 
-  const currentRef = useRef<{ text: string; index: number }>({ text: '', index: 0 });
+  // The active speech-check target: a lesson line in lines mode, or
+  // the learner's current dialogue turn in scenario mode. The
+  // recogniser's callback reads it through this ref so it always
+  // scores against what is on screen right now.
+  const activeTargetRef = useRef<{ text: string; kind: 'line' | 'turn'; index: number }>({
+    text: '',
+    kind: 'line',
+    index: 0,
+  });
   useEffect(() => {
-    currentRef.current = { text: current?.text || '', index };
-  }, [current, index]);
+    if (mode === 'scenario' && scenario) {
+      const turn = scenario.turns[turnIndex];
+      activeTargetRef.current = {
+        text: turn && turn.speaker === 'learner' ? turn.text : '',
+        kind: 'turn',
+        index: turnIndex,
+      };
+    } else {
+      activeTargetRef.current = { text: current?.text || '', kind: 'line', index };
+    }
+  }, [mode, scenario, turnIndex, current, index]);
 
   const speech = useSpeechCheck({
     onFinal: (transcript) => {
       setCheckError(null);
-      const { text, index: lineIndex } = currentRef.current;
-      const score = scoreSpeech(text, transcript);
+      const target = activeTargetRef.current;
+      if (!target.text) return;
+      const score = scoreSpeech(target.text, transcript);
       setCheckResult({ transcript, score });
-      setLineScores((prev) => ({
-        ...prev,
-        [lineIndex]: Math.max(prev[lineIndex] ?? 0, score.accuracy),
-      }));
+      if (target.kind === 'turn') {
+        setScenarioScores((prev) => ({
+          ...prev,
+          [target.index]: Math.max(prev[target.index] ?? 0, score.accuracy),
+        }));
+      } else {
+        setLineScores((prev) => ({
+          ...prev,
+          [target.index]: Math.max(prev[target.index] ?? 0, score.accuracy),
+        }));
+      }
     },
     onError: (error) => setCheckError(error),
   });
@@ -366,11 +452,102 @@ export default function SpeakingPractice() {
     setFinished(false);
   }, [stopPlayback]);
 
+  // ---- Scenario mode ------------------------------------------------
+  const resetTurnState = useCallback(() => {
+    stopPlayback();
+    setRecordingUri(null);
+    setCheckResult(null);
+    setCheckError(null);
+  }, [stopPlayback]);
+
+  const listenText = useCallback((text: string) => {
+    try {
+      Speech.stop();
+      Speech.speak(text, { language: 'en' });
+    } catch (error) {
+      console.log('Speech error:', error);
+    }
+  }, []);
+
+  const startScenario = useCallback(
+    (next: SpeakingScenario) => {
+      resetTurnState();
+      if (speech.listening) speech.abort();
+      setScenario(next);
+      setTurnIndex(0);
+      setScenarioScores({});
+      setScenarioDone(false);
+      setMode('scenario');
+    },
+    [resetTurnState, speech]
+  );
+
+  const backToMenu = useCallback(() => {
+    resetTurnState();
+    if (speech.listening) speech.abort();
+    try {
+      Speech.stop();
+    } catch {
+      // TTS is a nicety, never a blocker.
+    }
+    setMode('menu');
+    setScenario(null);
+    setScenarioDone(false);
+    setFinished(false);
+  }, [resetTurnState, speech]);
+
+  const scenarioNext = useCallback(async () => {
+    if (isRecording) await stopRecording();
+    if (speech.listening) speech.abort();
+    resetTurnState();
+    if (scenario && turnIndex < scenario.turns.length - 1) {
+      setTurnIndex(turnIndex + 1);
+    } else {
+      setScenarioDone(true);
+    }
+  }, [isRecording, stopRecording, speech, resetTurnState, scenario, turnIndex]);
+
+  const scenarioAgain = useCallback(() => {
+    resetTurnState();
+    setTurnIndex(0);
+    setScenarioScores({});
+    setScenarioDone(false);
+  }, [resetTurnState]);
+
+  const scenarioScoreValues = Object.values(scenarioScores);
+  const scenarioAvg =
+    scenarioScoreValues.length > 0
+      ? Math.round(scenarioScoreValues.reduce((a, b) => a + b, 0) / scenarioScoreValues.length)
+      : null;
+
+  const renderScenarioCard = (s: SpeakingScenario) => (
+    <Pressable
+      key={s.id}
+      onPress={() => startScenario(s)}
+      className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-4"
+    >
+      <View className="flex-row items-start gap-4">
+        <Text className="text-4xl">{s.emoji}</Text>
+        <View className="flex-1">
+          <Text className="text-xl font-bold text-[#0A192F]">{s.title}</Text>
+          <Text className="text-slate-500 mt-1">{s.description}</Text>
+          <Text className="text-xs font-bold text-brand uppercase mt-2">
+            {learnerLineCount(s)} lines to speak • with the {s.otherName}
+          </Text>
+        </View>
+        <Text className="text-slate-300 text-2xl">›</Text>
+      </View>
+    </Pressable>
+  );
+
   const attemptedScores = Object.values(lineScores);
   const avgScore =
     attemptedScores.length > 0
       ? Math.round(attemptedScores.reduce((a, b) => a + b, 0) / attemptedScores.length)
       : null;
+
+  const scenarioTurn = scenario && !scenarioDone ? scenario.turns[turnIndex] : undefined;
+  const scenarioIsLastTurn = scenario ? turnIndex === scenario.turns.length - 1 : false;
 
   return (
     <View className="flex-1 bg-white">
@@ -379,7 +556,7 @@ export default function SpeakingPractice() {
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-4 md:p-6">
           <View className="flex-row items-center gap-3">
             <Pressable
-              onPress={goBack}
+              onPress={mode !== 'menu' ? backToMenu : goBack}
               className="px-3 py-2 bg-white/10 rounded-lg border border-white/20"
             >
               <Text className="text-white font-bold text-sm">← Back</Text>
@@ -391,7 +568,279 @@ export default function SpeakingPractice() {
         </View>
       </SafeAreaView>
 
-      {loading ? (
+      {mode === 'menu' ? (
+        <ScrollView contentContainerStyle={{ padding: 24 }}>
+          <View className="max-w-3xl w-full mx-auto">
+            <Text className="text-lg text-slate-500 mb-6">
+              Choose how you want to practise speaking today.
+            </Text>
+
+            <Pressable
+              onPress={() => setMode('lines')}
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-8"
+            >
+              <Text className="text-4xl mb-2">📚</Text>
+              <Text className="text-xl font-bold text-[#0A192F] mb-1">Practise My Lesson Lines</Text>
+              <Text className="text-slate-500">
+                Say the words and sentences from your lessons out loud, and get your voice checked.
+              </Text>
+              <Text className="text-brand font-bold mt-3">START →</Text>
+            </Pressable>
+
+            <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
+              🎙️ Interviews
+            </Text>
+            {scenarios
+              .filter(s => s.category === 'Interview')
+              .map(s => renderScenarioCard(s))}
+
+            <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 mt-6">
+              💬 Small Talk
+            </Text>
+            {scenarios
+              .filter(s => s.category === 'Small Talk')
+              .map(s => renderScenarioCard(s))}
+          </View>
+        </ScrollView>
+      ) : mode === 'scenario' ? (
+        !scenario ? null : scenarioDone ? (
+          <View className="flex-1 items-center justify-center p-6">
+            <Text className="text-6xl mb-4">🎉</Text>
+            <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">
+              Great conversation!
+            </Text>
+            <Text className="text-lg text-slate-500 text-center mb-8">
+              You finished “{scenario.title}” with the {scenario.otherName}. Well done!
+            </Text>
+            {scenarioAvg !== null ? (
+              <Text className="text-xl font-bold text-brand text-center -mt-4 mb-8">
+                🎙️ Average speaking score: {scenarioAvg}%
+              </Text>
+            ) : null}
+            <Pressable
+              onPress={scenarioAgain}
+              className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
+            >
+              <Text className="text-white font-bold text-base">Practice Again</Text>
+            </Pressable>
+            <Pressable
+              onPress={backToMenu}
+              className="w-full max-w-sm px-6 py-4 bg-white border border-slate-200 rounded-full items-center mb-3"
+            >
+              <Text className="text-slate-600 font-bold text-base">🎙️ All Speaking Practice</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.replace('/learner')}
+              className="w-full max-w-sm px-6 py-4 bg-slate-100 border border-slate-200 rounded-full items-center"
+            >
+              <Text className="text-slate-600 font-bold text-base">Learner Home</Text>
+            </Pressable>
+            <Celebration visible />
+          </View>
+        ) : scenarioTurn ? (
+          <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
+            <View className="max-w-3xl w-full mx-auto flex-1">
+              {/* Progress */}
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-xs font-bold text-slate-500 uppercase">
+                  {scenario.emoji} {scenario.title}
+                </Text>
+                <Text className="text-xs font-bold text-brand uppercase">
+                  Turn {turnIndex + 1} of {scenario.turns.length}
+                </Text>
+              </View>
+              <View className="h-3 bg-slate-200 rounded-full overflow-hidden mb-6">
+                <View
+                  style={{
+                    width: `${((turnIndex + 1) / scenario.turns.length) * 100}%`,
+                    height: '100%',
+                    borderRadius: 9999,
+                    backgroundColor: '#2E7D32',
+                  }}
+                />
+              </View>
+
+              {/* Conversation so far */}
+              {turnIndex > 0 ? (
+                <View className="mb-6 gap-2">
+                  {scenario.turns.slice(0, turnIndex).map((t, i) => (
+                    <View
+                      key={i}
+                      className={`max-w-[85%] rounded-2xl px-4 py-2 ${t.speaker === 'other' ? 'self-start bg-slate-100' : 'self-end bg-brand/10'}`}
+                    >
+                      <Text className="text-xs font-bold text-slate-400 mb-0.5">
+                        {t.speaker === 'other' ? scenario.otherName : 'You'}
+                        {t.speaker === 'learner' && scenarioScores[i] !== undefined
+                          ? ` • ${scenarioScores[i]}%`
+                          : ''}
+                      </Text>
+                      <Text className="text-slate-600">{t.text}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Current turn */}
+              <View className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 items-center mb-6">
+                <Text className="text-sm text-slate-400 mb-3">
+                  {scenarioTurn.speaker === 'other'
+                    ? `${scenario.otherName} says:`
+                    : 'Your turn — say this:'}
+                </Text>
+                <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] text-center leading-snug">
+                  {scenarioTurn.text}
+                </Text>
+              </View>
+
+              <View className="items-center gap-3">
+                <Pressable
+                  onPress={() => listenText(scenarioTurn.text)}
+                  className="px-8 py-3 bg-brand rounded-full"
+                >
+                  <Text className="text-white font-bold text-base">🔊 Listen</Text>
+                </Pressable>
+
+                {scenarioTurn.speaker === 'other' ? (
+                  <Pressable
+                    onPress={() => {
+                      (async () => {
+                        await scenarioNext();
+                      })();
+                    }}
+                    className="w-full max-w-md px-6 py-4 bg-[#0A192F] rounded-full items-center mt-3"
+                  >
+                    <Text className="text-white font-bold text-lg">Your Turn →</Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    {/* Automatic speech check, where the device supports it */}
+                    {speech.supported ? (
+                      checkResult ? (
+                        <View className="w-full max-w-xl bg-slate-50 rounded-3xl border border-slate-200 p-6 items-center">
+                          <SpeechScoreView score={checkResult.score} transcript={checkResult.transcript} />
+                        </View>
+                      ) : speech.listening ? (
+                        <>
+                          <Pressable onPress={speech.stop} className="px-8 py-3 bg-red-500 rounded-full">
+                            <Text className="text-white font-bold text-base">
+                              ⏹ Listening… tap when done
+                            </Text>
+                          </Pressable>
+                          {speech.interim ? (
+                            <Text className="text-slate-500 italic text-center">
+                              &quot;{speech.interim}&quot;
+                            </Text>
+                          ) : (
+                            <Text className="text-slate-400">Say your line now 🎧</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Pressable onPress={startCheck} className="px-8 py-3 bg-[#0A192F] rounded-full">
+                          <Text className="text-white font-bold text-base">
+                            🎙️ Speak &amp; Check My Voice
+                          </Text>
+                        </Pressable>
+                      )
+                    ) : null}
+                    {checkError && speech.supported ? (
+                      <Text className="text-red-500 text-sm text-center max-w-md">
+                        {speechErrorMessage(checkError)}
+                      </Text>
+                    ) : null}
+
+                    {recordSupported ? (
+                      isRecording ? (
+                        <Pressable
+                          onPress={() => {
+                            (async () => {
+                              await stopRecording();
+                            })();
+                          }}
+                          className="px-8 py-3 bg-red-500 rounded-full"
+                        >
+                          <Text className="text-white font-bold text-base">
+                            ⏹ Stop ({recordingSeconds}s)
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          onPress={() => {
+                            (async () => {
+                              await startRecording();
+                            })();
+                          }}
+                          className="px-8 py-3 bg-[#0A192F] rounded-full"
+                        >
+                          <Text className="text-white font-bold text-base">🎙️ Record Your Voice</Text>
+                        </Pressable>
+                      )
+                    ) : (
+                      <View className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 max-w-md">
+                        <Text className="text-amber-700 text-sm text-center">
+                          🎙️ Recording isn&apos;t available here (microphone permission or browser
+                          support). You can still Listen and say the line out loud!
+                        </Text>
+                      </View>
+                    )}
+
+                    {recordingUri && !isRecording ? (
+                      <View className="flex-row items-center gap-4">
+                        <Pressable
+                          onPress={playRecording}
+                          className="px-6 py-3 bg-slate-100 border border-slate-200 rounded-full"
+                        >
+                          <Text className="text-slate-700 font-bold text-base">▶️ Play Back</Text>
+                        </Pressable>
+                        <Pressable onPress={retry} className="px-3 py-3">
+                          <Text className="text-slate-400 font-bold underline">Try again</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
+                    {checkResult && !checkResult.score.passed ? (
+                      <>
+                        <Pressable
+                          onPress={retry}
+                          className="w-full max-w-md px-6 py-4 bg-[#0A192F] rounded-full items-center mt-3"
+                        >
+                          <Text className="text-white font-bold text-lg">🎙️ Try Again</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            (async () => {
+                              await scenarioNext();
+                            })();
+                          }}
+                          className="px-3 py-2"
+                        >
+                          <Text className="text-slate-400 font-bold underline">Continue anyway →</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <Pressable
+                        onPress={() => {
+                          (async () => {
+                            await scenarioNext();
+                          })();
+                        }}
+                        className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center mt-3"
+                      >
+                        <Text className="text-white font-bold text-lg">
+                          {checkResult
+                            ? scenarioIsLastTurn
+                              ? '✅ Finish'
+                              : '✅ Great! Next →'
+                            : '✅ I said it!'}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        ) : null
+      ) : loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#0A192F" />
           <Text className="text-slate-400 mt-3">Preparing your lines…</Text>
@@ -416,6 +865,12 @@ export default function SpeakingPractice() {
             className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
           >
             <Text className="text-white font-bold text-base">Practice Again</Text>
+          </Pressable>
+          <Pressable
+            onPress={backToMenu}
+            className="w-full max-w-sm px-6 py-4 bg-white border border-slate-200 rounded-full items-center mb-3"
+          >
+            <Text className="text-slate-600 font-bold text-base">🎙️ All Speaking Practice</Text>
           </Pressable>
           <Pressable
             onPress={() => router.replace('/learner')}

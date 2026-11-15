@@ -9,6 +9,7 @@ import DownloadsManager from '../../components/admin/DownloadsManager';
 import GamesManager from '../../components/admin/GamesManager';
 import HelpCenterManager from '../../components/admin/HelpCenterManager';
 import PageManager from '../../components/admin/PageManager';
+import SpeakingManager from '../../components/admin/SpeakingManager';
 import SlideBuilder from '../../components/admin/SlideBuilder';
 import SystemSettings from '../../components/admin/SystemSettings';
 import UsersManager from '../../components/admin/UsersManager';
@@ -50,6 +51,7 @@ const ADMIN_MENU = [
       { id: 'videos', label: 'Video Lectures' },
     ]
   },
+  { id: 'speaking', label: 'Speaking Practice', icon: '🎙️' },
   { id: 'badges', label: 'Gamification & Badges', icon: '🏆' },
   { id: 'organizations', label: 'Users & Organizations', icon: '🏛️' },
   { id: 'pages', label: 'Static Pages & Legal', icon: '📄' },
@@ -81,6 +83,7 @@ const CONTENT_CARDS = [
   { key: 'videos', label: 'Videos', icon: '📺', table: 'video_lectures', tab: 'videos' },
   { key: 'downloads', label: 'Downloads', icon: '📥', table: 'downloads', tab: 'downloads' },
   { key: 'games', label: 'Games', icon: '🎮', table: 'games', tab: 'games' },
+  { key: 'speaking', label: 'Speaking', icon: '🎙️', table: 'speaking_scenarios', tab: 'speaking' },
   { key: 'badges', label: 'Badges', icon: '🏆', table: 'badges', tab: 'badges' },
   { key: 'categories', label: 'Categories', icon: '🏷️', table: 'categories', tab: 'categories' },
   { key: 'faqs', label: 'Support FAQs', icon: '❓', table: 'support_faqs', tab: 'support_faqs' },
@@ -473,6 +476,9 @@ export default function SuperAdminDashboard() {
 
       case 'videos':
         return <VideosManager />;
+
+      case 'speaking':
+        return <SpeakingManager />;
 
       case 'curriculum':
         return <CurriculumManager />;
