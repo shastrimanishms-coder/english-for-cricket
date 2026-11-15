@@ -14,9 +14,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
+import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSafeBack } from '../../lib/useSafeBack';
+import {
+  speechErrorMessage,
+  useSpeechCheck,
+  type SpeechCheckError,
+} from '../../lib/useSpeechCheck';
 
 interface PracticeItem {
   text: string;
@@ -116,7 +123,11 @@ export default function SpeakingPractice() {
           if (slideError) throw slideError;
 
           for (const slide of (slideRows || []) as SlideRow[]) {
-            if (slide.slide_type === 'focus_1up' || slide.slide_type === 'typing') {
+            if (
+              slide.slide_type === 'focus_1up' ||
+              slide.slide_type === 'typing' ||
+              slide.slide_type === 'speak_repeat'
+            ) {
               addLine(slide.correct_answer, slide.lesson_id);
             } else if (slide.slide_type === 'grid_4up' || slide.slide_type === 'quiz_4up') {
               for (const panel of slide.options?.panels || []) {
@@ -179,6 +190,48 @@ export default function SpeakingPractice() {
   }, []);
 
   const current: PracticeItem | undefined = items[index];
+
+  // ---- Speech checking (recogniser + word-by-word score) ---------------
+  // Where the device or browser supports it, the learner can have their
+  // voice checked automatically: the recogniser's transcript is scored
+  // against the line with the same engine the lesson slides use. Where
+  // it does not, the record-and-listen flow below remains the practice.
+  const [checkResult, setCheckResult] = useState<{ transcript: string; score: SpeechScore } | null>(
+    null
+  );
+  const [checkError, setCheckError] = useState<SpeechCheckError | null>(null);
+  // Best score per line, for the completion summary.
+  const [lineScores, setLineScores] = useState<Record<number, number>>({});
+
+  const currentRef = useRef<{ text: string; index: number }>({ text: '', index: 0 });
+  useEffect(() => {
+    currentRef.current = { text: current?.text || '', index };
+  }, [current, index]);
+
+  const speech = useSpeechCheck({
+    onFinal: (transcript) => {
+      setCheckError(null);
+      const { text, index: lineIndex } = currentRef.current;
+      const score = scoreSpeech(text, transcript);
+      setCheckResult({ transcript, score });
+      setLineScores((prev) => ({
+        ...prev,
+        [lineIndex]: Math.max(prev[lineIndex] ?? 0, score.accuracy),
+      }));
+    },
+    onError: (error) => setCheckError(error),
+  });
+
+  const startCheck = useCallback(() => {
+    setCheckError(null);
+    setCheckResult(null);
+    try {
+      Speech.stop();
+    } catch {
+      // TTS is a nicety, never a blocker.
+    }
+    void speech.start();
+  }, [speech]);
 
   const listen = useCallback(() => {
     if (!current) return;
@@ -284,26 +337,40 @@ export default function SpeakingPractice() {
 
   const advance = useCallback(async () => {
     if (isRecording) await stopRecording();
+    if (speech.listening) speech.abort();
     stopPlayback();
     setRecordingUri(null);
+    setCheckResult(null);
+    setCheckError(null);
     if (index < items.length - 1) {
       setIndex(index + 1);
     } else {
       setFinished(true);
     }
-  }, [index, items.length, isRecording, stopRecording, stopPlayback]);
+  }, [index, items.length, isRecording, stopRecording, stopPlayback, speech]);
 
   const retry = useCallback(() => {
     stopPlayback();
     setRecordingUri(null);
+    setCheckResult(null);
+    setCheckError(null);
   }, [stopPlayback]);
 
   const practiceAgain = useCallback(() => {
     stopPlayback();
     setRecordingUri(null);
+    setCheckResult(null);
+    setCheckError(null);
+    setLineScores({});
     setIndex(0);
     setFinished(false);
   }, [stopPlayback]);
+
+  const attemptedScores = Object.values(lineScores);
+  const avgScore =
+    attemptedScores.length > 0
+      ? Math.round(attemptedScores.reduce((a, b) => a + b, 0) / attemptedScores.length)
+      : null;
 
   return (
     <View className="flex-1 bg-white">
@@ -339,6 +406,11 @@ export default function SpeakingPractice() {
             You practised {items.length} {items.length === 1 ? 'line' : 'lines'} out loud.
             Keep it up, champion!
           </Text>
+          {avgScore !== null ? (
+            <Text className="text-xl font-bold text-brand text-center -mt-4 mb-8">
+              🎙️ Average speaking score: {avgScore}%
+            </Text>
+          ) : null}
           <Pressable
             onPress={practiceAgain}
             className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
@@ -392,6 +464,41 @@ export default function SpeakingPractice() {
                 <Text className="text-white font-bold text-base">🔊 Listen</Text>
               </Pressable>
 
+              {/* Automatic speech check, where the device supports it */}
+              {speech.supported ? (
+                checkResult ? (
+                  <View className="w-full max-w-xl bg-slate-50 rounded-3xl border border-slate-200 p-6 items-center">
+                    <SpeechScoreView score={checkResult.score} transcript={checkResult.transcript} />
+                  </View>
+                ) : speech.listening ? (
+                  <>
+                    <Pressable onPress={speech.stop} className="px-8 py-3 bg-red-500 rounded-full">
+                      <Text className="text-white font-bold text-base">
+                        ⏹ Listening… tap when done
+                      </Text>
+                    </Pressable>
+                    {speech.interim ? (
+                      <Text className="text-slate-500 italic text-center">
+                        &quot;{speech.interim}&quot;
+                      </Text>
+                    ) : (
+                      <Text className="text-slate-400">Say the line now 🎧</Text>
+                    )}
+                  </>
+                ) : (
+                  <Pressable onPress={startCheck} className="px-8 py-3 bg-[#0A192F] rounded-full">
+                    <Text className="text-white font-bold text-base">
+                      🎙️ Speak &amp; Check My Voice
+                    </Text>
+                  </Pressable>
+                )
+              ) : null}
+              {checkError && speech.supported ? (
+                <Text className="text-red-500 text-sm text-center max-w-md">
+                  {speechErrorMessage(checkError)}
+                </Text>
+              ) : null}
+
               {recordSupported ? (
                 isRecording ? (
                   <Pressable
@@ -441,16 +548,39 @@ export default function SpeakingPractice() {
                 </View>
               ) : null}
 
-              <Pressable
-                onPress={() => {
-                  (async () => {
-                    await advance();
-                  })();
-                }}
-                className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center mt-3"
-              >
-                <Text className="text-white font-bold text-lg">✅ I said it!</Text>
-              </Pressable>
+              {checkResult && !checkResult.score.passed ? (
+                <>
+                  <Pressable
+                    onPress={retry}
+                    className="w-full max-w-md px-6 py-4 bg-[#0A192F] rounded-full items-center mt-3"
+                  >
+                    <Text className="text-white font-bold text-lg">🎙️ Try Again</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      (async () => {
+                        await advance();
+                      })();
+                    }}
+                    className="px-3 py-2"
+                  >
+                    <Text className="text-slate-400 font-bold underline">Next line anyway →</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    (async () => {
+                      await advance();
+                    })();
+                  }}
+                  className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center mt-3"
+                >
+                  <Text className="text-white font-bold text-lg">
+                    {checkResult ? '✅ Great! Next Line' : '✅ I said it!'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           </View>
         </ScrollView>

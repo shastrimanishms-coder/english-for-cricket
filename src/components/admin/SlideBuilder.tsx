@@ -24,6 +24,7 @@ const TEMPLATES = [
   { id: 'grid_4up', label: '4-Up Intro Grid', icon: '🪟', desc: '4 Images to tap and listen' },
   { id: 'quiz_4up', label: 'Listen & Match', icon: '🎯', desc: '1 Prompt, 4 Image Choices' },
   { id: 'typing', label: 'Typing Practice', icon: '⌨️', desc: '1 Image, Text Input Challenge' },
+  { id: 'speak_repeat', label: 'Speak & Repeat', icon: '🎙️', desc: 'Listen, say it back, get a score' },
 ];
 
 export default function SlideBuilder() {
@@ -155,6 +156,9 @@ export default function SlideBuilder() {
     if (slideType.includes('4up') && !panels[0].text && !promptText) {
       return Alert.alert('Missing Info', 'Please provide text for the panels or prompt.');
     }
+    if (slideType === 'speak_repeat' && !correctAnswer.trim() && !promptText.trim()) {
+      return Alert.alert('Missing Phrase', 'Please enter the phrase the student must say.');
+    }
 
     setSaving(true);
     try {
@@ -177,10 +181,19 @@ export default function SlideBuilder() {
         });
       }
 
+      // Speak & Repeat: the phrase lives in correct_answer (it is what
+      // gets scored); mirror it into prompt_text when no separate
+      // instruction was typed, so lists and the player always have
+      // text to show.
+      const finalPromptText =
+        slideType === 'speak_repeat' && !promptText.trim()
+          ? correctAnswer.trim()
+          : promptText.trim();
+
       const payload = {
         lesson_id: selectedLessonId,
         slide_type: slideType,
-        prompt_text: promptText.trim(),
+        prompt_text: finalPromptText,
         correct_answer: correctAnswer.trim(),
         order_index: parseInt(orderIndex) || 0,
         media_url: activePanelCount === 1 ? processedPanels[0].media_url : '',
@@ -369,6 +382,33 @@ export default function SlideBuilder() {
                       />
                     </View>
                   )}
+                </View>
+              )}
+
+              {slideType === 'speak_repeat' && (
+                <View className="space-y-4">
+                  <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider">Main Presentation Content</Text>
+                  {renderPanelEditor(0)}
+                  <View className="bg-brand/5 p-4 rounded-xl border border-brand/20 mt-4">
+                    <Text className="text-sm font-bold text-brand mb-2">🎙️ Phrase the student must say (Required)</Text>
+                    <TextInput
+                      className="w-full bg-white p-4 rounded-xl border border-slate-200"
+                      placeholder="e.g., The bowler bowls the ball."
+                      value={correctAnswer}
+                      onChangeText={setCorrectAnswer}
+                    />
+                    <Text className="text-xs text-slate-500 mt-2">
+                      The student listens (the Panel 1 audio above, or the device voice), says the
+                      phrase into the microphone, and is scored word by word. 70% or more passes.
+                      Add an instruction below only if you want different wording shown above the phrase.
+                    </Text>
+                    <TextInput
+                      className="w-full bg-white p-4 rounded-xl border border-slate-200 mt-3"
+                      placeholder="Optional instruction, e.g., Say it like a commentator!"
+                      value={promptText}
+                      onChangeText={setPromptText}
+                    />
+                  </View>
                 </View>
               )}
 

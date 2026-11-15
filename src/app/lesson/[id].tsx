@@ -29,13 +29,20 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
 import NewBadgeCard from '../../components/ui/NewBadgeCard';
+import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import {
   awardLessonBadges,
   evaluateStreakBadges,
   type AwardedBadge,
 } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
+import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
+import {
+  speechErrorMessage,
+  useSpeechCheck,
+  type SpeechCheckError,
+} from '../../lib/useSpeechCheck';
 
 interface SlidePanel {
   id: number;
@@ -69,6 +76,8 @@ interface SlideAttempt {
   selectedPanelId: number | null;
   exploredPanelIds: number[];
   typingValue: string;
+  /** Last speech-check result on a Speak & Repeat slide, if any. */
+  speechResult: { transcript: string; score: SpeechScore } | null;
 }
 
 const EMPTY_ATTEMPT: SlideAttempt = {
@@ -77,9 +86,10 @@ const EMPTY_ATTEMPT: SlideAttempt = {
   selectedPanelId: null,
   exploredPanelIds: [],
   typingValue: '',
+  speechResult: null,
 };
 
-const SCORED_TYPES = ['quiz_4up', 'typing'];
+const SCORED_TYPES = ['quiz_4up', 'typing', 'speak_repeat'];
 
 function normalizeAnswer(value: string): string {
   return value
@@ -216,6 +226,147 @@ const burstStyles = StyleSheet.create({
   },
 });
 
+/**
+ * Speak & Repeat slide: listen to the phrase, say it into the
+ * microphone, and get word-by-word colour feedback with a score
+ * (70% passes). Where the device or browser cannot check speech at
+ * all, the slide falls back to say-it-out-loud self-marking so the
+ * student is never blocked by their hardware.
+ */
+function SpeakRepeatSlide({
+  slide,
+  attempt,
+  playOrSpeak,
+  onAnswered,
+  onRetry,
+}: {
+  slide: Slide;
+  attempt: SlideAttempt;
+  playOrSpeak: (url: string | null | undefined, text: string | null | undefined) => void;
+  onAnswered: (
+    slide: Slide,
+    correct: boolean,
+    result: { transcript: string; score: SpeechScore } | null
+  ) => void;
+  onRetry: (slide: Slide) => void;
+}) {
+  const target = slide.correct_answer || slide.prompt_text || '';
+  const instruction =
+    slide.prompt_text && slide.prompt_text !== target ? slide.prompt_text : null;
+  const [error, setError] = useState<SpeechCheckError | null>(null);
+
+  const speech = useSpeechCheck({
+    onFinal: (transcript) => {
+      setError(null);
+      const score = scoreSpeech(target, transcript);
+      onAnswered(slide, score.passed, { transcript, score });
+    },
+    onError: (speechError) => setError(speechError),
+  });
+
+  const startSpeaking = () => {
+    setError(null);
+    try {
+      Speech.stop();
+    } catch {
+      // TTS is a nicety, never a blocker.
+    }
+    void speech.start();
+  };
+
+  return (
+    <View className="items-center">
+      {slide.media_url ? (
+        <Image
+          source={{ uri: slide.media_url }}
+          className="w-full h-52 rounded-2xl mb-6"
+          resizeMode="cover"
+        />
+      ) : null}
+      {instruction ? (
+        <Text className="text-lg text-slate-500 text-center mb-2">{instruction}</Text>
+      ) : null}
+      <Text className="text-sm text-slate-400 mb-1">Listen, then say it out loud:</Text>
+      <Text className="text-3xl font-bold text-[#0A192F] text-center mb-6">{target}</Text>
+
+      <Pressable
+        onPress={() => playOrSpeak(slide.audio_url, target)}
+        className="px-6 py-3 bg-brand rounded-full mb-6"
+      >
+        <Text className="text-white font-bold text-base">🔊 Listen</Text>
+      </Pressable>
+
+      {attempt.answered && attempt.speechResult ? (
+        <View className="w-full items-center">
+          <SpeechScoreView score={attempt.speechResult.score} transcript={attempt.speechResult.transcript} />
+          {attempt.wasCorrect ? (
+            <Text className="text-slate-400 text-sm mt-4">⭐ Great! Moving to the next slide…</Text>
+          ) : (
+            <>
+              <Text className="text-slate-400 text-sm mt-4 text-center">
+                🔁 This one will come back at the end of the lesson.
+              </Text>
+              <Pressable onPress={() => onRetry(slide)} className="px-6 py-3 mt-3 bg-[#0A192F] rounded-full">
+                <Text className="text-white font-bold text-base">🎙️ Try Again Now</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      ) : attempt.answered ? (
+        <Text className="text-lg font-bold text-emerald-600">✅ You said it! Moving on…</Text>
+      ) : speech.supported === null ? (
+        <ActivityIndicator size="large" color="#0A192F" />
+      ) : speech.supported === false ? (
+        <View className="items-center">
+          <View className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 max-w-md mb-4">
+            <Text className="text-amber-700 text-sm text-center">
+              🎙️ This device or browser can&apos;t check speech automatically. Say the phrase out
+              loud, then tap below.
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => onAnswered(slide, true, null)}
+            className="px-8 py-4 bg-emerald-600 rounded-full"
+          >
+            <Text className="text-white font-bold text-base">✅ I said it out loud</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View className="items-center w-full">
+          {speech.listening ? (
+            <>
+              <Pressable onPress={speech.stop} className="px-8 py-4 bg-red-500 rounded-full mb-3">
+                <Text className="text-white font-bold text-base">⏹ Listening… tap when done</Text>
+              </Pressable>
+              {speech.interim ? (
+                <Text className="text-slate-500 italic text-center">&quot;{speech.interim}&quot;</Text>
+              ) : (
+                <Text className="text-slate-400 text-center">Say the phrase now 🎧</Text>
+              )}
+            </>
+          ) : (
+            <Pressable onPress={startSpeaking} className="px-8 py-4 bg-[#0A192F] rounded-full">
+              <Text className="text-white font-bold text-lg">🎙️ Tap to Speak</Text>
+            </Pressable>
+          )}
+          {error ? (
+            <View className="items-center mt-4 max-w-md">
+              <Text className="text-red-500 text-sm text-center mb-2">
+                {speechErrorMessage(error)}
+              </Text>
+              <Pressable onPress={() => onAnswered(slide, true, null)}>
+                <Text className="text-slate-400 font-bold underline text-sm">
+                  ✅ I said it out loud instead
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function LessonPlayer() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -228,7 +379,19 @@ export default function LessonPlayer() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [slides, setSlides] = useState<Slide[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Play order for this run. Starts as every slide in order; a scored
+  // slide answered wrong is appended to the end and comes back, again
+  // and again, until it is answered right - so `queue` can grow while
+  // `queuePos` walks it.
+  const [queue, setQueue] = useState<number[]>([]);
+  const [queuePos, setQueuePos] = useState(0);
+  // First-attempt result per scored slide: this is the honest score
+  // (stars, stats) even though practice continues until mastery.
+  const [firstResults, setFirstResults] = useState<Record<string, boolean>>({});
+  // Slides fully dealt with, for the progress bar.
+  const [completedIds, setCompletedIds] = useState<string[]>([]);
+  // How many slides had to come back for another try.
+  const [practiceRounds, setPracticeRounds] = useState(0);
   const [attempts, setAttempts] = useState<Record<string, SlideAttempt>>({});
   const [finished, setFinished] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
@@ -261,7 +424,11 @@ export default function LessonPlayer() {
         .eq('lesson_id', id)
         .order('order_index', { ascending: true });
       if (slideError) throw slideError;
-      setSlides((slideData || []) as Slide[]);
+      const loadedSlides = (slideData || []) as Slide[];
+      setSlides(loadedSlides);
+      // (Re)initialise the play queue for this run of the lesson.
+      setQueue(loadedSlides.map((_, i) => i));
+      setQueuePos(0);
     } catch (error: any) {
       setLoadError(error.message || 'Something went wrong while loading this lesson.');
     } finally {
@@ -298,7 +465,7 @@ export default function LessonPlayer() {
     } catch {
       // TTS is a nicety, never a blocker.
     }
-  }, [currentIndex, finished]);
+  }, [queuePos, finished]);
 
   const playAudio = useCallback((url: string | null | undefined) => {
     if (!url) return;
@@ -360,13 +527,17 @@ export default function LessonPlayer() {
     }));
   }, []);
 
-  const currentSlide: Slide | undefined = slides[currentIndex];
+  const currentSlideIndex: number | undefined = queue[queuePos];
+  const currentSlide: Slide | undefined =
+    currentSlideIndex !== undefined ? slides[currentSlideIndex] : undefined;
   const currentAttempt: SlideAttempt =
     (currentSlide && attempts[currentSlide.id]) || EMPTY_ATTEMPT;
 
   // Animated progress bar: the fill glides to the new width (~400ms)
-  // instead of jumping when the student moves between slides.
-  const progressPct = slides.length > 0 ? ((currentIndex + 1) / slides.length) * 100 : 0;
+  // instead of jumping when the student moves between slides. Progress
+  // counts slides fully dealt with, so practice rounds at the end do
+  // not drag the bar backwards.
+  const progressPct = slides.length > 0 ? (completedIds.length / slides.length) * 100 : 0;
   const progressSV = useSharedValue(0);
   useEffect(() => {
     progressSV.set(withTiming(progressPct, { duration: 400 }));
@@ -406,22 +577,26 @@ export default function LessonPlayer() {
     [cardScale, cardShakeX]
   );
 
-  const scoreFor = useCallback(
-    (slideList: Slide[], attemptMap: Record<string, SlideAttempt>) => {
-      let correct = 0;
-      let total = 0;
-      for (const slide of slideList) {
-        if (!SCORED_TYPES.includes(slide.slide_type)) continue;
-        const attempt = attemptMap[slide.id];
-        if (attempt?.answered) {
-          total += 1;
-          if (attempt.wasCorrect) correct += 1;
-        }
+  // The first attempt at each scored slide is recorded once and never
+  // overwritten: it is the score the completion screen and the stats
+  // use, even though a missed slide keeps coming back until the
+  // student gets it right.
+  const recordFirstResult = useCallback((slideId: string, correct: boolean) => {
+    setFirstResults((prev) => (slideId in prev ? prev : { ...prev, [slideId]: correct }));
+  }, []);
+
+  const firstScore = useCallback(() => {
+    let correct = 0;
+    let total = 0;
+    for (const slide of slides) {
+      if (!SCORED_TYPES.includes(slide.slide_type)) continue;
+      if (slide.id in firstResults) {
+        total += 1;
+        if (firstResults[slide.id]) correct += 1;
       }
-      return { correct, total };
-    },
-    []
-  );
+    }
+    return { correct, total };
+  }, [slides, firstResults]);
 
   const recordCompletion = useCallback(
     async (correct: number, total: number) => {
@@ -485,15 +660,70 @@ export default function LessonPlayer() {
     [lesson]
   );
 
-  const handleContinue = useCallback(async () => {
-    if (currentIndex < slides.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      return;
-    }
-    const { correct, total } = scoreFor(slides, attempts);
+  const finishLesson = useCallback(async () => {
+    const { correct, total } = firstScore();
     await recordCompletion(correct, total);
     setFinished(true);
-  }, [currentIndex, slides, attempts, scoreFor, recordCompletion]);
+  }, [firstScore, recordCompletion]);
+
+  // Move on from the current slide. A scored slide answered wrong is
+  // appended to the end of the queue (and its attempt reset) so it
+  // comes back for another try; the lesson only finishes when the
+  // queue runs out, which means every scored slide has been answered
+  // right at least once. Skipping is the one explicit way past a
+  // slide without mastering it.
+  const advance = useCallback(
+    async (opts?: { skipped?: boolean }) => {
+      if (!currentSlide || currentSlideIndex === undefined) return;
+      const attempt = attempts[currentSlide.id] || EMPTY_ATTEMPT;
+      const isScoredSlide = SCORED_TYPES.includes(currentSlide.slide_type);
+      const needsRetry =
+        isScoredSlide && !opts?.skipped && attempt.answered && attempt.wasCorrect === false;
+
+      if (!needsRetry) {
+        setCompletedIds((prev) =>
+          prev.includes(currentSlide.id) ? prev : [...prev, currentSlide.id]
+        );
+      }
+
+      let nextQueue = queue;
+      if (needsRetry) {
+        nextQueue = [...queue, currentSlideIndex];
+        setQueue(nextQueue);
+        setPracticeRounds((r) => r + 1);
+        setAttempts((prev) => ({ ...prev, [currentSlide.id]: EMPTY_ATTEMPT }));
+      }
+
+      if (queuePos < nextQueue.length - 1) {
+        setQueuePos(queuePos + 1);
+      } else {
+        await finishLesson();
+      }
+    },
+    [currentSlide, currentSlideIndex, attempts, queue, queuePos, finishLesson]
+  );
+
+  const advanceRef = useRef(advance);
+  useEffect(() => {
+    advanceRef.current = advance;
+  }, [advance]);
+
+  // Auto-advance: once a scored slide is answered, let the feedback
+  // sit briefly, then move on by itself - no Continue button to hunt
+  // for. A wrong answer lingers longer so the student can read the
+  // right answer before the slide goes to the back of the queue.
+  const currentSlideId = currentSlide?.id;
+  const currentAnswered = currentAttempt.answered;
+  const currentWasCorrect = currentAttempt.wasCorrect;
+  const currentIsScored = currentSlide ? SCORED_TYPES.includes(currentSlide.slide_type) : false;
+  useEffect(() => {
+    if (finished || !currentIsScored || !currentAnswered) return;
+    const delay = currentWasCorrect ? 1500 : 3000;
+    const timer = setTimeout(() => {
+      void advanceRef.current();
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [finished, currentIsScored, currentAnswered, currentWasCorrect, currentSlideId, queuePos]);
 
   const handleExit = useCallback(() => {
     if (finished) {
@@ -532,6 +762,7 @@ export default function LessonPlayer() {
         const correct = panel.is_correct === true;
         feedbackHaptic(correct);
         feedbackAnim(correct);
+        recordFirstResult(slide.id, correct);
         updateAttempt(slide.id, {
           answered: true,
           wasCorrect: correct,
@@ -539,7 +770,7 @@ export default function LessonPlayer() {
         });
       }
     },
-    [attempts, playOrSpeak, feedbackHaptic, feedbackAnim, updateAttempt]
+    [attempts, playOrSpeak, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
   );
 
   const handleTypingCheck = useCallback(
@@ -550,9 +781,36 @@ export default function LessonPlayer() {
         normalizeAnswer(attempt.typingValue) === normalizeAnswer(slide.correct_answer || '');
       feedbackHaptic(correct);
       feedbackAnim(correct);
+      recordFirstResult(slide.id, correct);
       updateAttempt(slide.id, { answered: true, wasCorrect: correct });
     },
-    [attempts, feedbackHaptic, feedbackAnim, updateAttempt]
+    [attempts, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
+  );
+
+  const handleSpeechAnswered = useCallback(
+    (
+      slide: Slide,
+      correct: boolean,
+      result: { transcript: string; score: SpeechScore } | null
+    ) => {
+      const attempt = attempts[slide.id] || EMPTY_ATTEMPT;
+      if (attempt.answered) return;
+      feedbackHaptic(correct);
+      feedbackAnim(correct);
+      recordFirstResult(slide.id, correct);
+      updateAttempt(slide.id, { answered: true, wasCorrect: correct, speechResult: result });
+    },
+    [attempts, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
+  );
+
+  // "Try Again Now" on a speaking slide: clear the attempt in place so
+  // the student can immediately have another go (this also cancels
+  // the pending auto-advance, whose effect watches `answered`).
+  const handleSpeechRetry = useCallback(
+    (slide: Slide) => {
+      setAttempts((prev) => ({ ...prev, [slide.id]: EMPTY_ATTEMPT }));
+    },
+    []
   );
 
   // ---- Render helpers -------------------------------------------------------
@@ -682,6 +940,19 @@ export default function LessonPlayer() {
       );
     }
 
+    if (slide.slide_type === 'speak_repeat') {
+      return (
+        <SpeakRepeatSlide
+          key={slide.id}
+          slide={slide}
+          attempt={attempt}
+          playOrSpeak={playOrSpeak}
+          onAnswered={handleSpeechAnswered}
+          onRetry={handleSpeechRetry}
+        />
+      );
+    }
+
     if (slide.slide_type === 'typing') {
       return (
         <View className="items-center">
@@ -785,7 +1056,7 @@ export default function LessonPlayer() {
   }
 
   if (finished) {
-    const { correct, total } = scoreFor(slides, attempts);
+    const { correct, total } = firstScore();
     const percentage = total > 0 ? Math.round((correct / total) * 100) : null;
     const starCount = percentage === null ? 0 : percentage >= 90 ? 3 : percentage >= 60 ? 2 : 1;
     const currentBadge = earnedBadges[badgeIndex];
@@ -806,6 +1077,11 @@ export default function LessonPlayer() {
           )}
         </PopIn>
         {percentage !== null ? <StarsRow count={starCount} /> : null}
+        {practiceRounds > 0 ? (
+          <Text className="text-emerald-600 font-bold text-center mb-2">
+            💪 You kept practising until every answer was right!
+          </Text>
+        ) : null}
         <Text className="text-slate-400 mb-6">Time: {formatDuration(durationSeconds)}</Text>
         {currentBadge ? (
           <NewBadgeCard
@@ -848,8 +1124,12 @@ export default function LessonPlayer() {
   }
 
   const isScored = SCORED_TYPES.includes(currentSlide.slide_type);
-  const canContinue = !isScored || currentAttempt.answered;
-  const isLast = currentIndex === slides.length - 1;
+  // A scored slide coming back after an earlier miss.
+  const isRepeat =
+    isScored &&
+    firstResults[currentSlide.id] !== undefined &&
+    !(currentAttempt.answered && currentAttempt.wasCorrect);
+  const isLastInQueue = queuePos >= queue.length - 1;
 
   return (
     <SafeAreaView className="flex-1 bg-surface-background">
@@ -871,13 +1151,23 @@ export default function LessonPlayer() {
 
           <View className="px-3 py-1 bg-slate-100 rounded-lg border border-slate-200">
             <Text className="text-xs font-bold text-slate-500 uppercase">
-              {currentIndex + 1} / {slides.length}
+              {completedIds.length} / {slides.length} done
             </Text>
           </View>
         </View>
 
         {lesson?.title ? (
           <Text className="text-center text-sm font-bold text-slate-400 mb-4">{lesson.title}</Text>
+        ) : null}
+
+        {isRepeat ? (
+          <View className="items-center mb-3">
+            <View className="px-3 py-1 bg-amber-100 border border-amber-200 rounded-full">
+              <Text className="text-xs font-bold text-amber-700">
+                🔁 Practice again — until it&apos;s right!
+              </Text>
+            </View>
+          </View>
         ) : null}
 
         {/* Slide Container - wrapped in an Animated.View so a correct
@@ -892,41 +1182,40 @@ export default function LessonPlayer() {
           <AnswerBurst burstKey={answerBurstKey} />
         </Animated.View>
 
-        {/* Footer Navigation */}
+        {/* Footer Navigation. Scored slides move on by themselves
+            once answered (see the auto-advance effect); listening
+            slides keep a Continue button. */}
         <View className="py-4 items-center">
-          {canContinue ? (
+          {isScored ? (
+            currentAttempt.answered ? (
+              <Text className="text-slate-400 text-sm">
+                {currentAttempt.wasCorrect
+                  ? '⭐ Great! Next slide coming…'
+                  : '🔁 This slide will come back at the end'}
+              </Text>
+            ) : (
+              <>
+                <Text className="text-slate-400 text-sm mb-3">Answer to continue</Text>
+                <Pressable
+                  onPress={() => {
+                    void advance({ skipped: true });
+                  }}
+                >
+                  <Text className="text-slate-400 font-bold underline">Skip this slide</Text>
+                </Pressable>
+              </>
+            )
+          ) : (
             <Pressable
               onPress={() => {
-                (async () => {
-                  await handleContinue();
-                })();
+                void advance();
               }}
               className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center"
             >
               <Text className="text-white font-bold text-lg">
-                {isLast ? 'Finish Lesson' : 'Continue'}
+                {isLastInQueue ? 'Finish Lesson' : 'Continue'}
               </Text>
             </Pressable>
-          ) : (
-            <>
-              <Text className="text-slate-400 text-sm mb-3">Answer to continue</Text>
-              <Pressable
-                onPress={() => {
-                  (async () => {
-                    // Skip: advance without recording an attempt for this slide.
-                    if (currentIndex < slides.length - 1) {
-                      setCurrentIndex(currentIndex + 1);
-                    } else {
-                      const { correct, total } = scoreFor(slides, attempts);
-                      await recordCompletion(correct, total);
-                      setFinished(true);
-                    }
-                  })();
-                }}
-              >
-                <Text className="text-slate-400 font-bold underline">Skip this slide</Text>
-              </Pressable>
-            </>
           )}
         </View>
       </View>

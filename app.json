@@ -37,7 +37,14 @@
       "expo-status-bar",
       "expo-web-browser",
       "expo-audio",
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "English for Cricket uses the microphone so you can practise speaking and check your pronunciation.",
+          "speechRecognitionPermission": "English for Cricket uses speech recognition to check the words you say in speaking practice."
+        }
+      ]
     ],
     "scheme": "englishforcricket",
     "slug": "english-for-cricket",
