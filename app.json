@@ -52,7 +52,7 @@
     "version": "1.0.0",
     "web": {
       "favicon": "./assets/images/favicon.png",
-      "output": "server"
+      "output": "static"
     }
   }
 }

@@ -1,0 +1,28 @@
+# English for Cricket - Apache rules for the static web export
+# (Lolipop shared hosting). Place in the web root with the export.
+RewriteEngine On
+
+# Dynamic routes serve their bracket shells; the app reads the id
+# from the URL on the client.
+RewriteRule ^lesson/[^/]+/?$ lesson/[id].html [L]
+RewriteRule ^games/[^/]+/?$ games/[id].html [L]
+RewriteRule ^videos/[^/]+/?$ videos/[id].html [L]
+RewriteRule ^p/[^/]+/?$ p/[slug].html [L]
+
+# Extensionless URLs resolve to the exported .html file when one
+# exists (e.g. /login -> login.html), so refreshes and shared
+# links work instead of 404ing.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+?)/?$ $1.html [L]
+
+# Long-cache the fingerprinted bundles; never cache HTML shells.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType application/javascript "access plus 30 days"
+  ExpiresByType text/css "access plus 30 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+</IfModule>
