@@ -24,6 +24,41 @@ interface SupportMessage {
   reply_text: string | null;
 }
 
+// One stored reply in a conversation thread (support_message_replies,
+// migration 20261115000012). author is 'admin' for panel replies; 'user'
+// is reserved for sender follow-ups if they are ever imported.
+interface SupportReply {
+  id: string;
+  message_id: string;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+// One entry in a conversation timeline: either a message from the
+// sender (kind 'user') or an admin reply (kind 'admin').
+interface TimelineEntry {
+  key: string;
+  kind: 'user' | 'admin';
+  body: string;
+  created_at: string;
+  messageId: string;
+  subject: string | null;
+}
+
+// All messages from one sender email, merged with the admin replies
+// into a single chronological thread.
+interface Conversation {
+  key: string;
+  name: string;
+  email: string;
+  firstSubject: string | null;
+  messages: SupportMessage[];
+  timeline: TimelineEntry[];
+  lastActivity: string;
+  unreadCount: number;
+}
+
 export default function HelpCenterManager() {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [existingSections, setExistingSections] = useState<string[]>([]);
@@ -37,13 +72,20 @@ export default function HelpCenterManager() {
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [inboxReady, setInboxReady] = useState(true);
 
-  // Reply composer state: one composer open at a time (replyingId),
-  // sendingReplyId drives the busy state, viewingReplyId expands the
-  // stored text of an already-sent reply.
-  const [replyingId, setReplyingId] = useState<string | null>(null);
+  // Conversation state: admin replies live in support_message_replies
+  // (migration 20261115000012). repliesReady=false means that table is
+  // not there yet - timelines then fall back to the replied_at /
+  // reply_text stamp on each message row.
+  const [replies, setReplies] = useState<SupportReply[]>([]);
+  const [repliesReady, setRepliesReady] = useState(true);
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+  const [messageSearch, setMessageSearch] = useState('');
+
+  // Reply composer state: one composer open at a time, keyed by
+  // conversation (sender email); sendingKey drives the busy state.
+  const [replyingKey, setReplyingKey] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
-  const [sendingReplyId, setSendingReplyId] = useState<string | null>(null);
-  const [viewingReplyId, setViewingReplyId] = useState<string | null>(null);
+  const [sendingKey, setSendingKey] = useState<string | null>(null);
 
   // Form State
   const [editId, setEditId] = useState<string | null>(null);
@@ -104,23 +146,46 @@ export default function HelpCenterManager() {
     }
   }, []);
 
+  const fetchReplies = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('support_message_replies')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setReplies(data || []);
+      setRepliesReady(true);
+    } catch {
+      // Replies table missing (migration 12 not run yet): fail soft -
+      // timelines fall back to each message's reply stamp.
+      setReplies([]);
+      setRepliesReady(false);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       await fetchMessages();
+      await fetchReplies();
     })();
-  }, [fetchMessages]);
+  }, [fetchMessages, fetchReplies]);
 
   const unreadCount = messages.filter((m) => !m.is_read).length;
 
-  const handleToggleRead = async (msg: SupportMessage) => {
+  // Mark read/unread applies to the whole conversation at once, so the
+  // thread's unread badge and the section badge stay in step.
+  const handleToggleConversationRead = async (conversation: Conversation) => {
+    const markRead = conversation.unreadCount > 0;
+    const ids = conversation.messages.map((m) => m.id);
     try {
       const { error } = await supabase
         .from('support_messages')
-        .update({ is_read: !msg.is_read })
-        .eq('id', msg.id);
+        .update({ is_read: markRead })
+        .in('id', ids);
       if (error) throw error;
       setMessages((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, is_read: !m.is_read } : m))
+        prev.map((m) => (ids.includes(m.id) ? { ...m, is_read: markRead } : m))
       );
     } catch (error: any) {
       Alert.alert('Update Failed', error.message);
@@ -145,39 +210,48 @@ export default function HelpCenterManager() {
       const { error } = await supabase.from('support_messages').delete().eq('id', id);
       if (error) throw error;
       setMessages((prev) => prev.filter((m) => m.id !== id));
+      // The database cascades the delete to the message's replies;
+      // mirror that locally.
+      setReplies((prev) => prev.filter((r) => r.message_id !== id));
     } catch (error: any) {
       Alert.alert('Delete Failed', error.message);
     }
   };
 
-  const handleOpenReply = (msg: SupportMessage) => {
-    setReplyingId(msg.id);
+  const handleOpenReply = (key: string) => {
+    setReplyingKey(key);
     setReplyDraft('');
   };
 
   const handleCancelReply = () => {
-    setReplyingId(null);
+    setReplyingKey(null);
     setReplyDraft('');
   };
 
-  // Sends the reply through the send-support-email Edge Function, which
-  // mails it via the owner's own SMTP (From: noreply@englishforcricket.com).
-  // replied_at / reply_text are stamped on the row ONLY after the email
-  // has actually gone out - a failed send leaves the inbox record
-  // untouched (and the draft open) so the admin can retry or fall back
-  // to their email app.
-  const handleSendReply = async (msg: SupportMessage) => {
+  // Sends a conversation reply through the send-support-email Edge
+  // Function, which mails it via the owner's own SMTP
+  // (From: noreply@englishforcricket.com). The reply is recorded ONLY
+  // after the email has actually gone out: a row in
+  // support_message_replies (so the thread can hold many replies) plus
+  // the replied_at / reply_text stamp on the latest message row, which
+  // keeps the latest-reply markers working. If the replies table is not
+  // there yet (migration 12 pending) the stamp alone is written - the
+  // timeline renders stamped replies too, so nothing is lost. A failed
+  // send leaves everything untouched (and the draft open) so the admin
+  // can retry or fall back to their email app.
+  const handleSendReply = async (conversation: Conversation) => {
     const text = replyDraft.trim();
-    if (!text || sendingReplyId) return;
+    if (!text || sendingKey) return;
 
-    setSendingReplyId(msg.id);
+    const latest = conversation.messages[conversation.messages.length - 1];
+    setSendingKey(conversation.key);
     let emailSent = false;
     try {
       const { error: invokeError } = await supabase.functions.invoke('send-support-email', {
         body: {
           mode: 'reply',
-          to: msg.email,
-          subject: 'Re: ' + (msg.subject || 'Your support message'),
+          to: latest.email,
+          subject: 'Re: ' + (latest.subject || 'Your support message'),
           message: text,
         },
       });
@@ -185,39 +259,80 @@ export default function HelpCenterManager() {
       emailSent = true;
 
       const repliedAt = new Date().toISOString();
+
+      // Record the reply in the thread table (best effort - the table
+      // may not exist until migration 12 is run).
+      let storedReply: SupportReply | null = null;
+      const { data: inserted, error: insertError } = await supabase
+        .from('support_message_replies')
+        .insert([{ message_id: latest.id, author: 'admin', body: text }])
+        .select()
+        .single();
+      if (!insertError && inserted) {
+        storedReply = inserted as SupportReply;
+        setRepliesReady(true);
+      }
+
+      // Stamp the latest message row (latest-reply marker + read).
       const { error: updateError } = await supabase
         .from('support_messages')
         .update({ replied_at: repliedAt, reply_text: text, is_read: true })
-        .eq('id', msg.id);
-      if (updateError) throw updateError;
+        .eq('id', latest.id);
+      const stamped = !updateError;
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msg.id ? { ...m, replied_at: repliedAt, reply_text: text, is_read: true } : m
-        )
-      );
-      setReplyingId(null);
+      const replyRow = storedReply;
+      if (replyRow) {
+        setReplies((prev) => [...prev, replyRow]);
+      }
+      if (stamped) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === latest.id ? { ...m, replied_at: repliedAt, reply_text: text, is_read: true } : m
+          )
+        );
+      }
+      setReplyingKey(null);
       setReplyDraft('');
-      Alert.alert('Reply Sent', `Your reply was emailed to ${msg.email}.`);
-    } catch {
-      if (emailSent) {
-        // The email went out but the inbox record could not be stamped.
+
+      if (replyRow && stamped) {
+        Alert.alert('Reply Sent', `Your reply was emailed to ${latest.email}.`);
+      } else if (stamped) {
+        // Email sent and stamped, but the thread table is missing: the
+        // reply still shows in the timeline via the stamp.
+        Alert.alert(
+          'Reply Sent',
+          `Your reply was emailed to ${latest.email} and saved. Full conversation history is kept once the latest database step (migration 12) is run.`
+        );
+      } else {
+        // The email went out but the inbox record could not be updated.
         Alert.alert(
           'Reply Sent',
           'The reply email was sent, but saving the reply record failed. The inbox will refresh now.'
         );
-        setReplyingId(null);
+        await fetchMessages();
+        await fetchReplies();
+      }
+    } catch {
+      if (emailSent) {
+        // The email went out but recording it failed unexpectedly:
+        // refresh rather than inviting a duplicate send.
+        Alert.alert(
+          'Reply Sent',
+          'The reply email was sent, but saving the reply record failed. The inbox will refresh now.'
+        );
+        setReplyingKey(null);
         setReplyDraft('');
         await fetchMessages();
+        await fetchReplies();
       } else {
         Alert.alert(
           'Reply Not Sent',
           'The reply email could not be sent - the email service may not be set up yet. ' +
-            'The original message is safe in this inbox; you can try again later or reply via your email app.'
+            'The conversation is safe in this inbox; you can try again later or reply via your email app.'
         );
       }
     } finally {
-      setSendingReplyId(null);
+      setSendingKey(null);
     }
   };
 
@@ -295,6 +410,109 @@ export default function HelpCenterManager() {
     setOrderIndex('0');
   };
 
+  // ---- Conversations ---------------------------------------------------
+  // Group messages by sender email and merge in the admin replies to
+  // build one chronological thread per sender.
+  const repliesByMessageId = new Map<string, SupportReply[]>();
+  replies.forEach((r) => {
+    const list = repliesByMessageId.get(r.message_id) || [];
+    list.push(r);
+    repliesByMessageId.set(r.message_id, list);
+  });
+
+  const conversationMap = new Map<string, SupportMessage[]>();
+  messages.forEach((m) => {
+    const key = m.email.trim().toLowerCase();
+    const list = conversationMap.get(key) || [];
+    list.push(m);
+    conversationMap.set(key, list);
+  });
+
+  const conversations: Conversation[] = Array.from(conversationMap.entries())
+    .map(([key, msgs]) => {
+      const sorted = [...msgs].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      const entries: TimelineEntry[] = [];
+      sorted.forEach((m) => {
+        entries.push({
+          key: `msg-${m.id}`,
+          kind: 'user',
+          body: m.message,
+          created_at: m.created_at,
+          messageId: m.id,
+          subject: m.subject,
+        });
+        const threadReplies = repliesByMessageId.get(m.id) || [];
+        threadReplies.forEach((r) => {
+          entries.push({
+            key: `reply-${r.id}`,
+            kind: 'admin',
+            body: r.body,
+            created_at: r.created_at,
+            messageId: m.id,
+            subject: null,
+          });
+        });
+        // Replies sent before the thread table existed only live in the
+        // row stamp - surface them too (unless the same text is already
+        // stored as a thread reply, which the current send flow writes).
+        if (m.reply_text && m.replied_at && !threadReplies.some((r) => r.body === m.reply_text)) {
+          entries.push({
+            key: `stamp-${m.id}`,
+            kind: 'admin',
+            body: m.reply_text,
+            created_at: m.replied_at,
+            messageId: m.id,
+            subject: null,
+          });
+        }
+      });
+      // True chronological order across the whole thread (a reply to an
+      // earlier message can postdate a newer message); insertion order
+      // breaks ties so a message always precedes its same-time replies.
+      const timeline = entries
+        .map((entry, seq) => ({ entry, seq }))
+        .sort((a, b) => {
+          const diff = new Date(a.entry.created_at).getTime() - new Date(b.entry.created_at).getTime();
+          return diff !== 0 ? diff : a.seq - b.seq;
+        })
+        .map(({ entry }) => entry);
+      const latest = sorted[sorted.length - 1];
+      return {
+        key,
+        name: latest.name,
+        email: latest.email,
+        firstSubject: sorted[0].subject,
+        messages: sorted,
+        timeline,
+        lastActivity: timeline.length > 0 ? timeline[timeline.length - 1].created_at : latest.created_at,
+        unreadCount: sorted.filter((m) => !m.is_read).length,
+      };
+    })
+    .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+
+  const searchTerm = messageSearch.trim().toLowerCase();
+  const isSearching = searchTerm.length > 0;
+  const visibleConversations = isSearching
+    ? conversations.filter((c) => {
+        if (c.name.toLowerCase().includes(searchTerm)) return true;
+        if (c.email.toLowerCase().includes(searchTerm)) return true;
+        if (c.key.includes(searchTerm)) return true;
+        return c.timeline.some(
+          (e) =>
+            e.body.toLowerCase().includes(searchTerm) ||
+            (e.subject ? e.subject.toLowerCase().includes(searchTerm) : false)
+        );
+      })
+    : conversations;
+
+  const toggleConversation = (key: string) => {
+    setExpandedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center">
@@ -302,9 +520,11 @@ export default function HelpCenterManager() {
       </View>
 
       {/* Messages Inbox - contact-form submissions from the Support page,
-          stored in the database (support_messages). Replies are written
-          here and emailed via the send-support-email Edge Function
-          (owner's SMTP) once that function is deployed. */}
+          stored in the database (support_messages) and grouped into one
+          conversation thread per sender. Replies are written here,
+          stored in support_message_replies, and emailed via the
+          send-support-email Edge Function (owner's SMTP) once that
+          function is deployed. */}
       <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <View className="flex-row items-center gap-3 p-4 border-b border-slate-100">
           <Text className="text-lg font-bold text-[#0A192F]">📩 Messages</Text>
@@ -314,6 +534,22 @@ export default function HelpCenterManager() {
             </Text>
           )}
         </View>
+        {inboxReady && !messagesLoading && messages.length > 0 && (
+          <View className="flex-row items-center gap-3 px-4 py-3 border-b border-slate-100 bg-slate-50">
+            <TextInput
+              className="flex-1 bg-white px-4 py-2.5 rounded-xl border border-slate-200"
+              placeholder="Search by name, email, subject or message text..."
+              value={messageSearch}
+              onChangeText={setMessageSearch}
+              autoCapitalize="none"
+            />
+            {isSearching && (
+              <Pressable onPress={() => setMessageSearch('')} className="px-3 py-2 bg-slate-200 rounded-lg">
+                <Text className="text-sm font-semibold text-slate-600">Clear</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
         {!inboxReady ? (
           <View className="p-6">
             <Text className="text-slate-500">
@@ -327,121 +563,142 @@ export default function HelpCenterManager() {
           <View className="p-8 items-center">
             <Text className="text-slate-500">No messages yet. New contact-form submissions will appear here.</Text>
           </View>
+        ) : visibleConversations.length === 0 ? (
+          <View className="p-8 items-center">
+            <Text className="text-slate-500">No conversations match your search.</Text>
+          </View>
         ) : (
-          messages.map((msg, index) => (
-            <View
-              key={msg.id}
-              className={`p-4 ${index !== messages.length - 1 ? 'border-b border-slate-100' : ''} ${!msg.is_read ? 'bg-blue-50' : ''}`}
-            >
-              <View className="flex-col md:flex-row justify-between items-start gap-3">
-                <View className="flex-1 pr-4">
-                  <View className="flex-row items-center gap-2 mb-1 flex-wrap">
-                    <Text className={`text-base text-text-primary ${!msg.is_read ? 'font-extrabold' : 'font-bold'}`}>
-                      {msg.name}
-                    </Text>
-                    {!msg.is_read && (
-                      <Text className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold">NEW</Text>
-                    )}
-                    <Text className="text-xs text-slate-400">
-                      {new Date(msg.created_at).toLocaleString()}
-                    </Text>
-                  </View>
-                  <Pressable onPress={() => Linking.openURL(`mailto:${msg.email}`)}>
-                    <Text className="text-sm text-action font-semibold mb-1">{msg.email}</Text>
-                  </Pressable>
-                  {msg.subject ? (
-                    <Text className="font-bold text-text-primary text-sm mb-1">{msg.subject}</Text>
-                  ) : null}
-                  <Text className="text-sm text-slate-600">{msg.message}</Text>
-                  {msg.replied_at ? (
-                    <View className="mt-3 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
-                      <View className="flex-row items-center justify-between gap-3 flex-wrap">
-                        <Text className="text-xs font-bold text-green-700">
-                          ✓ Replied {new Date(msg.replied_at).toLocaleString()}
+          visibleConversations.map((conversation, index) => {
+            const expanded = isSearching || expandedKeys.includes(conversation.key);
+            const sending = sendingKey === conversation.key;
+            const composerOpen = replyingKey === conversation.key;
+            return (
+              <View
+                key={conversation.key}
+                className={`${index !== visibleConversations.length - 1 ? 'border-b border-slate-200' : ''} ${conversation.unreadCount > 0 ? 'bg-blue-50' : ''}`}
+              >
+                <Pressable
+                  onPress={() => toggleConversation(conversation.key)}
+                  className="flex-row items-start justify-between gap-3 p-4"
+                >
+                  <View className="flex-1 pr-2">
+                    <View className="flex-row items-center gap-2 flex-wrap">
+                      <Text className={`text-base text-text-primary ${conversation.unreadCount > 0 ? 'font-extrabold' : 'font-bold'}`}>
+                        {conversation.name}
+                      </Text>
+                      <Text className="text-sm text-action font-semibold">{conversation.email}</Text>
+                      {conversation.unreadCount > 0 && (
+                        <Text className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">
+                          {conversation.unreadCount} unread
                         </Text>
-                        {msg.reply_text ? (
-                          <Pressable
-                            onPress={() => setViewingReplyId(viewingReplyId === msg.id ? null : msg.id)}
-                          >
-                            <Text className="text-xs font-semibold text-green-700 underline">
-                              {viewingReplyId === msg.id ? 'Hide reply' : 'View reply'}
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                      {viewingReplyId === msg.id && msg.reply_text ? (
-                        <Text className="text-sm text-slate-600 mt-2">{msg.reply_text}</Text>
-                      ) : null}
+                      )}
                     </View>
-                  ) : null}
-                </View>
-
-                <View className="flex-row gap-3 mt-2 md:mt-0">
-                  <Pressable
-                    onPress={() => (replyingId === msg.id ? handleCancelReply() : handleOpenReply(msg))}
-                    className="px-3 py-1.5 bg-[#0A192F] rounded border border-[#0A192F]"
-                  >
-                    <Text className="text-white text-sm font-semibold">Reply in panel</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleToggleRead(msg)}
-                    className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200"
-                  >
-                    <Text className="text-text-secondary text-sm font-semibold">
-                      {msg.is_read ? 'Mark unread' : 'Mark read'}
+                    {conversation.firstSubject ? (
+                      <Text className="text-sm font-semibold text-text-primary mt-0.5">{conversation.firstSubject}</Text>
+                    ) : null}
+                    <Text className="text-xs text-slate-400 mt-0.5">
+                      {conversation.timeline.length} {conversation.timeline.length === 1 ? 'entry' : 'entries'} · Last activity {new Date(conversation.lastActivity).toLocaleString()}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleDeleteMessage(msg.id)}
-                    className="px-3 py-1.5 bg-red-50 rounded border border-red-100"
-                  >
-                    <Text className="text-red-600 text-sm font-semibold">Delete</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              {replyingId === msg.id && (
-                <View className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
-                  <Text className="text-sm font-semibold text-text-secondary mb-2">
-                    Reply to {msg.name} ({msg.email}) - sent from noreply@englishforcricket.com
-                  </Text>
-                  <TextInput
-                    className="w-full bg-white p-4 rounded-xl border border-slate-200 min-h-[100px]"
-                    placeholder="Write your reply..."
-                    value={replyDraft}
-                    onChangeText={setReplyDraft}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                  <View className="flex-row items-center justify-between gap-4 mt-3 flex-wrap">
-                    <Pressable onPress={() => Linking.openURL(`mailto:${msg.email}`)}>
-                      <Text className="text-xs text-slate-400 font-semibold">or reply via your email app</Text>
-                    </Pressable>
-                    <View className="flex-row gap-3">
-                      <View className="w-24">
-                        <AnimatedButton
-                          title="Cancel"
-                          onPress={handleCancelReply}
-                          disabled={sendingReplyId === msg.id}
-                          variant="outline"
-                          size="sm"
-                        />
-                      </View>
-                      <View className="w-32">
-                        <AnimatedButton
-                          title={sendingReplyId === msg.id ? 'Sending...' : 'Send Reply'}
-                          onPress={() => handleSendReply(msg)}
-                          disabled={sendingReplyId === msg.id || !replyDraft.trim()}
-                          variant="primary"
-                          size="sm"
-                        />
-                      </View>
-                    </View>
                   </View>
-                </View>
-              )}
-            </View>
-          ))
+                  <Text className="text-slate-400 font-bold mt-1">{expanded ? '▲' : '▼'}</Text>
+                </Pressable>
+
+                {expanded && (
+                  <View className="px-4 pb-4">
+                    <View className="gap-3">
+                      {conversation.timeline.map((entry) =>
+                        entry.kind === 'user' ? (
+                          <View key={entry.key} className="self-start max-w-[85%] bg-white border border-slate-200 rounded-xl px-3 py-2.5">
+                            <Text className="text-xs font-bold text-text-secondary mb-1">
+                              {conversation.name} · {new Date(entry.created_at).toLocaleString()}
+                            </Text>
+                            {entry.subject ? (
+                              <Text className="text-sm font-bold text-text-primary mb-1">{entry.subject}</Text>
+                            ) : null}
+                            <Text className="text-sm text-slate-600">{entry.body}</Text>
+                            <View className="flex-row justify-end mt-2">
+                              <Pressable onPress={() => handleDeleteMessage(entry.messageId)}>
+                                <Text className="text-xs font-semibold text-red-500">Delete message</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ) : (
+                          <View key={entry.key} className="self-end max-w-[85%] bg-[#0A192F] rounded-xl px-3 py-2.5">
+                            <Text className="text-xs font-bold text-slate-300 mb-1">
+                              You (noreply@englishforcricket.com) · {new Date(entry.created_at).toLocaleString()}
+                            </Text>
+                            <Text className="text-sm text-white">{entry.body}</Text>
+                          </View>
+                        )
+                      )}
+                    </View>
+
+                    {!repliesReady && (
+                      <Text className="text-xs text-slate-400 mt-3">
+                        Full reply history is kept once the latest database step (migration 12) is run; until then only the latest reply per message is shown.
+                      </Text>
+                    )}
+
+                    <View className="flex-row items-center gap-3 mt-4 flex-wrap">
+                      <Pressable
+                        onPress={() => (composerOpen ? handleCancelReply() : handleOpenReply(conversation.key))}
+                        className="px-3 py-1.5 bg-[#0A192F] rounded border border-[#0A192F]"
+                      >
+                        <Text className="text-white text-sm font-semibold">Reply in panel</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleToggleConversationRead(conversation)}
+                        className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200"
+                      >
+                        <Text className="text-text-secondary text-sm font-semibold">
+                          {conversation.unreadCount > 0 ? 'Mark all read' : 'Mark all unread'}
+                        </Text>
+                      </Pressable>
+                      <Pressable onPress={() => Linking.openURL(`mailto:${conversation.email}`)}>
+                        <Text className="text-xs text-slate-400 font-semibold">or reply via your email app</Text>
+                      </Pressable>
+                    </View>
+
+                    {composerOpen && (
+                      <View className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                        <Text className="text-sm font-semibold text-text-secondary mb-2">
+                          Reply to {conversation.name} ({conversation.email}) - sent from noreply@englishforcricket.com
+                        </Text>
+                        <TextInput
+                          className="w-full bg-white p-4 rounded-xl border border-slate-200 min-h-[100px]"
+                          placeholder="Write your reply..."
+                          value={replyDraft}
+                          onChangeText={setReplyDraft}
+                          multiline
+                          textAlignVertical="top"
+                        />
+                        <View className="flex-row justify-end gap-3 mt-3">
+                          <View className="w-24">
+                            <AnimatedButton
+                              title="Cancel"
+                              onPress={handleCancelReply}
+                              disabled={sending}
+                              variant="outline"
+                              size="sm"
+                            />
+                          </View>
+                          <View className="w-32">
+                            <AnimatedButton
+                              title={sending ? 'Sending...' : 'Send Reply'}
+                              onPress={() => handleSendReply(conversation)}
+                              disabled={sending || !replyDraft.trim()}
+                              variant="primary"
+                              size="sm"
+                            />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })
         )}
       </View>
 
