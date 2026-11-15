@@ -34,6 +34,22 @@ export function playDing(): void {
   }
 }
 
+/**
+ * Clean a display string before handing it to the device voice.
+ * Slide text is written for eyes - emoji markers (⭐ 🎬 🏏), gap
+ * blanks (___) - and voices read those literally: "star", "clapper
+ * board", "underscore underscore underscore". Strip pictographs and
+ * symbols, turn gap blanks into the word "blank", and collapse the
+ * extra spaces so the voice only ever reads the actual words.
+ */
+export function toSpeechText(text: string): string {
+  return (text || '')
+    .replace(/_+/g, ' blank ')
+    .replace(/[\p{Extended_Pictographic}\p{So}\u{FE0F}\u{200D}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Sequence guard: starting (or cancelling) a line invalidates every
 // earlier pending completion callback, so a stale "finished" event
 // can never open the microphone on the wrong slide.
@@ -46,7 +62,7 @@ let speakSeq = 0;
  * never does (some web voices are silent about finishing).
  */
 export function speakWithCallback(text: string, onDone?: () => void): void {
-  const spoken = (text || '').trim();
+  const spoken = toSpeechText(text);
   if (!spoken) {
     onDone?.();
     return;

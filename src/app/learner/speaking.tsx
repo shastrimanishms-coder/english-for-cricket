@@ -21,6 +21,7 @@ import {
   playDing,
   probeVoicesAvailable,
   speakWithCallback,
+  toSpeechText,
 } from '../../lib/speechCue';
 import {
   SPEAKING_SCENARIOS,
@@ -315,7 +316,7 @@ export default function SpeakingPractice() {
     if (!current) return;
     try {
       Speech.stop();
-      Speech.speak(current.text, { language: 'en' });
+      Speech.speak(toSpeechText(current.text), { language: 'en' });
     } catch (error) {
       console.log('Speech error:', error);
     }
@@ -531,7 +532,7 @@ export default function SpeakingPractice() {
   const listenText = useCallback((text: string) => {
     try {
       Speech.stop();
-      Speech.speak(text, { language: 'en' });
+      Speech.speak(toSpeechText(text), { language: 'en' });
     } catch (error) {
       console.log('Speech error:', error);
     }

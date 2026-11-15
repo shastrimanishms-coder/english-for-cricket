@@ -2,7 +2,7 @@ import { createAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
@@ -36,13 +37,14 @@ import {
   type AwardedBadge,
 } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
-import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import { scoreMessage, scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
 import {
   cancelSpeechCue,
   playDing,
   probeVoicesAvailable,
   speakWithCallback,
+  toSpeechText,
 } from '../../lib/speechCue';
 import {
   speechErrorMessage,
@@ -249,10 +251,13 @@ const burstStyles = StyleSheet.create({
 function FallbackImage({
   uri,
   className,
+  height,
   fallback = null,
 }: {
   uri: string;
   className?: string;
+  /** Explicit height (screen-fit sizing); overrides any h-* class. */
+  height?: number;
   fallback?: ReactNode;
 }) {
   const [failed, setFailed] = useState(false);
@@ -261,9 +266,360 @@ function FallbackImage({
     <Image
       source={{ uri }}
       className={className}
+      style={height ? { height } : undefined}
       resizeMode="cover"
       onError={() => setFailed(true)}
     />
+  );
+}
+
+/**
+ * The word-introduction grids as a guided speak-along: the panels
+ * play one by one by themselves - picture and sound first, a ding,
+ * then the microphone opens and the learner repeats the word (or
+ * phrase) with the same word-by-word scoring as Speak & Repeat.
+ * A pass moves on by itself; a miss offers Try Again or Next so
+ * nobody gets stuck, and devices that cannot check speech fall
+ * back to say-it-out-loud self-marking. Tapping any panel still
+ * just plays its sound, like the old tap-to-listen grid.
+ */
+function GridSpeakSlide({
+  slide,
+  playOrSpeak,
+  playModelThen,
+  panelImgH,
+  tight,
+}: {
+  slide: Slide;
+  playOrSpeak: (url: string | null | undefined, text: string | null | undefined) => void;
+  playModelThen: (
+    url: string | null | undefined,
+    text: string | null | undefined,
+    onDone: () => void
+  ) => void;
+  panelImgH: number;
+  tight: boolean;
+}) {
+  const panels = useMemo(() => slide.options?.panels || [], [slide]);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [phase, setPhase] = useState<'playing' | 'listening' | 'feedback' | 'selfmark' | 'done'>(
+    'playing'
+  );
+  const [results, setResults] = useState<
+    Record<number, { score: SpeechScore | null; passed: boolean }>
+  >({});
+  const [lastScore, setLastScore] = useState<SpeechScore | null>(null);
+  const [error, setError] = useState<SpeechCheckError | null>(null);
+  const runRef = useRef(0);
+  const mountTokenRef = useRef({ cancelled: false });
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const speech = useSpeechCheck({
+    onFinal: (transcript) => {
+      const panel = panels[activeIdx];
+      if (!panel) return;
+      const score = scoreSpeech(toSpeechText(panel.text), transcript);
+      setLastScore(score);
+      setError(null);
+      setPhase('feedback');
+      if (score.passed) {
+        timerRef.current = setTimeout(() => {
+          advancePanel(activeIdx, { score, passed: true });
+        }, 1400);
+      }
+    },
+    onError: (speechError) => {
+      setError(speechError);
+      setLastScore(null);
+      setPhase('feedback');
+    },
+  });
+
+  const speechRef = useRef(speech);
+  useEffect(() => {
+    speechRef.current = speech;
+  });
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  // The external half of a panel's turn: play its sound, ding, then
+  // open the microphone (or fall back to self-marking). State resets
+  // live with the callers so this can be kicked off from an effect
+  // without setting state synchronously inside it; every setState
+  // below happens in an async callback (sound finished / timer).
+  const startSequence = useCallback(
+    (idx: number) => {
+      const panel = panels[idx];
+      if (!panel) return;
+      clearTimer();
+      const run = ++runRef.current;
+      const token = mountTokenRef.current;
+      playModelThen(panel.audio_url, panel.text, () => {
+        if (token.cancelled || runRef.current !== run) return;
+        playDing();
+        const tryStart = (attemptsLeft: number) => {
+          if (token.cancelled || runRef.current !== run) return;
+          const current = speechRef.current;
+          if (current.supported) {
+            setPhase('listening');
+            timerRef.current = setTimeout(() => {
+              if (token.cancelled || runRef.current !== run) return;
+              setError(null);
+              try {
+                Speech.stop();
+              } catch {
+                // TTS is a nicety, never a blocker.
+              }
+              void speechRef.current.start();
+            }, 450);
+          } else if (current.supported === false) {
+            setPhase('selfmark');
+          } else if (attemptsLeft > 0) {
+            timerRef.current = setTimeout(() => tryStart(attemptsLeft - 1), 500);
+          } else {
+            // Support still unknown: show the manual speak button.
+            setPhase('listening');
+          }
+        };
+        tryStart(4);
+      });
+    },
+    [panels, playModelThen]
+  );
+
+  const advancePanel = useCallback(
+    (idx: number, result: { score: SpeechScore | null; passed: boolean }) => {
+      clearTimer();
+      setResults((prev) => ({ ...prev, [idx]: result }));
+      if (idx + 1 < panels.length) {
+        setActiveIdx(idx + 1);
+        setPhase('playing');
+        setError(null);
+        setLastScore(null);
+        startSequence(idx + 1);
+      } else {
+        runRef.current++;
+        setPhase('done');
+      }
+    },
+    [panels.length, startSequence]
+  );
+
+  // Start the sequence on arrival; leaving the slide cancels it.
+  useEffect(() => {
+    const token = mountTokenRef.current;
+    startSequence(0);
+    return () => {
+      token.cancelled = true;
+      clearTimer();
+      cancelSpeechCue();
+    };
+  }, [startSequence]);
+
+  // No-voice hint, same reasoning as Speak & Repeat: if any panel
+  // relies on the device voice and the browser has none, say so.
+  const [noVoices, setNoVoices] = useState(false);
+  useEffect(() => {
+    if (!panels.some((p) => !p.audio_url)) return;
+    let alive = true;
+    void probeVoicesAvailable().then((ok) => {
+      if (alive) setNoVoices(!ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [panels]);
+
+  const startSpeaking = () => {
+    setError(null);
+    setLastScore(null);
+    setPhase('listening');
+    try {
+      Speech.stop();
+    } catch {
+      // TTS is a nicety, never a blocker.
+    }
+    void speech.start();
+  };
+
+  const prompt =
+    slide.prompt_text && !slide.prompt_text.startsWith('Tap each')
+      ? slide.prompt_text
+      : '🎧 Listen, then say each one!';
+
+  return (
+    <View>
+      <Text className="text-xl font-bold text-[#0A192F] text-center mb-2">{prompt}</Text>
+      {!tight || phase === 'done' ? (
+        <Text className="text-sm text-slate-400 text-center mb-2">
+          {phase === 'done'
+            ? 'All of them done — tap Continue below! 🎉'
+            : `Sound ${Math.min(activeIdx + 1, panels.length)} of ${panels.length}`}
+        </Text>
+      ) : null}
+      <View className="flex-row flex-wrap justify-between gap-y-3">
+        {panels.map((panel, idx) => {
+          const result = results[idx];
+          const isActive = phase !== 'done' && idx === activeIdx;
+          let borderClass = 'border-slate-200';
+          let bgClass = 'bg-slate-50';
+          if (result) {
+            borderClass = result.passed ? 'border-emerald-500' : 'border-amber-400';
+            bgClass = result.passed ? 'bg-emerald-50' : 'bg-amber-50';
+          } else if (isActive) {
+            borderClass = 'border-brand';
+            bgClass = 'bg-amber-50';
+          }
+          return (
+            <Pressable
+              key={panel.id}
+              onPress={() => playOrSpeak(panel.audio_url, panel.text)}
+              className={`w-[48%] rounded-2xl border-2 ${borderClass} ${bgClass} p-2 items-center`}
+            >
+              {panel.media_url ? (
+                <FallbackImage
+                  key={panel.media_url}
+                  uri={panel.media_url}
+                  className="w-full rounded-xl mb-2"
+                  height={panelImgH}
+                  fallback={
+                    <View
+                      className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+                      style={{ height: panelImgH }}
+                    >
+                      <Text className="text-3xl">🔊</Text>
+                    </View>
+                  }
+                />
+              ) : (
+                <View
+                  className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+                  style={{ height: panelImgH }}
+                >
+                  <Text className="text-3xl">🔊</Text>
+                </View>
+              )}
+              <Text
+                className={`${tight ? 'text-sm' : 'text-base'} font-bold text-slate-800 text-center`}
+              >
+                {panel.text}
+              </Text>
+              <Text className="text-xs text-slate-400 mt-1">
+                {result
+                  ? result.score
+                    ? `✅ ${result.score.accuracy}%`
+                    : '✅ Said it'
+                  : isActive
+                    ? phase === 'playing'
+                      ? '🔊 Listen…'
+                      : '🎙️ Your turn!'
+                    : 'Tap to listen'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {noVoices && phase !== 'done' ? (
+        <Text className="text-amber-600 text-xs text-center mt-3">
+          🔇 This browser has no voice installed, so the words may stay silent. Chrome, or the
+          phone app, can read them aloud.
+        </Text>
+      ) : null}
+
+      <View className={`items-center mt-3 ${tight ? 'min-h-[40px]' : 'min-h-[52px]'}`}>
+        {phase === 'done' ? (
+          <Text className="text-lg font-bold text-emerald-600">🎉 Great speaking!</Text>
+        ) : phase === 'playing' ? (
+          <Text className="text-slate-400">🔊 Listen…</Text>
+        ) : phase === 'selfmark' ? (
+          <View className="items-center">
+            <Text className="text-slate-500 text-sm text-center mb-2">
+              🎙️ This device can&apos;t check speech. Say it out loud, then tap:
+            </Text>
+            <Pressable
+              onPress={() => advancePanel(activeIdx, { score: null, passed: true })}
+              className="px-6 py-3 bg-emerald-600 rounded-full"
+            >
+              <Text className="text-white font-bold text-base">✅ I said it</Text>
+            </Pressable>
+          </View>
+        ) : phase === 'feedback' ? (
+          <View className="items-center w-full">
+            {lastScore ? (
+              <>
+                <Text
+                  className={`text-3xl font-bold ${
+                    lastScore.passed ? 'text-emerald-600' : 'text-amber-600'
+                  }`}
+                >
+                  {lastScore.accuracy}%
+                </Text>
+                <Text className="text-sm font-bold text-slate-600 mt-1">
+                  {scoreMessage(lastScore.accuracy)}
+                </Text>
+                {lastScore.passed ? (
+                  <Text className="text-slate-400 text-sm mt-2">⭐ Great! Next one coming…</Text>
+                ) : (
+                  <View className="flex-row gap-3 mt-3">
+                    <Pressable onPress={startSpeaking} className="px-5 py-3 bg-[#0A192F] rounded-full">
+                      <Text className="text-white font-bold text-sm">🎙️ Try Again</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => advancePanel(activeIdx, { score: lastScore, passed: false })}
+                      className="px-5 py-3 bg-slate-200 rounded-full"
+                    >
+                      <Text className="text-slate-600 font-bold text-sm">Next ➡️</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {error ? (
+                  <Text className="text-red-500 text-sm text-center mb-2 max-w-md">
+                    {speechErrorMessage(error)}
+                  </Text>
+                ) : null}
+                <View className="flex-row gap-3">
+                  <Pressable onPress={startSpeaking} className="px-5 py-3 bg-[#0A192F] rounded-full">
+                    <Text className="text-white font-bold text-sm">🎙️ Try Again</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => advancePanel(activeIdx, { score: null, passed: true })}
+                    className="px-5 py-3 bg-slate-200 rounded-full"
+                  >
+                    <Text className="text-slate-600 font-bold text-sm">✅ I said it — Next</Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        ) : speech.listening ? (
+          <View className="items-center">
+            <Pressable onPress={speech.stop} className="px-6 py-3 bg-red-500 rounded-full mb-2">
+              <Text className="text-white font-bold text-base">⏹ Listening… tap when done</Text>
+            </Pressable>
+            {speech.interim ? (
+              <Text className="text-slate-500 italic text-center">
+                &quot;{speech.interim}&quot;
+              </Text>
+            ) : (
+              <Text className="text-slate-400">Say it now 🎧</Text>
+            )}
+          </View>
+        ) : (
+          <Pressable onPress={startSpeaking} className="px-6 py-3 bg-[#0A192F] rounded-full">
+            <Text className="text-white font-bold text-base">🎙️ Tap to Speak</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -273,11 +629,13 @@ function SpeakRepeatSlide({
   playOrSpeak,
   playModelThen,
   visitKey,
+  imageHeight,
   onAnswered,
   onRetry,
 }: {
   slide: Slide;
   attempt: SlideAttempt;
+  imageHeight: number;
   playOrSpeak: (url: string | null | undefined, text: string | null | undefined) => void;
   playModelThen: (
     url: string | null | undefined,
@@ -382,7 +740,11 @@ function SpeakRepeatSlide({
   return (
     <View className="items-center">
       {slide.media_url ? (
-        <FallbackImage uri={slide.media_url} className="w-full h-52 rounded-2xl mb-6" />
+        <FallbackImage
+          uri={slide.media_url}
+          className="w-full rounded-2xl mb-4"
+          height={imageHeight}
+        />
       ) : null}
       {instruction ? (
         <Text className="text-lg text-slate-500 text-center mb-2">{instruction}</Text>
@@ -575,6 +937,18 @@ export default function LessonPlayer() {
     }
   }, [queuePos, finished]);
 
+  // Screen-fit sizing: slide pictures and panels scale with the
+  // window height so a whole slide stays visible without scrolling
+  // on laptops, tablets and phones alike. Floors keep pictures
+  // usable on very short (landscape) screens.
+  const { height: winH } = useWindowDimensions();
+  const compact = winH < 760;
+  const tight = winH < 680;
+  const shrink = tight ? 0.8 : 1;
+  const focusImgH = Math.round(Math.min(256, Math.max(110, winH * 0.3)) * shrink);
+  const wideImgH = Math.round(Math.min(208, Math.max(96, winH * 0.24)) * shrink);
+  const panelImgH = Math.round(Math.min(100, Math.max(48, winH * 0.12)) * shrink);
+
   const playAudio = useCallback((url: string | null | undefined) => {
     if (!url) return;
     try {
@@ -594,7 +968,7 @@ export default function LessonPlayer() {
   // uploads) would otherwise be completely silent. The device's voice
   // reads the text aloud instead, in English.
   const speakText = useCallback((text: string | null | undefined) => {
-    const spoken = (text || '').trim();
+    const spoken = toSpeechText(text || '');
     if (!spoken) return;
     try {
       Speech.stop();
@@ -1001,15 +1375,22 @@ export default function LessonPlayer() {
           <FallbackImage
             key={panel.media_url}
             uri={panel.media_url}
-            className="w-full h-28 rounded-xl mb-2"
+            className="w-full rounded-xl mb-2"
+            height={panelImgH}
             fallback={
-              <View className="w-full h-28 rounded-xl mb-2 bg-slate-200 items-center justify-center">
+              <View
+                className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+                style={{ height: panelImgH }}
+              >
                 <Text className="text-3xl">🔊</Text>
               </View>
             }
           />
         ) : (
-          <View className="w-full h-28 rounded-xl mb-2 bg-slate-200 items-center justify-center">
+          <View
+            className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+            style={{ height: panelImgH }}
+          >
             <Text className="text-3xl">🔊</Text>
           </View>
         )}
@@ -1030,14 +1411,15 @@ export default function LessonPlayer() {
             <FallbackImage
               key={slide.media_url}
               uri={slide.media_url}
-              className="w-full h-64 rounded-2xl mb-6"
+              className="w-full rounded-2xl mb-4"
+              height={focusImgH}
             />
           ) : null}
           {slide.prompt_text ? (
             <Text className="text-lg text-slate-500 text-center mb-2">{slide.prompt_text}</Text>
           ) : null}
           {slide.correct_answer ? (
-            <Text className="text-3xl font-bold text-[#0A192F] text-center mb-6">
+            <Text className="text-3xl font-bold text-[#0A192F] text-center mb-4">
               {slide.correct_answer}
             </Text>
           ) : null}
@@ -1057,20 +1439,14 @@ export default function LessonPlayer() {
 
     if (slide.slide_type === 'grid_4up') {
       return (
-        <View>
-          {slide.prompt_text ? (
-            <Text className="text-xl font-bold text-[#0A192F] text-center mb-2">
-              {slide.prompt_text}
-            </Text>
-          ) : null}
-          <Text className="text-sm text-slate-400 text-center mb-4">
-            Tap each picture to hear it. Explored {attempt.exploredPanelIds.length} of{' '}
-            {panels.length}.
-          </Text>
-          <View className="flex-row flex-wrap justify-between gap-y-4">
-            {panels.map((panel) => renderPanel(slide, panel))}
-          </View>
-        </View>
+        <GridSpeakSlide
+          key={slide.id}
+          slide={slide}
+          playOrSpeak={playOrSpeak}
+          playModelThen={playModelThen}
+          panelImgH={panelImgH}
+          tight={tight}
+        />
       );
     }
 
@@ -1078,23 +1454,23 @@ export default function LessonPlayer() {
       return (
         <View>
           {slide.prompt_text ? (
-            <Text className="text-2xl font-bold text-[#0A192F] text-center mb-4">
+            <Text className="text-2xl font-bold text-[#0A192F] text-center mb-3">
               {slide.prompt_text}
             </Text>
           ) : null}
-          <View className="flex-row flex-wrap justify-between gap-y-4">
+          <View className="flex-row flex-wrap justify-between gap-y-3">
             {panels.map((panel) => renderPanel(slide, panel))}
           </View>
           {attempt.answered ? (
             <Text
-              className={`text-center text-lg font-bold mt-6 ${
+              className={`text-center text-lg font-bold mt-4 ${
                 attempt.wasCorrect ? 'text-emerald-600' : 'text-red-500'
               }`}
             >
               {attempt.wasCorrect ? 'Correct! Well done.' : 'Not quite - the green one is right.'}
             </Text>
           ) : (
-            <Text className="text-center text-sm text-slate-400 mt-6">
+            <Text className="text-center text-sm text-slate-400 mt-4">
               Tap the picture that matches.
             </Text>
           )}
@@ -1111,6 +1487,7 @@ export default function LessonPlayer() {
           playOrSpeak={playOrSpeak}
           playModelThen={playModelThen}
           visitKey={queuePos}
+          imageHeight={wideImgH}
           onAnswered={handleSpeechAnswered}
           onRetry={handleSpeechRetry}
         />
@@ -1118,23 +1495,56 @@ export default function LessonPlayer() {
     }
 
     if (slide.slide_type === 'typing') {
+      // Two shapes: "Type this sentence:" slides keep the sentence in
+      // correct_answer - it must be SHOWN (learners copy what they
+      // see) and Listen must read the sentence, not the instruction.
+      // "Type the missing word: The ___ ..." slides carry the gapped
+      // sentence inside the prompt; the answer stays hidden there.
+      const prompt = slide.prompt_text || '';
+      const isGap = prompt.includes('___');
+      const isInstruction = !isGap && /type/i.test(prompt) && prompt.length < 60;
+      const gapSplit = isGap ? prompt.indexOf(': ') : -1;
+      const gapInstruction = gapSplit > 0 ? prompt.slice(0, gapSplit + 1) : null;
+      const gapSentence = gapSplit > 0 ? prompt.slice(gapSplit + 2) : null;
+      const listenText = isGap
+        ? prompt
+        : isInstruction
+          ? slide.correct_answer
+          : prompt || slide.correct_answer;
       return (
         <View className="items-center">
           {slide.media_url ? (
             <FallbackImage
               key={slide.media_url}
               uri={slide.media_url}
-              className="w-full h-52 rounded-2xl mb-6"
+              className="w-full rounded-2xl mb-4"
+              height={wideImgH}
             />
           ) : null}
-          {slide.prompt_text ? (
-            <Text className="text-lg text-slate-500 text-center mb-4">{slide.prompt_text}</Text>
-          ) : null}
-          {slide.audio_url || slide.prompt_text || slide.correct_answer ? (
+          {isGap ? (
+            <>
+              {gapInstruction ? (
+                <Text className="text-lg text-slate-500 text-center mb-2">{gapInstruction}</Text>
+              ) : null}
+              <Text className="text-2xl font-bold text-[#0A192F] text-center mb-4">
+                {gapSentence || prompt}
+              </Text>
+            </>
+          ) : (
+            <>
+              {prompt ? (
+                <Text className="text-lg text-slate-500 text-center mb-2">{prompt}</Text>
+              ) : null}
+              {isInstruction && slide.correct_answer ? (
+                <Text className="text-2xl font-bold text-[#0A192F] text-center mb-4">
+                  {slide.correct_answer}
+                </Text>
+              ) : null}
+            </>
+          )}
+          {slide.audio_url || listenText ? (
             <Pressable
-              onPress={() =>
-                playOrSpeak(slide.audio_url, slide.prompt_text || slide.correct_answer)
-              }
+              onPress={() => playOrSpeak(slide.audio_url, listenText)}
               className="px-6 py-3 bg-brand rounded-full mb-4"
             >
               <Text className="text-white font-bold text-base">🔊 Listen</Text>
@@ -1142,7 +1552,7 @@ export default function LessonPlayer() {
           ) : null}
           <TextInput
             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-lg text-slate-800 mb-4"
-            placeholder="Type the sentence here"
+            placeholder={isGap ? 'Type the missing word here' : 'Type the sentence here'}
             value={attempt.typingValue}
             onChangeText={(text) => updateAttempt(slide.id, { typingValue: text })}
             editable={!attempt.answered}
@@ -1321,7 +1731,7 @@ export default function LessonPlayer() {
         </View>
 
         {lesson?.title ? (
-          <Text className="text-center text-sm font-bold text-slate-400 mb-4">{lesson.title}</Text>
+          <Text className="text-center text-sm font-bold text-slate-400 mb-2">{lesson.title}</Text>
         ) : null}
 
         {isRepeat ? (
@@ -1339,7 +1749,11 @@ export default function LessonPlayer() {
         <Animated.View style={[{ flex: 1 }, cardStyle]}>
           <ScrollView
             className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm"
-            contentContainerStyle={{ padding: 20, flexGrow: 1, justifyContent: 'center' }}
+            contentContainerStyle={{
+              padding: compact ? 14 : 20,
+              flexGrow: 1,
+              justifyContent: 'center',
+            }}
           >
             {renderSlide(currentSlide)}
           </ScrollView>
@@ -1349,7 +1763,7 @@ export default function LessonPlayer() {
         {/* Footer Navigation. Scored slides move on by themselves
             once answered (see the auto-advance effect); listening
             slides keep a Continue button. */}
-        <View className="py-4 items-center">
+        <View className="py-3 items-center">
           {isScored ? (
             currentAttempt.answered ? (
               <Text className="text-slate-400 text-sm">
