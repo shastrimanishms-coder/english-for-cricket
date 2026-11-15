@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 
@@ -61,7 +62,7 @@ export default function GamesManager() {
       if (gameError) throw gameError;
       setGames(gameData || []);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      showAlert('Error', error.message);
     } finally {
       setLoading(false);
     }
@@ -133,11 +134,11 @@ export default function GamesManager() {
 
   const handleSave = async () => {
     if (!title.trim() || !categoryId) {
-      Alert.alert('Missing Fields', 'Title and Category are required.');
+      showAlert('Missing Fields', 'Title and Category are required.');
       return;
     }
     if (!gameUrl && !selectedGameFile) {
-      Alert.alert('Missing File', 'Please upload the Game File (HTML/ZIP).');
+      showAlert('Missing File', 'Please upload the Game File (HTML/ZIP).');
       return;
     }
 
@@ -184,7 +185,7 @@ export default function GamesManager() {
       cancelEdit();
       await fetchData();
     } catch (error: any) {
-      Alert.alert('Save Failed', error.message);
+      showAlert('Save Failed', error.message);
     } finally {
       setSaving(false);
     }
@@ -236,7 +237,7 @@ export default function GamesManager() {
 
       await fetchData();
     } catch (error: any) {
-      Alert.alert('Delete Failed', error.message);
+      showAlert('Delete Failed', error.message);
     }
   };
 
