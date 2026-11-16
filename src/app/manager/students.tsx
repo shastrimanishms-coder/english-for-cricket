@@ -314,6 +314,22 @@ export default function StudentManagement() {
     }
   };
 
+  // Clears the student's placement-test recommendation (migration 21)
+  // so they can re-take "Find Your Start" fresh. Fails with guidance
+  // until the migration has run.
+  const resetPlacement = async (id: string, name: string) => {
+    try {
+      const { error } = await supabase
+        .from('sub_accounts')
+        .update({ placement_stage: null, placement_module_id: null, placement_taken_at: null })
+        .eq('id', id);
+      if (error) throw error;
+      Alert.alert('Placement Reset', `${name} can now re-take the placement test.`);
+    } catch (error: any) {
+      Alert.alert('Reset Failed', `${error.message}\n\nIf this mentions "placement_stage", run migration 21 in Supabase first.`);
+    }
+  };
+
   const handleDelete = (id: string, name: string) => {
     if (Platform.OS === 'web') {
       if (window.confirm(`Are you sure you want to delete ${name}? This cannot be undone.`)) {
@@ -583,6 +599,12 @@ export default function StudentManagement() {
                                     className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200"
                                   >
                                     <Text className="text-text-secondary font-semibold text-sm">Edit</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => resetPlacement(student.id, student.display_name)}
+                                    className="px-4 py-2 bg-amber-50 rounded-lg border border-amber-100"
+                                  >
+                                    <Text className="text-amber-700 font-semibold text-sm">Reset Placement</Text>
                                   </Pressable>
                                   <Pressable
                                     onPress={() => handleDelete(student.id, student.display_name)}

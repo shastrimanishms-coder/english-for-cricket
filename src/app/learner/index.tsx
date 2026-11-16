@@ -89,6 +89,14 @@ const LEARNING_MODULES = [
     icon: '🎙️',
   },
   {
+    id: 'placement',
+    title: 'Find Your Start',
+    description: 'A short placement test that suggests the best stage to start from. Nothing is ever locked.',
+    cta: 'take the test >',
+    imageColor: '#FCE7F3',
+    icon: '🎯',
+  },
+  {
     id: 'journey',
     title: 'My Journey',
     description: 'See your whole path on one map — lessons finished, extras collected, and what is still waiting.',
@@ -164,6 +172,9 @@ export default function LearnerDashboard() {
         break;
       case 'journey':
         router.push('/learner/journey');
+        break;
+      case 'placement':
+        router.push('/learner/placement');
         break;
       case 'profile':
         router.push('/learner/profile');
