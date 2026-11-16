@@ -29,6 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
+import MascotPair from '../../components/ui/Mascots';
 import NewBadgeCard from '../../components/ui/NewBadgeCard';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import {
@@ -1646,7 +1647,9 @@ export default function LessonPlayer() {
     const currentBadge = earnedBadges[badgeIndex];
     return (
       <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
-        <Text className="text-6xl mb-4">🏆</Text>
+        <View className="mb-2">
+          <MascotPair height={130} />
+        </View>
         <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">Lesson Complete!</Text>
         <Text className="text-lg text-slate-500 text-center mb-2">
           {lesson?.title}

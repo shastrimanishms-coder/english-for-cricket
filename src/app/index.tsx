@@ -4,6 +4,7 @@ import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import AnimatedButton from '../components/ui/AnimatedButton';
+import MascotPair from '../components/ui/Mascots';
 import { supabase } from '../lib/supabase';
 import { useAppLogo } from '../lib/useAppLogo';
 
@@ -121,6 +122,12 @@ export default function LandingPage() {
               At a school or club? Your teacher can give you a username and PIN — no email
               needed.
             </Text>
+            <View className="mt-8 self-start items-center">
+              <MascotPair height={180} />
+              <Text className="text-sm text-slate-300 mt-2 text-center">
+                Meet the KYCO mascots — they&apos;ll cheer you on as you learn! 🦊
+              </Text>
+            </View>
           </View>
 
           {/* Right Side: Intro Video with Poster Image */}

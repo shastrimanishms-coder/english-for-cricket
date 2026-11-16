@@ -13,6 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MascotPair from '../../components/ui/Mascots';
 import { evaluateStreakBadges } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -185,6 +186,7 @@ export default function LearnerDashboard() {
                   Choose a section below to continue your journey.
                 </Text>
               </View>
+              <MascotPair height={92} />
             </View>
           </Animated.View>
 
