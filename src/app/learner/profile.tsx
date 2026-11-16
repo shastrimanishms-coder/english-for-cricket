@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import RewardsCard from '../../components/ui/RewardsCard';
 import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
@@ -301,6 +302,9 @@ export default function StudentProfile() {
             </View>
           </View>
         )}
+
+        {/* XP & Stars */}
+        <RewardsCard />
 
         {/* Study Days (migration 16) */}
         <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">

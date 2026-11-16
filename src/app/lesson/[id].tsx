@@ -37,6 +37,7 @@ import {
   evaluateStreakBadges,
   type AwardedBadge,
 } from '../../lib/badgeAwards';
+import { awardPoints, isTodayAStudyDay, POINTS } from '../../lib/points';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { scoreMessage, scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
@@ -1192,6 +1193,21 @@ export default function LessonPlayer() {
       // A finished lesson is also a day of activity: re-evaluate streak
       // badges against the now-updated activity days. Fails soft.
       const streakBadges = await evaluateStreakBadges(identity);
+
+      // XP & Stars (migration 18, fails soft): finishing pays XP once per
+      // lesson, with an accuracy bonus; finishing on a chosen study day
+      // also pays the study-day stars, once per day.
+      const accuracyPct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      await awardPoints(
+        identity,
+        'lesson_complete',
+        POINTS.LESSON_XP + Math.round(accuracyPct / 10),
+        0,
+        lesson.id
+      );
+      if (await isTodayAStudyDay(identity)) {
+        await awardPoints(identity, 'study_day', 0, POINTS.STUDY_DAY_STARS, new Date().toISOString().slice(0, 10));
+      }
 
       const freshBadges = [...lessonBadges, ...streakBadges];
       if (freshBadges.length > 0) {

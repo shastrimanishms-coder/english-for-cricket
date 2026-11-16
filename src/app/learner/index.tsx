@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MascotPair from '../../components/ui/Mascots';
+import RewardsCard from '../../components/ui/RewardsCard';
 import { evaluateStreakBadges } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -189,6 +190,8 @@ export default function LearnerDashboard() {
               <MascotPair height={92} />
             </View>
           </Animated.View>
+
+          <RewardsCard />
 
           {/* Feature Grid - cards fade and rise in, staggered ~60ms apart */}
           <View className="flex-row flex-wrap justify-between gap-y-8">
