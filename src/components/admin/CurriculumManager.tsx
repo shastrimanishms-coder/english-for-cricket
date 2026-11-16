@@ -8,6 +8,14 @@ interface Module {
   title: string;
   description: string;
   order_index: number;
+  stage_id?: string | null;
+}
+
+interface Stage {
+  id: string;
+  title: string;
+  description: string | null;
+  order_index: number;
 }
 
 interface Lesson {
@@ -27,6 +35,16 @@ export default function CurriculumManager() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Stages (migration 17). Fail-soft: stagesAvailable stays false until the
+  // curriculum_stages table exists, and the stage picker simply hides.
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [stagesAvailable, setStagesAvailable] = useState(false);
+  const [formStageId, setFormStageId] = useState<string | null>(null);
+  const [stageEditId, setStageEditId] = useState<string | null>(null);
+  const [stageTitle, setStageTitle] = useState('');
+  const [stageOrder, setStageOrder] = useState('0');
+  const [stageSaving, setStageSaving] = useState(false);
   
   // Form State
   const [editId, setEditId] = useState<string | null>(null);
@@ -50,11 +68,72 @@ export default function CurriculumManager() {
     }
   }, []);
 
+  const fetchStages = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('curriculum_stages')
+      .select('*')
+      .order('order_index', { ascending: true });
+    if (error) {
+      setStagesAvailable(false);
+      setStages([]);
+      return;
+    }
+    setStagesAvailable(true);
+    setStages((data || []) as Stage[]);
+  }, []);
+
   useEffect(() => {
     (async () => {
       await fetchModules();
+      await fetchStages();
     })();
-  }, [fetchModules]);
+  }, [fetchModules, fetchStages]);
+
+  const saveStage = async () => {
+    if (!stageTitle.trim()) {
+      Alert.alert('Missing Field', 'Stage title is required.');
+      return;
+    }
+    setStageSaving(true);
+    try {
+      const payload = { title: stageTitle.trim(), order_index: parseInt(stageOrder) || 0 };
+      if (stageEditId) {
+        const { error } = await supabase.from('curriculum_stages').update(payload).eq('id', stageEditId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('curriculum_stages').insert([payload]);
+        if (error) throw error;
+      }
+      setStageEditId(null);
+      setStageTitle('');
+      setStageOrder(stages.length.toString());
+      await fetchStages();
+    } catch (error: any) {
+      Alert.alert('Save Failed', error.message);
+    } finally {
+      setStageSaving(false);
+    }
+  };
+
+  const deleteStage = async (stage: Stage) => {
+    const run = async () => {
+      const { error } = await supabase.from('curriculum_stages').delete().eq('id', stage.id);
+      if (error) Alert.alert('Delete Failed', error.message);
+      else {
+        if (formStageId === stage.id) setFormStageId(null);
+        await fetchStages();
+        await fetchModules();
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Delete stage "${stage.title}"? Its modules keep existing, just without a stage.`)) run();
+    } else {
+      Alert.alert('Delete Stage', `Delete "${stage.title}"? Modules keep existing without a stage.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: run },
+      ]);
+    }
+  };
 
   const fetchLessons = async (moduleId: string) => {
     try {
@@ -105,6 +184,10 @@ export default function CurriculumManager() {
       payload.module_id = selectedModule.id;
     }
 
+    if (activeView === 'modules' && stagesAvailable) {
+      payload.stage_id = formStageId;
+    }
+
     try {
       if (editId) {
         const { error } = await supabase.from(table).update(payload).eq('id', editId);
@@ -129,6 +212,7 @@ export default function CurriculumManager() {
     setTitle(item.title);
     setDescription(item.description || '');
     setOrderIndex(item.order_index?.toString() || '0');
+    if (activeView === 'modules') setFormStageId(item.stage_id ?? null);
   };
 
   const handleDelete = async (id: string, itemTitle: string) => {
@@ -162,7 +246,8 @@ export default function CurriculumManager() {
     setEditId(null);
     setTitle('');
     setDescription('');
-    
+    setFormStageId(null);
+
     // Auto-increment the order index for the next item based on current length
     const nextOrder = activeView === 'modules' ? modules.length : lessons.length;
     setOrderIndex(nextOrder.toString());
@@ -230,6 +315,29 @@ export default function CurriculumManager() {
           />
         </View>
 
+        {isModuleView && stagesAvailable ? (
+          <View>
+            <Text className="text-sm font-semibold text-text-secondary mb-2">Stage (Stage → Module → Lesson)</Text>
+            <View className="flex-row flex-wrap gap-2">
+              <Pressable
+                onPress={() => setFormStageId(null)}
+                className={`px-3 py-2 rounded-full border ${formStageId === null ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+              >
+                <Text className={`text-xs font-semibold ${formStageId === null ? 'text-white' : 'text-slate-600'}`}>No stage</Text>
+              </Pressable>
+              {stages.map((s) => (
+                <Pressable
+                  key={s.id}
+                  onPress={() => setFormStageId(s.id)}
+                  className={`px-3 py-2 rounded-full border ${formStageId === s.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                >
+                  <Text className={`text-xs font-semibold ${formStageId === s.id ? 'text-white' : 'text-slate-600'}`}>{s.title}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View className="flex-row justify-end gap-4 mt-2">
           {editId && (
             <View className="w-24">
@@ -247,6 +355,83 @@ export default function CurriculumManager() {
           </View>
         </View>
       </View>
+
+      {/* Stages Manager (modules view only) */}
+      {isModuleView ? (
+        <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
+          <Text className="text-lg font-bold text-[#0A192F]">Stages</Text>
+          {!stagesAvailable ? (
+            <Text className="text-sm text-slate-500">
+              Stages live above modules (Stage → Module → Lesson). Run migration 17 in Supabase to switch them on — modules keep working without stages until then.
+            </Text>
+          ) : (
+            <>
+              <View className="flex-col md:flex-row gap-4">
+                <View className="flex-2">
+                  <Text className="text-sm font-semibold text-text-secondary mb-2">Stage Title</Text>
+                  <TextInput
+                    className="w-full bg-slate-50 p-3 rounded-xl border border-slate-200"
+                    placeholder="e.g., Stage 1: The Foundation"
+                    value={stageTitle}
+                    onChangeText={setStageTitle}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-text-secondary mb-2">Order</Text>
+                  <TextInput
+                    className="w-full bg-slate-50 p-3 rounded-xl border border-slate-200"
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={stageOrder}
+                    onChangeText={setStageOrder}
+                  />
+                </View>
+                <View className="justify-end">
+                  <AnimatedButton
+                    title={stageSaving ? 'Saving...' : stageEditId ? 'Save Stage' : 'Add Stage'}
+                    onPress={saveStage}
+                    disabled={stageSaving}
+                    variant="primary"
+                    size="sm"
+                  />
+                </View>
+                {stageEditId ? (
+                  <View className="justify-end">
+                    <AnimatedButton
+                      title="Cancel"
+                      onPress={() => { setStageEditId(null); setStageTitle(''); }}
+                      variant="outline"
+                      size="sm"
+                    />
+                  </View>
+                ) : null}
+              </View>
+              {stages.length === 0 ? (
+                <Text className="text-sm text-slate-500">No stages yet. Create Stage 1, then pick it on each module below.</Text>
+              ) : (
+                stages.map((s) => (
+                  <View key={s.id} className="flex-row items-center justify-between border-t border-slate-100 pt-3">
+                    <Text className="font-semibold text-text-primary">{s.order_index}. {s.title}
+                      <Text className="text-slate-400 font-normal">  ·  {modules.filter((m) => m.stage_id === s.id).length} modules</Text>
+                    </Text>
+                    <View className="flex-row gap-3">
+                      <Pressable
+                        onPress={() => { setStageEditId(s.id); setStageTitle(s.title); setStageOrder(s.order_index.toString()); }}
+                        className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200"
+                      >
+                        <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
+                      </Pressable>
+                      <Pressable onPress={() => deleteStage(s)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                        <Text className="text-red-600 text-sm font-semibold">Delete</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              )}
+            </>
+          )}
+        </View>
+      ) : null}
 
       {/* Dynamic List */}
       <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -270,6 +455,11 @@ export default function CurriculumManager() {
                   </View>
                   <View>
                     <Text className="font-bold text-text-primary text-base">{item.title}</Text>
+                    {isModuleView && item.stage_id ? (
+                      <Text className="text-xs font-bold text-brand mt-0.5">
+                        {stages.find((s) => s.id === item.stage_id)?.title || 'Stage'}
+                      </Text>
+                    ) : null}
                     {item.description ? <Text className="text-sm text-slate-500 mt-1">{item.description}</Text> : null}
                   </View>
                 </View>

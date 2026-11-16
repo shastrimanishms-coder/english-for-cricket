@@ -17,6 +17,14 @@ interface Module {
   description: string | null;
   order_index: number;
   category_id?: string | null;
+  stage_id?: string | null;
+}
+
+interface Stage {
+  id: string;
+  title: string;
+  description: string | null;
+  order_index: number;
 }
 
 interface Lesson {
@@ -29,6 +37,7 @@ interface Lesson {
 
 interface CategoryGroup {
   category: Category | null; // null = modules with no matching category
+  title?: string;
   modules: Module[];
 }
 
@@ -67,24 +76,46 @@ export default function LearningPath() {
       }
       setLessonsByModule(byModule);
 
-      // Modules carry no category link in the current schema (CurriculumManager
-      // never writes one). Group by category_id when a module has one; modules
-      // without one fall under the single curriculum category when there is
-      // exactly one, otherwise under a trailing ungrouped section.
-      const grouped: CategoryGroup[] = categories.map((category) => ({
-        category,
-        modules: modules.filter((m) => m.category_id === category.id),
-      }));
-      const assigned = new Set(grouped.flatMap((g) => g.modules.map((m) => m.id)));
-      const unassigned = modules.filter((m) => !assigned.has(m.id));
-      if (unassigned.length > 0) {
-        if (grouped.length === 1) {
-          grouped[0].modules = [...grouped[0].modules, ...unassigned];
-        } else {
-          grouped.push({ category: null, modules: unassigned });
+      // Stages (migration 17) are the primary grouping when any module has
+      // one: Stage -> Module -> Lesson. Fail-soft: without stages we keep
+      // the older category grouping below.
+      const stagesRes = await supabase
+        .from('curriculum_stages')
+        .select('id, title, description, order_index')
+        .order('order_index', { ascending: true });
+      const stages = (!stagesRes.error ? (stagesRes.data || []) : []) as Stage[];
+      const useStages = stages.length > 0 && modules.some((m) => m.stage_id);
+
+      if (useStages) {
+        const grouped: CategoryGroup[] = stages.map((stage) => ({
+          category: null,
+          title: stage.title,
+          modules: modules.filter((m) => m.stage_id === stage.id),
+        }));
+        const assignedIds = new Set(grouped.flatMap((g) => g.modules.map((m) => m.id)));
+        const rest = modules.filter((m) => !assignedIds.has(m.id));
+        if (rest.length > 0) grouped.push({ category: null, title: 'More Modules', modules: rest });
+        setGroups(grouped.filter((g) => g.modules.length > 0));
+      } else {
+        // Modules carry no category link in the current schema (CurriculumManager
+        // never writes one). Group by category_id when a module has one; modules
+        // without one fall under the single curriculum category when there is
+        // exactly one, otherwise under a trailing ungrouped section.
+        const grouped: CategoryGroup[] = categories.map((category) => ({
+          category,
+          modules: modules.filter((m) => m.category_id === category.id),
+        }));
+        const assigned = new Set(grouped.flatMap((g) => g.modules.map((m) => m.id)));
+        const unassigned = modules.filter((m) => !assigned.has(m.id));
+        if (unassigned.length > 0) {
+          if (grouped.length === 1) {
+            grouped[0].modules = [...grouped[0].modules, ...unassigned];
+          } else {
+            grouped.push({ category: null, modules: unassigned });
+          }
         }
+        setGroups(grouped.filter((g) => g.modules.length > 0));
       }
-      setGroups(grouped.filter((g) => g.modules.length > 0));
       setExpandedModules(new Set(modules.map((m) => m.id)));
 
       // Completion ticks: lesson_completions exists only after migration
@@ -186,9 +217,9 @@ export default function LearningPath() {
             </View>
           ) : (
             groups.map((group) => (
-              <View key={group.category?.id || 'ungrouped'} className="mb-10">
+              <View key={group.category?.id || group.title || 'ungrouped'} className="mb-10">
                 <Text className="text-2xl md:text-3xl font-bold text-[#0A192F] mb-1">
-                  {group.category ? group.category.name : 'More Modules'}
+                  {group.title || (group.category ? group.category.name : 'More Modules')}
                 </Text>
                 {group.category?.description ? (
                   <Text className="text-slate-500 mb-4">{group.category.description}</Text>

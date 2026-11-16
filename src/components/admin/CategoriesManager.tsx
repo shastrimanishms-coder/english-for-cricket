@@ -8,6 +8,7 @@ interface Category {
   name: string;
   description: string;
   type: string;
+  parent_id?: string | null;
 }
 
 const CATEGORY_TYPES = [
@@ -15,6 +16,8 @@ const CATEGORY_TYPES = [
   { id: 'downloads', label: 'Downloads & Workbooks', color: 'bg-pink-100 text-pink-800' },
   { id: 'games', label: 'Games & Arcade', color: 'bg-teal-100 text-teal-800' },
   { id: 'videos', label: 'Video Lectures', color: 'bg-orange-100 text-orange-800' },
+  { id: 'speaking', label: 'Speaking Practice', color: 'bg-purple-100 text-purple-800' },
+  { id: 'reading', label: 'Smart Reading', color: 'bg-emerald-100 text-emerald-800' },
 ];
 
 export default function CategoriesManager() {
@@ -27,6 +30,9 @@ export default function CategoriesManager() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState('curriculum');
+  const [parentId, setParentId] = useState<string | null>(null);
+  // True once a fetched row proves the parent_id column exists (migration 17).
+  const [hasParentColumn, setHasParentColumn] = useState(false);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -39,6 +45,7 @@ export default function CategoriesManager() {
 
       if (error) throw error;
       setCategories(data || []);
+      if ((data || []).length > 0 && 'parent_id' in data[0]) setHasParentColumn(true);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -60,26 +67,26 @@ export default function CategoriesManager() {
 
     setSaving(true);
     try {
+      const payload: any = {
+        name: name.trim(),
+        description: description.trim(),
+        type: selectedType,
+      };
+      // Only write parent_id when the column exists (migration 17) or a
+      // parent is actually chosen — pre-migration saves keep working.
+      if (hasParentColumn || parentId) payload.parent_id = parentId;
       if (editId) {
         // Update existing
         const { error } = await supabase
           .from('categories')
-          .update({ 
-            name: name.trim(), 
-            description: description.trim(),
-            type: selectedType 
-          })
+          .update(payload)
           .eq('id', editId);
         if (error) throw error;
       } else {
         // Create new
         const { error } = await supabase
           .from('categories')
-          .insert([{ 
-            name: name.trim(), 
-            description: description.trim(),
-            type: selectedType
-          }]);
+          .insert([payload]);
         if (error) throw error;
       }
 
@@ -97,6 +104,7 @@ export default function CategoriesManager() {
     setName(cat.name);
     setDescription(cat.description || '');
     setSelectedType(cat.type || 'curriculum');
+    setParentId(cat.parent_id ?? null);
   };
 
   const handleDelete = async (id: string, catName: string) => {
@@ -129,7 +137,55 @@ export default function CategoriesManager() {
     setName('');
     setDescription('');
     setSelectedType('curriculum');
+    setParentId(null);
   };
+
+  // Categories that may be a parent: same type, not this category, and not
+  // one of its own descendants (which would create a loop).
+  const descendantIds = (id: string | null): Set<string> => {
+    const out = new Set<string>();
+    if (!id) return out;
+    let frontier = [id];
+    while (frontier.length) {
+      const next: string[] = [];
+      for (const c of categories) {
+        if (c.parent_id && frontier.includes(c.parent_id) && !out.has(c.id)) {
+          out.add(c.id);
+          next.push(c.id);
+        }
+      }
+      frontier = next;
+    }
+    return out;
+  };
+  const excluded = descendantIds(editId);
+  const parentOptions = categories.filter(
+    (c) => c.type === selectedType && c.id !== editId && !excluded.has(c.id)
+  );
+
+  // Display order: grouped by type, parents first, children indented under
+  // their parent (depth-first, capped at 3 levels).
+  const displayCategories: { cat: Category; depth: number }[] = (() => {
+    const out: { cat: Category; depth: number }[] = [];
+    const byType = new Map<string, Category[]>();
+    for (const c of categories) {
+      if (!byType.has(c.type)) byType.set(c.type, []);
+      byType.get(c.type)!.push(c);
+    }
+    const typeOrder = [...CATEGORY_TYPES.map((t) => t.id), ...[...byType.keys()].filter((t) => !CATEGORY_TYPES.some((x) => x.id === t))];
+    for (const type of typeOrder) {
+      const list = byType.get(type) || [];
+      const ids = new Set(list.map((c) => c.id));
+      const roots = list.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+      const walk = (cat: Category, depth: number) => {
+        out.push({ cat, depth });
+        if (depth >= 3) return;
+        list.filter((c) => c.parent_id === cat.id).forEach((child) => walk(child, depth + 1));
+      };
+      roots.forEach((r) => walk(r, 0));
+    }
+    return out;
+  })();
 
   const getTypeStyle = (typeId: string) => {
     const typeDef = CATEGORY_TYPES.find(t => t.id === typeId);
@@ -169,6 +225,31 @@ export default function CategoriesManager() {
               </Pressable>
             ))}
           </View>
+        </View>
+
+        {/* Parent (sub-category) Selector */}
+        <View>
+          <Text className="text-sm font-semibold text-text-secondary mb-3">Parent category (leave as Top level for a main category)</Text>
+          <View className="flex-row flex-wrap gap-3">
+            <Pressable
+              onPress={() => setParentId(null)}
+              className={`px-4 py-2 rounded-full border ${parentId === null ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+            >
+              <Text className={`font-semibold text-sm ${parentId === null ? 'text-white' : 'text-slate-600'}`}>Top level</Text>
+            </Pressable>
+            {parentOptions.map((c) => (
+              <Pressable
+                key={c.id}
+                onPress={() => setParentId(c.id)}
+                className={`px-4 py-2 rounded-full border ${parentId === c.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+              >
+                <Text className={`font-semibold text-sm ${parentId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {parentOptions.length === 0 ? (
+            <Text className="text-xs text-slate-400 mt-2">No other categories of this type yet — create the parent first, then the sub-category under it.</Text>
+          ) : null}
         </View>
 
         <View className="flex-col md:flex-row gap-4">
@@ -219,13 +300,14 @@ export default function CategoriesManager() {
             <Text className="text-slate-500">No categories found. Create your first one above.</Text>
           </View>
         ) : (
-          categories.map((cat, index) => (
-            <View 
-              key={cat.id} 
-              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== categories.length - 1 ? 'border-b border-slate-100' : ''}`}
+          displayCategories.map(({ cat, depth }, index) => (
+            <View
+              key={cat.id}
+              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== displayCategories.length - 1 ? 'border-b border-slate-100' : ''}`}
+              style={{ paddingLeft: 16 + depth * 24 }}
             >
               <View className="flex-row items-center flex-wrap gap-3">
-                <Text className="font-bold text-text-primary text-base">{cat.name}</Text>
+                <Text className="font-bold text-text-primary text-base">{depth > 0 ? '↳ ' : ''}{cat.name}</Text>
                 
                 {/* Visual Type Badge */}
                 <View className={`px-2.5 py-1 rounded-md ${getTypeStyle(cat.type)}`}>

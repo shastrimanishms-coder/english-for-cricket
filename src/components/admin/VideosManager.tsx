@@ -4,6 +4,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { contentTypeForFileName } from '../../lib/fileTypes';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
+import BelongsToPicker from './BelongsToPicker';
+import { useLessonTagging } from '../../lib/useLessonTagging';
 
 interface Category {
   id: string;
@@ -15,6 +17,7 @@ interface Video {
   title: string;
   description: string;
   category_id: string;
+  lesson_id?: string | null;
   video_url: string;
   thumbnail_url: string;
   is_published: boolean;
@@ -31,6 +34,8 @@ export default function VideosManager() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [lessonId, setLessonId] = useState<string | null>(null);
+  const taggingAvailable = useLessonTagging('video_lectures');
   
   const [videoUrl, setVideoUrl] = useState('');
   const [selectedVideoFile, setSelectedVideoFile] = useState<any>(null);
@@ -166,6 +171,7 @@ export default function VideosManager() {
             title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
+            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             video_url: finalVideoUrl,
             thumbnail_url: finalThumbUrl,
             is_published: isPublished
@@ -179,6 +185,7 @@ export default function VideosManager() {
             title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
+            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             video_url: finalVideoUrl,
             thumbnail_url: finalThumbUrl,
             is_published: isPublished
@@ -200,6 +207,7 @@ export default function VideosManager() {
     setTitle(vid.title);
     setDescription(vid.description || '');
     setCategoryId(vid.category_id);
+    setLessonId(vid.lesson_id ?? null);
     setVideoUrl(vid.video_url);
     setThumbnailUrl(vid.thumbnail_url || '');
     setIsPublished(vid.is_published !== false);
@@ -269,6 +277,7 @@ export default function VideosManager() {
     setIsPublished(true);
     setSelectedImage(null);
     setSelectedVideoFile(null);
+    setLessonId(null);
     if (categories.length > 0) setCategoryId(categories[0].id);
   };
 
@@ -315,6 +324,12 @@ export default function VideosManager() {
             )}
           </View>
         </View>
+
+        {taggingAvailable ? (
+          <View className="border-t border-slate-100 pt-4">
+            <BelongsToPicker value={lessonId} onChange={setLessonId} />
+          </View>
+        ) : null}
 
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Description</Text>

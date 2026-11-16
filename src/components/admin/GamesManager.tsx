@@ -5,6 +5,8 @@ import { contentTypeForFileName } from '../../lib/fileTypes';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
+import BelongsToPicker from './BelongsToPicker';
+import { useLessonTagging } from '../../lib/useLessonTagging';
 
 interface Category {
   id: string;
@@ -16,6 +18,7 @@ interface Game {
   title: string;
   description: string;
   category_id: string;
+  lesson_id?: string | null;
   game_url: string;
   thumbnail_url: string;
 }
@@ -31,6 +34,8 @@ export default function GamesManager() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [lessonId, setLessonId] = useState<string | null>(null);
+  const taggingAvailable = useLessonTagging('games');
   
   const [gameUrl, setGameUrl] = useState('');
   const [selectedGameFile, setSelectedGameFile] = useState<any>(null);
@@ -161,10 +166,11 @@ export default function GamesManager() {
       if (editId) {
         const { error } = await supabase
           .from('games')
-          .update({ 
-            title: title.trim(), 
+          .update({
+            title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
+            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             game_url: finalGameUrl,
             thumbnail_url: finalThumbUrl
           })
@@ -173,10 +179,11 @@ export default function GamesManager() {
       } else {
         const { error } = await supabase
           .from('games')
-          .insert([{ 
-            title: title.trim(), 
+          .insert([{
+            title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
+            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             game_url: finalGameUrl,
             thumbnail_url: finalThumbUrl
           }]);
@@ -197,6 +204,7 @@ export default function GamesManager() {
     setTitle(game.title);
     setDescription(game.description || '');
     setCategoryId(game.category_id);
+    setLessonId(game.lesson_id ?? null);
     setGameUrl(game.game_url);
     setThumbnailUrl(game.thumbnail_url || '');
     setSelectedImage(null);
@@ -250,6 +258,7 @@ export default function GamesManager() {
     setThumbnailUrl('');
     setSelectedImage(null);
     setSelectedGameFile(null);
+    setLessonId(null);
     if (categories.length > 0) setCategoryId(categories[0].id);
   };
 
@@ -296,6 +305,12 @@ export default function GamesManager() {
             )}
           </View>
         </View>
+
+        {taggingAvailable ? (
+          <View className="border-t border-slate-100 pt-4">
+            <BelongsToPicker value={lessonId} onChange={setLessonId} />
+          </View>
+        ) : null}
 
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Short Intro / How to Play</Text>

@@ -5,6 +5,8 @@ import { contentTypeForFileName } from '../../lib/fileTypes';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
+import BelongsToPicker from './BelongsToPicker';
+import { useLessonTagging } from '../../lib/useLessonTagging';
 
 interface Category {
   id: string;
@@ -16,6 +18,7 @@ interface Download {
   title: string;
   description: string;
   category_id: string;
+  lesson_id?: string | null;
   file_url: string;
 }
 
@@ -30,6 +33,8 @@ export default function DownloadsManager() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [lessonId, setLessonId] = useState<string | null>(null);
+  const taggingAvailable = useLessonTagging('downloads');
   const [fileUrl, setFileUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<any>(null);
 
@@ -141,10 +146,11 @@ export default function DownloadsManager() {
         // UPDATE existing
         const { error } = await supabase
           .from('downloads')
-          .update({ 
-            title: title.trim(), 
+          .update({
+            title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
+            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             file_url: finalFileUrl
           })
           .eq('id', editId);
@@ -153,10 +159,11 @@ export default function DownloadsManager() {
         // CREATE new
         const { error } = await supabase
           .from('downloads')
-          .insert([{ 
-            title: title.trim(), 
+          .insert([{
+            title: title.trim(),
             description: description.trim(),
             category_id: categoryId,
+            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             file_url: finalFileUrl
           }]);
         if (error) throw error;
@@ -176,6 +183,7 @@ export default function DownloadsManager() {
     setTitle(dl.title);
     setDescription(dl.description || '');
     setCategoryId(dl.category_id);
+    setLessonId(dl.lesson_id ?? null);
     setFileUrl(dl.file_url);
     setSelectedFile(null); // Clear any pending selection
   };
@@ -218,6 +226,7 @@ export default function DownloadsManager() {
     setDescription('');
     setFileUrl('');
     setSelectedFile(null);
+    setLessonId(null);
     if (categories.length > 0) setCategoryId(categories[0].id);
   };
 
@@ -264,6 +273,12 @@ export default function DownloadsManager() {
             )}
           </View>
         </View>
+
+        {taggingAvailable ? (
+          <View className="border-t border-slate-100 pt-4">
+            <BelongsToPicker value={lessonId} onChange={setLessonId} />
+          </View>
+        ) : null}
 
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Description</Text>

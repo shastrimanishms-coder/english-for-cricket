@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
+import { useLessonTagging } from '../../lib/useLessonTagging';
+import BelongsToPicker from './BelongsToPicker';
 
 // Admin manager for the standalone Speaking Practice area ONLY
 // (interviews + small talk role-plays). Lessons keep their own
@@ -39,6 +41,8 @@ interface ScenarioRow {
   is_published: boolean;
   order_index: number;
   created_at: string;
+  lesson_id?: string | null;
+  category_id?: string | null;
 }
 
 const CATEGORIES = ['Interview', 'Small Talk'] as const;
@@ -58,6 +62,10 @@ export default function SpeakingManager() {
   const [description, setDescription] = useState('');
   const [otherName, setOtherName] = useState('');
   const [turns, setTurns] = useState<ScenarioTurn[]>([]);
+  const [lessonId, setLessonId] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
+  const taggingAvailable = useLessonTagging('speaking_scenarios');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -86,6 +94,8 @@ export default function SpeakingManager() {
   useEffect(() => {
     (async () => {
       await fetchData();
+      const { data } = await supabase.from('categories').select('id, name').eq('type', 'speaking').order('name');
+      setSpeakingCats((data || []) as { id: string; name: string }[]);
     })();
   }, [fetchData]);
 
@@ -111,6 +121,8 @@ export default function SpeakingManager() {
     setDescription(row.description || '');
     setOtherName(row.other_name || '');
     setTurns(Array.isArray(row.turns) ? row.turns : []);
+    setLessonId(row.lesson_id ?? null);
+    setCategoryId(row.category_id ?? '');
     setShowForm(true);
   };
 
@@ -167,6 +179,7 @@ export default function SpeakingManager() {
         description: description.trim() || null,
         other_name: otherName.trim() || 'Partner',
         turns: cleanTurns,
+        ...(taggingAvailable ? { lesson_id: lessonId, category_id: categoryId || null } : {}),
       };
       if (editId) {
         const { error } = await supabase
@@ -325,6 +338,34 @@ export default function SpeakingManager() {
               />
             </View>
           </View>
+
+          {taggingAvailable ? (
+            <View className="gap-4 border-t border-slate-100 pt-4">
+              {speakingCats.length > 0 ? (
+                <View>
+                  <Text className="text-sm font-semibold text-text-secondary mb-2">Shelf Category (optional)</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    <Pressable
+                      onPress={() => setCategoryId('')}
+                      className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                    >
+                      <Text className={`text-xs font-semibold ${categoryId === '' ? 'text-white' : 'text-slate-600'}`}>None</Text>
+                    </Pressable>
+                    {speakingCats.map((c) => (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => setCategoryId(c.id)}
+                        className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                      >
+                        <Text className={`text-xs font-semibold ${categoryId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              <BelongsToPicker value={lessonId} onChange={setLessonId} />
+            </View>
+          ) : null}
 
           {/* Dialogue editor */}
           <View>
