@@ -89,6 +89,14 @@ const LEARNING_MODULES = [
     icon: '🎙️',
   },
   {
+    id: 'reading',
+    title: 'Smart Reading',
+    description: 'Read short stories while the words light up, or read aloud and get a score for every sentence.',
+    cta: 'start reading >',
+    imageColor: '#DCFCE7',
+    icon: '📖',
+  },
+  {
     id: 'profile',
     title: 'Student Profile',
     description: 'Manage your profile, PIN, see your earned badges, and track your progress.',
@@ -142,6 +150,9 @@ export default function LearnerDashboard() {
         break;
       case 'speaking':
         router.push('/learner/speaking');
+        break;
+      case 'reading':
+        router.push('/learner/reading');
         break;
       case 'profile':
         router.push('/learner/profile');

@@ -10,6 +10,7 @@ import GamesManager from '../../components/admin/GamesManager';
 import HelpCenterManager from '../../components/admin/HelpCenterManager';
 import PageManager from '../../components/admin/PageManager';
 import SpeakingManager from '../../components/admin/SpeakingManager';
+import ReadingManager from '../../components/admin/ReadingManager';
 import SlideBuilder from '../../components/admin/SlideBuilder';
 import SystemSettings from '../../components/admin/SystemSettings';
 import UsersManager from '../../components/admin/UsersManager';
@@ -52,6 +53,7 @@ const ADMIN_MENU = [
     ]
   },
   { id: 'speaking', label: 'Speaking Practice', icon: '🎙️' },
+  { id: 'reading', label: 'Smart Reading', icon: '📖' },
   { id: 'badges', label: 'Gamification & Badges', icon: '🏆' },
   { id: 'organizations', label: 'Users & Organizations', icon: '🏛️' },
   { id: 'pages', label: 'Static Pages & Legal', icon: '📄' },
@@ -84,6 +86,7 @@ const CONTENT_CARDS = [
   { key: 'downloads', label: 'Downloads', icon: '📥', table: 'downloads', tab: 'downloads' },
   { key: 'games', label: 'Games', icon: '🎮', table: 'games', tab: 'games' },
   { key: 'speaking', label: 'Speaking', icon: '🎙️', table: 'speaking_scenarios', tab: 'speaking' },
+  { key: 'reading', label: 'Smart Reading', icon: '📖', table: 'reading_stories', tab: 'reading' },
   { key: 'badges', label: 'Badges', icon: '🏆', table: 'badges', tab: 'badges' },
   { key: 'categories', label: 'Categories', icon: '🏷️', table: 'categories', tab: 'categories' },
   { key: 'faqs', label: 'Support FAQs', icon: '❓', table: 'support_faqs', tab: 'support_faqs' },
@@ -479,6 +482,9 @@ export default function SuperAdminDashboard() {
 
       case 'speaking':
         return <SpeakingManager />;
+
+      case 'reading':
+        return <ReadingManager />;
 
       case 'curriculum':
         return <CurriculumManager />;
