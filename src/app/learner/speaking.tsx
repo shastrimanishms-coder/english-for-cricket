@@ -28,6 +28,7 @@ import {
   learnerLineCount,
   type SpeakingScenario,
 } from '../../lib/speakingScenarios';
+import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSafeBack } from '../../lib/useSafeBack';
@@ -105,6 +106,20 @@ export default function SpeakingPractice() {
   // further down; the speech callbacks reach it through this ref.
   const scenarioNextRef = useRef<(() => Promise<void>) | null>(null);
   const passTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The learner's own name, shown in the conversation instead of a
+  // generic "You" wherever we know it (PIN students carry their name
+  // in the session; email learners in their profile).
+  const [learnerName, setLearnerName] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void getStudentIdentity().then((identity) => {
+      if (alive) setLearnerName(identity?.displayName || null);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Recording state for the current item. Recording is strictly
   // best-effort: when the microphone is denied or unsupported,
@@ -780,7 +795,7 @@ export default function SpeakingPractice() {
                       className={`max-w-[85%] rounded-2xl px-4 py-2 ${t.speaker === 'other' ? 'self-start bg-slate-100' : 'self-end bg-brand/10'}`}
                     >
                       <Text className="text-xs font-bold text-slate-400 mb-0.5">
-                        {t.speaker === 'other' ? scenario.otherName : 'You'}
+                        {t.speaker === 'other' ? scenario.otherName : learnerName || 'You'}
                         {t.speaker === 'learner' && scenarioScores[i] !== undefined
                           ? ` • ${scenarioScores[i]}%`
                           : ''}
@@ -817,7 +832,9 @@ export default function SpeakingPractice() {
                 <Text className="text-sm text-slate-400 mb-3">
                   {scenarioTurn.speaker === 'other'
                     ? `${scenario.otherName} says:`
-                    : 'Your turn — say this:'}
+                    : learnerName
+                      ? `${learnerName}, your turn — say this:`
+                      : 'Your turn — say this:'}
                 </Text>
                 <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] text-center leading-snug">
                   {scenarioTurn.text}

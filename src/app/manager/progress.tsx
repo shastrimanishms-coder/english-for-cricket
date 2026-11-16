@@ -25,6 +25,30 @@ interface StudentProgress {
   accuracyPercent: number | null;
 }
 
+type ReportPeriod = 'today' | 'week' | 'overall';
+
+const PERIOD_LABELS: Record<ReportPeriod, string> = {
+  today: 'Today',
+  week: 'This Week',
+  overall: 'Overall',
+};
+
+/**
+ * The local-time start of a report period, as an ISO string for the
+ * database filters (null = no filter, all time). "This Week" starts
+ * on Monday, matching the school week.
+ */
+function periodStartISO(period: ReportPeriod): string | null {
+  if (period === 'overall') return null;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (period === 'week') {
+    const daysSinceMonday = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - daysSinceMonday);
+  }
+  return start.toISOString();
+}
+
 function formatPlaytime(totalSeconds: number): string {
   if (totalSeconds < 60) return `${totalSeconds} sec`;
   if (totalSeconds < 3600) return `${Math.floor(totalSeconds / 60)} min`;
@@ -38,6 +62,9 @@ export default function LearningProgress() {
   const guardStatus = useRequireRole(['manager']);
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState<StudentProgress[]>([]);
+  // Report period for the playtime / lessons / accuracy figures.
+  // Badges are always all-time (they are earned once, not per period).
+  const [period, setPeriod] = useState<ReportPeriod>('overall');
 
   // Collapsible class groups + student cards, same organisation as
   // the Students screen and the admin tree.
@@ -53,6 +80,7 @@ export default function LearningProgress() {
   };
 
   const fetchProgressData = useCallback(async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -121,12 +149,15 @@ export default function LearningProgress() {
       // cover this manager), the affected figures simply stay at zero
       // instead of breaking the whole dashboard.
       const studentIds = formattedStudents.map((s) => s.id);
+      const since = periodStartISO(period);
       if (studentIds.length > 0) {
         try {
-          const { data: logs, error: logsError } = await supabase
+          let logsQuery = supabase
             .from('activity_logs')
             .select('student_id, duration_seconds')
             .in('student_id', studentIds);
+          if (since) logsQuery = logsQuery.gte('created_at', since);
+          const { data: logs, error: logsError } = await logsQuery;
           if (logsError) throw logsError;
           const totals = new Map<string, number>();
           for (const row of logs || []) {
@@ -140,11 +171,13 @@ export default function LearningProgress() {
         }
 
         try {
-          const { data: completions, error: completionsError } = await supabase
+          let completionsQuery = supabase
             .from('lesson_completions')
             .select('student_id, score_correct, score_total')
             .eq('student_kind', 'sub_account')
             .in('student_id', studentIds);
+          if (since) completionsQuery = completionsQuery.gte('completed_at', since);
+          const { data: completions, error: completionsError } = await completionsQuery;
           if (completionsError) throw completionsError;
           const counts = new Map<string, number>();
           const correct = new Map<string, number>();
@@ -171,7 +204,7 @@ export default function LearningProgress() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, period]);
 
   useEffect(() => {
     (async () => {
@@ -202,6 +235,32 @@ export default function LearningProgress() {
         <View className="max-w-5xl w-full mx-auto space-y-6">
           <Text className="text-text-secondary text-lg mb-4">
             Track lesson completion, accuracy, and earned badges for all your students.
+          </Text>
+
+          {/* Report period: the figures below (playtime, lessons,
+              accuracy) cover just this period. Badges are earned
+              once, so they always show all-time. */}
+          <View className="flex-row gap-2 mb-2">
+            {(Object.keys(PERIOD_LABELS) as ReportPeriod[]).map((p) => (
+              <Pressable
+                key={p}
+                onPress={() => setPeriod(p)}
+                className={`px-5 py-2.5 rounded-full border ${
+                  period === p
+                    ? 'bg-[#0A192F] border-[#0A192F]'
+                    : 'bg-white border-slate-300'
+                }`}
+              >
+                <Text className={`font-bold text-sm ${period === p ? 'text-white' : 'text-slate-600'}`}>
+                  {PERIOD_LABELS[p]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text className="text-sm text-text-secondary mb-6">
+            {PERIOD_LABELS[period]}: {students.reduce((sum, s) => sum + s.lessonsCompleted, 0)} lessons
+            completed • {formatPlaytime(students.reduce((sum, s) => sum + s.playtimeSeconds, 0))} total
+            playtime • Badges are always all-time
           </Text>
 
           {students.length === 0 ? (

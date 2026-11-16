@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
+import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 
 export default function OrganizationSettings() {
@@ -21,6 +22,11 @@ export default function OrganizationSettings() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState('');
   const [orgCode, setOrgCode] = useState('');
+
+  // Change Password State
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchSettingsData = useCallback(async () => {
     try {
@@ -120,6 +126,33 @@ export default function OrganizationSettings() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!newPassword) {
+      showAlert('Missing Password', 'Please enter a new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      showAlert('Password Too Short', 'Your new password needs at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showAlert('Passwords Do Not Match', 'Please type the same new password in both boxes.');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setNewPassword('');
+      setConfirmPassword('');
+      showAlert('Password Updated', 'Your password has been changed. Use the new password the next time you sign in.');
+    } catch (error: any) {
+      showAlert('Could Not Change Password', error?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   if (loading || guardStatus !== 'authorized') {
     return (
       <View className="flex-1 bg-surface-background justify-center items-center">
@@ -213,6 +246,50 @@ export default function OrganizationSettings() {
                   />
                 </View>
               </View>
+            </View>
+          </View>
+
+          <View className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4 gap-4">
+            <View>
+              <Text className="text-lg font-bold text-text-primary mb-1">Change Password</Text>
+              <Text className="text-sm text-text-secondary">
+                Set a new password for your manager account. You will stay signed in here; the new password applies from your next sign-in.
+              </Text>
+            </View>
+
+            <View>
+              <Text className="text-sm font-semibold text-text-secondary mb-2">New Password</Text>
+              <TextInput
+                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary text-base"
+                placeholder="At least 6 characters"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View>
+              <Text className="text-sm font-semibold text-text-secondary mb-2">Confirm New Password</Text>
+              <TextInput
+                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary text-base"
+                placeholder="Type the new password again"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View className="w-full md:w-64">
+              <AnimatedButton
+                title={changingPassword ? 'Updating...' : 'Update Password'}
+                onPress={handleChangePassword}
+                disabled={changingPassword}
+                variant="secondary"
+              />
             </View>
           </View>
 
