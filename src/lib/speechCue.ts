@@ -97,6 +97,46 @@ export function speakWithCallback(text: string, onDone?: () => void): void {
   }
 }
 
+interface SpeechSynthLike {
+  speaking: boolean;
+  pending: boolean;
+}
+
+/**
+ * Wait until the device voice is genuinely silent - not merely
+ * reported finished. Some voices (Chrome's network voices on Linux
+ * especially) fire their "done" event while the last word is still
+ * coming out of the speakers; a microphone opened at that moment
+ * hears the app itself and the learner gets scored on the model's
+ * voice. Polls the browser's own speech queue; on native platforms
+ * (no such queue to inspect) it resolves at once.
+ */
+export function waitForSpeechIdle(maxMs = 3500): Promise<void> {
+  return new Promise((resolve) => {
+    const synth = (globalThis as unknown as { speechSynthesis?: SpeechSynthLike })
+      .speechSynthesis;
+    if (!synth) {
+      resolve();
+      return;
+    }
+    const startedAt = Date.now();
+    const check = () => {
+      let busy = false;
+      try {
+        busy = synth.speaking || synth.pending;
+      } catch {
+        busy = false;
+      }
+      if (!busy || Date.now() - startedAt >= maxMs) {
+        resolve();
+        return;
+      }
+      setTimeout(check, 120);
+    };
+    check();
+  });
+}
+
 /** Stop any cue speech and invalidate its pending completion. */
 export function cancelSpeechCue(): void {
   speakSeq++;

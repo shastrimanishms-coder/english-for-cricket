@@ -108,6 +108,12 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
 
   const subscriptionsRef = useRef<{ remove: () => void }[]>([]);
   const finalSeenRef = useRef(false);
+  // The latest interim transcript. Some browsers end a session (or
+  // report no-speech) without ever delivering a formal final result,
+  // even though the learner's words were already on screen as the
+  // interim line - in that case these words are the honest result
+  // and must be scored, not thrown away as "nothing heard".
+  const interimRef = useRef('');
   const activeRef = useRef(false);
   // Mic permission is asked once per hook instance: asking again on
   // every start spams the console on web (requestPermissionsAsync is
@@ -201,6 +207,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
 
     cleanupListeners();
     finalSeenRef.current = false;
+    interimRef.current = '';
     deliberateRef.current = false;
     setInterim('');
 
@@ -227,6 +234,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
           callbacksRef.current.onError('no-speech');
         }
       } else if (transcript) {
+        interimRef.current = transcript;
         setInterim(transcript);
       }
     });
@@ -236,14 +244,32 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
       cleanupListeners();
       // An abort we requested ourselves is not a failure.
       if (event?.error === 'aborted' && deliberateRef.current) return;
-      callbacksRef.current.onError(mapErrorCode(event?.error));
+      const mapped = mapErrorCode(event?.error);
+      // A no-speech report that contradicts words already heard
+      // (they were on screen as the interim line) is a browser
+      // quirk, not silence: score the words.
+      if (mapped === 'no-speech' && !finalSeenRef.current && interimRef.current.trim()) {
+        finalSeenRef.current = true;
+        callbacksRef.current.onFinal(interimRef.current.trim());
+        return;
+      }
+      callbacksRef.current.onError(mapped);
     });
     addSub('end', () => {
       setListening(false);
       if (activeRef.current && !finalSeenRef.current) {
         activeRef.current = false;
         cleanupListeners();
-        callbacksRef.current.onError('no-speech');
+        // The session ended without a formal final result. If words
+        // were heard along the way, they are the result; only true
+        // silence is a no-speech error.
+        const heard = interimRef.current.trim();
+        if (heard) {
+          finalSeenRef.current = true;
+          callbacksRef.current.onFinal(heard);
+        } else {
+          callbacksRef.current.onError('no-speech');
+        }
       }
     });
 

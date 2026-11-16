@@ -49,6 +49,7 @@ import {
   probeVoicesAvailable,
   speakWithCallback,
   toSpeechText,
+  waitForSpeechIdle,
 } from '../../lib/speechCue';
 import {
   speechErrorMessage,
@@ -287,6 +288,25 @@ function FallbackImage({
  * back to say-it-out-loud self-marking. Tapping any panel still
  * just plays its sound, like the old tap-to-listen grid.
  */
+/**
+ * The completed version of a gap-fill quiz prompt: "We are a ___ of
+ * eleven." + the tapped word "team" -> "We are a team of eleven."
+ * Hearing the whole finished sentence is the point of the exercise;
+ * hearing the lone answer word teaches almost nothing. Returns null
+ * when the prompt has no blank to fill.
+ */
+function completedSentence(
+  prompt: string | null | undefined,
+  answerText: string
+): string | null {
+  if (!prompt || !/_/.test(prompt)) return null;
+  const answer = toSpeechText(answerText);
+  if (!answer) return null;
+  const sentences = prompt.match(/[^.?!]+[.?!]*/g) || [prompt];
+  const gapSentence = sentences.find((s) => /_/.test(s)) || prompt;
+  return gapSentence.replace(/_+/g, answer).trim();
+}
+
 function GridSpeakSlide({
   slide,
   playOrSpeak,
@@ -371,16 +391,22 @@ function GridSpeakSlide({
           const current = speechRef.current;
           if (current.supported) {
             setPhase('listening');
-            timerRef.current = setTimeout(() => {
+            try {
+              Speech.stop();
+            } catch {
+              // TTS is a nicety, never a blocker.
+            }
+            // The model voice must be genuinely finished - not just
+            // reported finished - before the mic opens, or the
+            // recogniser hears the app itself through the speakers.
+            void waitForSpeechIdle().then(() => {
               if (token.cancelled || runRef.current !== run) return;
-              setError(null);
-              try {
-                Speech.stop();
-              } catch {
-                // TTS is a nicety, never a blocker.
-              }
-              void speechRef.current.start();
-            }, 450);
+              timerRef.current = setTimeout(() => {
+                if (token.cancelled || runRef.current !== run) return;
+                setError(null);
+                void speechRef.current.start();
+              }, 250);
+            });
           } else if (current.supported === false) {
             setPhase('selfmark');
           } else if (attemptsLeft > 0) {
@@ -707,16 +733,22 @@ function SpeakRepeatSlide({
         if (cancelled) return;
         const current = speechRef.current;
         if (current.supported) {
-          timer = setTimeout(() => {
+          try {
+            Speech.stop();
+          } catch {
+            // TTS is a nicety, never a blocker.
+          }
+          // Wait for the model voice to be genuinely silent before
+          // opening the mic (see waitForSpeechIdle): a "done" event
+          // can arrive while the last word is still playing.
+          void waitForSpeechIdle().then(() => {
             if (cancelled) return;
-            setError(null);
-            try {
-              Speech.stop();
-            } catch {
-              // TTS is a nicety, never a blocker.
-            }
-            void speechRef.current.start();
-          }, 450);
+            timer = setTimeout(() => {
+              if (cancelled) return;
+              setError(null);
+              void speechRef.current.start();
+            }, 250);
+          });
         } else if (current.supported === null && attemptsLeft > 0) {
           // The recogniser is still reporting whether it exists.
           timer = setTimeout(() => tryStart(attemptsLeft - 1), 500);
@@ -1328,7 +1360,18 @@ export default function LessonPlayer() {
 
   const handlePanelTap = useCallback(
     (slide: Slide, panel: SlidePanel) => {
-      playOrSpeak(panel.audio_url, panel.text);
+      if (slide.slide_type === 'quiz_4up') {
+        // A quiz tap speaks the finished sentence ("We are a team of
+        // eleven."), not just the tapped word ("team").
+        const sentence = completedSentence(slide.prompt_text, panel.text);
+        if (sentence) {
+          speakText(sentence);
+        } else {
+          playOrSpeak(panel.audio_url, panel.text);
+        }
+      } else {
+        playOrSpeak(panel.audio_url, panel.text);
+      }
       const attempt = attempts[slide.id] || EMPTY_ATTEMPT;
 
       if (slide.slide_type === 'grid_4up') {
@@ -1352,7 +1395,7 @@ export default function LessonPlayer() {
         });
       }
     },
-    [attempts, playOrSpeak, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
+    [attempts, playOrSpeak, speakText, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
   );
 
   const handleTypingCheck = useCallback(

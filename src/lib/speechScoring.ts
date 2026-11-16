@@ -144,7 +144,11 @@ export function scoreSpeech(target: string, transcript: string): SpeechScore {
   let credit = 0;
   for (const w of words) {
     if (w.status === 'correct') credit += 1;
-    else if (w.status === 'close') credit += 0.5;
+    // A lone word has no sentence around it to carry the score, so
+    // "close" (the recogniser heard a near-twin: "pitch" as "peach",
+    // "team" as "Tim") earns most of the credit - at half credit a
+    // well-said single word could never reach the pass mark.
+    else if (w.status === 'close') credit += m === 1 ? 0.75 : 0.5;
   }
   const accuracy = Math.round((credit / m) * 100);
   return { accuracy, passed: accuracy >= SPEECH_PASS_MARK, words, extraWords };
