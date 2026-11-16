@@ -32,6 +32,7 @@ import Celebration from '../../components/ui/Celebration';
 import MascotPair from '../../components/ui/Mascots';
 import NewBadgeCard from '../../components/ui/NewBadgeCard';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import TrickyWordsPractice, { type TrickyWord } from '../../components/lesson/TrickyWordsPractice';
 import {
   awardLessonBadges,
   evaluateStreakBadges,
@@ -876,6 +877,13 @@ export default function LessonPlayer() {
   const [practiceRounds, setPracticeRounds] = useState(0);
   const [attempts, setAttempts] = useState<Record<string, SlideAttempt>>({});
   const [finished, setFinished] = useState(false);
+  // Red-words review: the FIRST speech score per slide is kept here (the
+  // attempts map itself is reset whenever a slide is re-queued), and the
+  // tricky-words practice opens from the completion screen.
+  const firstSpeechRef = useRef<Record<string, SpeechScore>>({});
+  const [trickyWords, setTrickyWords] = useState<TrickyWord[]>([]);
+  const [showTricky, setShowTricky] = useState(false);
+  const [trickyFixed, setTrickyFixed] = useState<number | null>(null);
   const [durationSeconds, setDurationSeconds] = useState(0);
   // Badges newly earned by this completion, shown one at a time on the
   // completion screen (badgeIndex walks the queue).
@@ -1220,9 +1228,24 @@ export default function LessonPlayer() {
 
   const finishLesson = useCallback(async () => {
     const { correct, total } = firstScore();
+    // Red words from the FIRST attempt at each speaking slide — words the
+    // scorer marked wrong or missing ("close" orange words are already
+    // fine and stay out). Computed here, not at render time.
+    const byWord = new Map<string, TrickyWord>();
+    for (const slide of slides) {
+      if (slide.slide_type !== 'speak_repeat') continue;
+      const score = firstSpeechRef.current[slide.id];
+      if (!score) continue;
+      for (const w of score.words) {
+        if (w.status !== 'wrong' && w.status !== 'missing') continue;
+        const key = w.word.toLowerCase();
+        if (!byWord.has(key)) byWord.set(key, { word: w.word, heard: w.heard });
+      }
+    }
+    setTrickyWords([...byWord.values()].slice(0, 8));
     await recordCompletion(correct, total);
     setFinished(true);
-  }, [firstScore, recordCompletion]);
+  }, [firstScore, recordCompletion, slides]);
 
   // Move on from the current slide. A scored slide answered wrong is
   // appended to the end of the queue (and its attempt reset) so it
@@ -1356,6 +1379,9 @@ export default function LessonPlayer() {
       feedbackHaptic(correct);
       feedbackAnim(correct);
       recordFirstResult(slide.id, correct);
+      if (result && !firstSpeechRef.current[slide.id]) {
+        firstSpeechRef.current[slide.id] = result.score;
+      }
       updateAttempt(slide.id, { answered: true, wasCorrect: correct, speechResult: result });
     },
     [attempts, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
@@ -1661,6 +1687,22 @@ export default function LessonPlayer() {
     const percentage = total > 0 ? Math.round((correct / total) * 100) : null;
     const starCount = percentage === null ? 0 : percentage >= 90 ? 3 : percentage >= 60 ? 2 : 1;
     const currentBadge = earnedBadges[badgeIndex];
+
+    if (showTricky) {
+      return (
+        <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
+          <TrickyWordsPractice
+            words={trickyWords}
+            lessonId={lesson?.id || ''}
+            onClose={(n) => {
+              setTrickyFixed(n);
+              setShowTricky(false);
+            }}
+          />
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
         <View className="mb-2">
@@ -1692,6 +1734,21 @@ export default function LessonPlayer() {
             badge={currentBadge}
             onDismiss={() => setBadgeIndex((i) => i + 1)}
           />
+        ) : null}
+        {trickyWords.length > 0 && trickyFixed === null ? (
+          <Pressable
+            onPress={() => setShowTricky(true)}
+            className="w-full max-w-sm px-6 py-4 bg-[#D4AF37] rounded-full mb-3 items-center"
+          >
+            <Text className="text-white font-bold text-base">
+              🗣️ Fix {trickyWords.length} tricky word{trickyWords.length > 1 ? 's' : ''} · +2 ⭐ each
+            </Text>
+          </Pressable>
+        ) : null}
+        {trickyFixed !== null && trickyFixed > 0 ? (
+          <Text className="text-emerald-600 font-bold text-center mb-3">
+            ⭐ You fixed {trickyFixed} tricky word{trickyFixed > 1 ? 's' : ''}!
+          </Text>
         ) : null}
         <Pressable
           onPress={() => router.replace('/learner/path')}
