@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import { awardExtraIfTagged } from '../../lib/extras';
 import { awardPoints, POINTS } from '../../lib/points';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { getStudentIdentity } from '../../lib/studentIdentity';
@@ -174,6 +175,8 @@ export default function SmartReading() {
           0,
           listenMode ? `${story.id}:listen` : story.id
         );
+        // A lesson-tagged story also completes that lesson's extra.
+        await awardExtraIfTagged(identity, 'reading', story.id, story.lesson_id);
       }
       await fetchData();
     },

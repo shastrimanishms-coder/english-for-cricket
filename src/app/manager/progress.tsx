@@ -4,6 +4,8 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
 import { useRequireRole } from '../../hooks/useRequireRole';
+import { fetchExtrasDone } from '../../lib/extras';
+import { fetchPointTotals, levelForXp } from '../../lib/points';
 import { groupStudentsByClass } from '../../lib/studentGroups';
 import { supabase } from '../../lib/supabase';
 
@@ -55,6 +57,63 @@ function formatPlaytime(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours} hrs`;
+}
+
+/**
+ * XP, stars, recommended extras and Smart Reading for one student —
+ * fetched only when the student's card is expanded. All sources fail
+ * soft (migrations 18-20), and the block hides itself when the student
+ * has no rewards activity yet.
+ */
+function StudentExtras({ studentId }: { studentId: string }) {
+  const [info, setInfo] = useState<{
+    xp: number;
+    stars: number;
+    extras: number;
+    readingBest: number | null;
+    readingCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const identity = { studentId, studentKind: 'sub_account' as const, displayName: null };
+      const totals = await fetchPointTotals(identity);
+      const done = await fetchExtrasDone(identity);
+      let readingBest: number | null = null;
+      let readingCount = 0;
+      try {
+        const { data } = await supabase.rpc('get_reading_records', {
+          p_student_id: studentId,
+          p_student_kind: 'sub_account',
+        });
+        if (Array.isArray(data)) {
+          readingCount = data.length;
+          for (const r of data as any[]) {
+            if (r.accuracy != null) readingBest = Math.max(readingBest ?? 0, r.accuracy);
+          }
+        }
+      } catch {
+        // Smart Reading not switched on yet.
+      }
+      setInfo({ xp: totals.xp, stars: totals.stars, extras: done.size, readingBest, readingCount });
+    })();
+  }, [studentId]);
+
+  if (!info) return null;
+  if (info.xp === 0 && info.stars === 0 && info.readingCount === 0) return null;
+  const level = levelForXp(info.xp);
+
+  return (
+    <View className="mb-6 bg-amber-50 border border-amber-100 rounded-xl p-4">
+      <Text className="text-sm font-bold text-amber-700 uppercase mb-1">Rewards & Extras</Text>
+      <Text className="text-slate-600">
+        {level.emoji} {level.name} · {info.xp} XP · ⭐ {info.stars} stars · {info.extras} recommended extras done
+        {info.readingCount > 0
+          ? ` · 📖 Smart Reading: ${info.readingCount} session${info.readingCount > 1 ? 's' : ''}${info.readingBest !== null ? `, best accuracy ${info.readingBest}%` : ''}`
+          : ''}
+      </Text>
+    </View>
+  );
 }
 
 export default function LearningProgress() {
@@ -328,6 +387,8 @@ export default function LearningProgress() {
                                 <Text className="text-xl font-bold text-blue-800">{student.lessonsCompleted}</Text>
                               </View>
                             </View>
+
+                            <StudentExtras studentId={student.id} />
 
                             {/* Badges Section */}
                             <Text className="text-sm font-bold text-text-secondary uppercase mb-3">Earned Badges</Text>

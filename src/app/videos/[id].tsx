@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { awardExtraIfTagged } from '../../lib/extras';
+import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSafeBack } from '../../lib/useSafeBack';
@@ -11,6 +13,7 @@ interface VideoDetails {
   id: string;
   title: string;
   video_url: string;
+  lesson_id?: string | null;
 }
 
 type EmbedStatus = 'loading' | 'ready' | 'error';
@@ -31,6 +34,16 @@ export default function VideoPlayer() {
   // 20261115000008 (log_activity RPC) has been run.
   useActivityLogger({ activityType: 'video', targetId: video?.id ?? null });
 
+  // If this video is tagged to a lesson, opening it completes that
+  // lesson's recommended extra (+3 stars, once per video). Fails soft.
+  useEffect(() => {
+    if (!video) return;
+    (async () => {
+      const identity = await getStudentIdentity();
+      if (identity) await awardExtraIfTagged(identity, 'video', video.id, video.lesson_id);
+    })();
+  }, [video]);
+
   // Layout: portrait keeps the video in a 16:9 frame at the top of the
   // screen (with the title beneath it); landscape gives the video the
   // full available area, like a fullscreen player.
@@ -41,14 +54,25 @@ export default function VideoPlayer() {
     try {
       setLoading(true);
       setFetchError(null);
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('video_lectures')
-        .select('id, title, video_url')
+        .select('id, title, video_url, lesson_id')
         .eq('id', id)
         .maybeSingle();
 
+      if (error && /lesson_id/.test(error.message)) {
+        // Migration 17 not run yet: the tag column does not exist.
+        const retry = await supabase
+          .from('video_lectures')
+          .select('id, title, video_url')
+          .eq('id', id)
+          .maybeSingle();
+        data = retry.data as typeof data;
+        error = retry.error;
+      }
+
       if (error) throw error;
-      setVideo(data);
+      setVideo(data as VideoDetails);
       setEmbedStatus('loading');
     } catch (error: any) {
       console.error('Error fetching video:', error);

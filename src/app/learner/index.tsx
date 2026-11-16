@@ -89,6 +89,14 @@ const LEARNING_MODULES = [
     icon: '🎙️',
   },
   {
+    id: 'journey',
+    title: 'My Journey',
+    description: 'See your whole path on one map — lessons finished, extras collected, and what is still waiting.',
+    cta: 'see my journey >',
+    imageColor: '#FEF9C3',
+    icon: '🗺️',
+  },
+  {
     id: 'reading',
     title: 'Smart Reading',
     description: 'Read short stories while the words light up, or read aloud and get a score for every sentence.',
@@ -153,6 +161,9 @@ export default function LearnerDashboard() {
         break;
       case 'reading':
         router.push('/learner/reading');
+        break;
+      case 'journey':
+        router.push('/learner/journey');
         break;
       case 'profile':
         router.push('/learner/profile');

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { awardExtraIfTagged } from '../../lib/extras';
+import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -10,6 +12,7 @@ interface DownloadItem {
   description: string;
   file_url: string;
   category: string;
+  lesson_id?: string | null;
 }
 
 export default function DownloadsGallery() {
@@ -20,11 +23,22 @@ export default function DownloadsGallery() {
   useEffect(() => {
     const fetchDownloads = async () => {
       try {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('downloads')
-          .select('id, title, description, file_url, categories(name)')
+          .select('id, title, description, file_url, lesson_id, categories(name)')
           .eq('is_published', true)
           .order('created_at', { ascending: false });
+
+        if (error && /lesson_id/.test(error.message)) {
+          // Migration 17 not run yet: the tag column does not exist.
+          const retry = await supabase
+            .from('downloads')
+            .select('id, title, description, file_url, categories(name)')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false });
+          data = retry.data as typeof data;
+          error = retry.error;
+        }
 
         if (error) throw error;
         
@@ -44,11 +58,15 @@ export default function DownloadsGallery() {
     fetchDownloads();
   }, []);
 
-  const handleDownload = async (url: string) => {
+  const handleDownload = async (item: DownloadItem) => {
     try {
-      const supported = await Linking.canOpenURL(url);
+      const supported = await Linking.canOpenURL(item.file_url);
       if (supported) {
-        await Linking.openURL(url);
+        await Linking.openURL(item.file_url);
+        // Opening a lesson-tagged download completes that lesson's
+        // recommended extra (+3 stars, once per item). Fails soft.
+        const identity = await getStudentIdentity();
+        if (identity) await awardExtraIfTagged(identity, 'download', item.id, item.lesson_id);
       } else {
         Alert.alert('Error', 'Cannot open this file type on your device.');
       }
@@ -102,7 +120,7 @@ export default function DownloadsGallery() {
                 </View>
 
                 <Pressable 
-                  onPress={() => handleDownload(item.file_url)}
+                  onPress={() => handleDownload(item)}
                   className="w-full md:w-auto px-6 py-3 bg-[#0A192F] rounded-lg items-center justify-center mt-2 md:mt-0"
                 >
                   <Text className="text-white font-bold text-sm">Download</Text>

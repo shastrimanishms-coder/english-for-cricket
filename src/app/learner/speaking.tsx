@@ -28,6 +28,8 @@ import {
   learnerLineCount,
   type SpeakingScenario,
 } from '../../lib/speakingScenarios';
+import { awardExtraIfTagged } from '../../lib/extras';
+import { awardPoints, POINTS } from '../../lib/points';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -201,12 +203,23 @@ export default function SpeakingPractice() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('speaking_scenarios')
-          .select('id, title, category, emoji, description, other_name, turns')
+          .select('id, title, category, emoji, description, other_name, turns, lesson_id')
           .eq('is_published', true)
           .order('order_index', { ascending: true })
           .order('created_at', { ascending: true });
+        if (error && /lesson_id/.test(error.message)) {
+          // Migration 17 not run yet: the tag column does not exist.
+          const retry = await supabase
+            .from('speaking_scenarios')
+            .select('id, title, category, emoji, description, other_name, turns')
+            .eq('is_published', true)
+            .order('order_index', { ascending: true })
+            .order('created_at', { ascending: true });
+          data = retry.data as typeof data;
+          error = retry.error;
+        }
         if (error) throw error;
         const rows: SpeakingScenario[] = (data || [])
           .map((row: any) => ({
@@ -217,6 +230,7 @@ export default function SpeakingPractice() {
             description: row.description || '',
             otherName: row.other_name || 'Partner',
             turns: Array.isArray(row.turns) ? row.turns : [],
+            lessonId: row.lesson_id ?? null,
           }))
           .filter((s: SpeakingScenario) => s.turns.length > 0);
         if (rows.length > 0) setDbScenarios(rows);
@@ -645,6 +659,25 @@ export default function SpeakingPractice() {
     scenarioScoreValues.length > 0
       ? Math.round(scenarioScoreValues.reduce((a, b) => a + b, 0) / scenarioScoreValues.length)
       : null;
+
+  // Finishing a scenario pays speaking XP (once per scenario per day)
+  // and, when the scenario is tagged to a lesson, completes that
+  // lesson's recommended extra (+3 stars). Fails soft.
+  useEffect(() => {
+    if (!scenarioDone || !scenario) return;
+    (async () => {
+      const identity = await getStudentIdentity();
+      if (!identity) return;
+      await awardPoints(
+        identity,
+        'speaking_pass',
+        POINTS.SPEAKING_XP,
+        0,
+        `${scenario.id}:${new Date().toISOString().slice(0, 10)}`
+      );
+      await awardExtraIfTagged(identity, 'speaking', scenario.id, scenario.lessonId);
+    })();
+  }, [scenarioDone, scenario]);
 
   const renderScenarioCard = (s: SpeakingScenario) => (
     <Pressable

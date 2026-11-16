@@ -22,6 +22,8 @@ export interface SpeakingScenario {
   /** Who the app plays: Reporter, Coach, Teammate… */
   otherName: string;
   turns: ScenarioTurn[];
+  /** "Belongs to" lesson tag (migration 17), when the admin set one. */
+  lessonId?: string | null;
 }
 
 export const SPEAKING_SCENARIOS: SpeakingScenario[] = [

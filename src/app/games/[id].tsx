@@ -10,6 +10,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
+import { awardExtraIfTagged } from '../../lib/extras';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -19,6 +20,7 @@ interface GameDetails {
   id: string;
   title: string;
   game_url: string;
+  lesson_id?: string | null;
 }
 
 type EmbedStatus = 'loading' | 'ready' | 'error';
@@ -113,6 +115,9 @@ export default function GamePlayer() {
       if (!identity) return;
       const awarded = await evaluateGameBadge(identity, game.id);
       if (awarded.length > 0) setBadgeToasts(awarded);
+      // If this game is tagged to a lesson, opening it also completes
+      // that lesson's recommended extra (+3 stars, once per game).
+      await awardExtraIfTagged(identity, 'game', game.id, game.lesson_id);
     })();
   }, [game]);
 
@@ -120,14 +125,25 @@ export default function GamePlayer() {
     try {
       setLoading(true);
       setFetchError(null);
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('games')
-        .select('id, title, game_url')
+        .select('id, title, game_url, lesson_id')
         .eq('id', id)
         .maybeSingle();
 
+      if (error && /lesson_id/.test(error.message)) {
+        // Migration 17 not run yet: the tag column does not exist.
+        const retry = await supabase
+          .from('games')
+          .select('id, title, game_url')
+          .eq('id', id)
+          .maybeSingle();
+        data = retry.data as typeof data;
+        error = retry.error;
+      }
+
       if (error) throw error;
-      setGame(data);
+      setGame(data as GameDetails);
       setEmbedStatus('loading');
     } catch (error: any) {
       console.error('Error fetching game:', error);

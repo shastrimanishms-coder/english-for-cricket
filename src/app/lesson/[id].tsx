@@ -33,6 +33,7 @@ import MascotPair from '../../components/ui/Mascots';
 import NewBadgeCard from '../../components/ui/NewBadgeCard';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import TrickyWordsPractice, { type TrickyWord } from '../../components/lesson/TrickyWordsPractice';
+import Recommendations from '../../components/lesson/Recommendations';
 import {
   awardLessonBadges,
   evaluateStreakBadges,
@@ -1750,6 +1751,7 @@ export default function LessonPlayer() {
             ⭐ You fixed {trickyFixed} tricky word{trickyFixed > 1 ? 's' : ''}!
           </Text>
         ) : null}
+        {lesson ? <Recommendations lessonId={lesson.id} /> : null}
         <Pressable
           onPress={() => router.replace('/learner/path')}
           className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
