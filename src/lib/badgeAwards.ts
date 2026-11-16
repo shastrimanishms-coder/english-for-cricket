@@ -237,8 +237,36 @@ function shiftUtcDate(dateStr: string, days: number): string {
  * today to extend it. It is dead (0) when neither today nor yesterday
  * was active.
  */
-export function computeCurrentStreak(activeDays: Iterable<string>): number {
+export function computeCurrentStreak(
+  activeDays: Iterable<string>,
+  studyDays?: number[] | null
+): number {
   const days = new Set(activeDays);
+
+  // Study-days mode (migration 16): the student picked the weekdays
+  // they study (at least 3). Only those days count: a non-study day
+  // neither extends nor breaks the streak, a missed study day breaks
+  // it, and today's study day is still "pending" until the day ends,
+  // so it neither counts nor breaks yet.
+  if (studyDays && studyDays.length >= 3) {
+    const study = new Set(studyDays);
+    const today = todayUtc();
+    let streak = 0;
+    let cursor = today;
+    for (let i = 0; i < 370; i++) {
+      const weekday = new Date(`${cursor}T00:00:00.000Z`).getUTCDay();
+      if (study.has(weekday)) {
+        if (days.has(cursor)) {
+          streak += 1;
+        } else if (cursor !== today) {
+          break;
+        }
+      }
+      cursor = shiftUtcDate(cursor, -1);
+    }
+    return streak;
+  }
+
   let cursor: string;
   if (days.has(todayUtc())) {
     cursor = todayUtc();
@@ -253,6 +281,31 @@ export function computeCurrentStreak(activeDays: Iterable<string>): number {
     cursor = shiftUtcDate(cursor, -1);
   }
   return streak;
+}
+
+/**
+ * The student's chosen study days (migration 16), or null when they
+ * have not chosen any (every day counts) or the column is not there
+ * yet. Fails soft for the same reason fetchActivityDays does.
+ */
+async function fetchStudyDays(identity: StudentIdentity): Promise<number[] | null> {
+  try {
+    const table = identity.studentKind === 'sub_account' ? 'sub_accounts' : 'user_profiles';
+    const { data, error } = await supabase
+      .from(table)
+      .select('study_days')
+      .eq('id', identity.studentId)
+      .maybeSingle();
+    if (error || !data) return null;
+    const raw = (data as { study_days?: unknown }).study_days;
+    if (!Array.isArray(raw)) return null;
+    const days = raw.filter(
+      (d): d is number => typeof d === 'number' && d >= 0 && d <= 6
+    );
+    return days.length >= 3 ? days : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -302,7 +355,11 @@ export async function evaluateStreakBadges(identity: StudentIdentity): Promise<A
     const streakBadges = badges.filter((b) => b.condition_type === 'streak');
     if (streakBadges.length === 0) return [];
 
-    const streak = computeCurrentStreak(await fetchActivityDays(identity));
+    const [activityDays, studyDays] = await Promise.all([
+      fetchActivityDays(identity),
+      fetchStudyDays(identity),
+    ]);
+    const streak = computeCurrentStreak(activityDays, studyDays);
     if (streak <= 0) return [];
 
     const earned: BadgeRow[] = [];

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import {
   distinctClassNames,
@@ -31,6 +32,7 @@ interface Student {
   gender: string;
   avatar_url?: string;   // NEW
   class_name: string | null; // migration 14: class / group / team
+  study_days: number[] | null; // migration 16: chosen study weekdays
   created_at: string;
 }
 
@@ -69,6 +71,7 @@ export default function StudentManagement() {
   const [newGender, setNewGender] = useState<'Male' | 'Female' | 'Other' | ''>('');
   const [customPin, setCustomPin] = useState('');
   const [newClassName, setNewClassName] = useState('');
+  const [newStudyDays, setNewStudyDays] = useState<number[]>([]);
 
   // Collapsible class groups + student rows in the list below.
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -148,11 +151,11 @@ export default function StudentManagement() {
       let studentsData: any[] | null = null;
       const withClass = await supabase
         .from('sub_accounts')
-        .select(`${baseColumns}, class_name`)
+        .select(`${baseColumns}, class_name, study_days`)
         .eq('organization_id', org.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
-      if (withClass.error && /class_name/.test(withClass.error.message)) {
+      if (withClass.error && /class_name|study_days/.test(withClass.error.message)) {
         const fallback = await supabase
           .from('sub_accounts')
           .select(baseColumns)
@@ -160,7 +163,11 @@ export default function StudentManagement() {
           .eq('is_active', true)
           .order('created_at', { ascending: false });
         if (fallback.error) throw fallback.error;
-        studentsData = (fallback.data || []).map((row: any) => ({ ...row, class_name: null }));
+        studentsData = (fallback.data || []).map((row: any) => ({
+          ...row,
+          class_name: null,
+          study_days: null,
+        }));
       } else if (withClass.error) {
         throw withClass.error;
       } else {
@@ -195,6 +202,7 @@ export default function StudentManagement() {
     setNewGender('');
     setCustomPin(Math.floor(1000 + Math.random() * 9000).toString());
     setNewClassName('');
+    setNewStudyDays([]);
     setShowForm(true);
   };
 
@@ -205,6 +213,7 @@ export default function StudentManagement() {
     setNewGender(student.gender as any);
     setCustomPin(student.hashed_pin);
     setNewClassName(student.class_name || '');
+    setNewStudyDays(Array.isArray(student.study_days) ? student.study_days : []);
     setShowForm(true);
   };
 
@@ -237,8 +246,13 @@ export default function StudentManagement() {
       // One save attempt; includeClass=false is the pre-migration-14
       // shape, used as an automatic fallback so saving a student never
       // breaks just because the class column is not there yet.
-      const attemptSave = async (includeClass: boolean) => {
+      const attemptSave = async (includeClass: boolean, includeDays: boolean) => {
         const classField = includeClass ? { class_name: newClassName.trim() || null } : {};
+        // Fewer than 3 picked days means "no plan set" - every day
+        // counts toward the streak until a real plan is chosen.
+        const daysField = includeDays
+          ? { study_days: isValidStudyDays(newStudyDays) ? [...newStudyDays].sort((a, b) => a - b) : null }
+          : {};
         if (editId) {
           return supabase
             .from('sub_accounts')
@@ -248,6 +262,7 @@ export default function StudentManagement() {
               gender: newGender,
               hashed_pin: customPin.trim(),
               ...classField,
+              ...daysField,
             })
             .eq('id', editId);
         }
@@ -259,20 +274,30 @@ export default function StudentManagement() {
           date_of_birth: newDob.trim(),
           gender: newGender,
           ...classField,
+          ...daysField,
         });
       };
 
-      let { error } = await attemptSave(true);
+      let { error } = await attemptSave(true, true);
       let classDropped = false;
+      let daysDropped = false;
       if (error && /class_name/.test(error.message)) {
         classDropped = true;
-        ({ error } = await attemptSave(false));
+        ({ error } = await attemptSave(false, true));
+      }
+      if (error && /study_days/.test(error.message)) {
+        daysDropped = true;
+        ({ error } = await attemptSave(!classDropped, false));
       }
       if (error) throw error;
 
-      const classNote = classDropped
-        ? '\n\nNote: the Class / Group field needs a one-time database update (migration 14) before it can be saved.'
-        : '';
+      const classNote =
+        (classDropped
+          ? '\n\nNote: the Class / Group field needs a one-time database update (migration 14) before it can be saved.'
+          : '') +
+        (daysDropped
+          ? '\n\nNote: Study Days need a one-time database update (migration 16) before they can be saved.'
+          : '');
       if (editId) {
         Alert.alert('Success', 'Student profile updated!' + classNote);
       } else {
@@ -448,6 +473,14 @@ export default function StudentManagement() {
                     ))}
                   </View>
                 )}
+              </View>
+
+              <View>
+                <Text className="text-sm font-semibold text-text-secondary mb-2">Study Days (optional)</Text>
+                <Text className="text-xs text-text-secondary mb-2">
+                  The days this student plans to study. Only these days count for their streak — or let the student choose in their own profile.
+                </Text>
+                <StudyDaysPicker value={newStudyDays} onChange={setNewStudyDays} />
               </View>
 
               <View className="flex-row justify-end gap-4 mt-4">

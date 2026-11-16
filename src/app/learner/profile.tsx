@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
+import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 
 interface EarnedBadge {
@@ -28,6 +30,11 @@ export default function StudentProfile() {
   const [country, setCountry] = useState('');
   const [region, setRegion] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
+
+  // Study days (migration 16, both identity kinds): the weekdays the
+  // student plans to study. Only these days count toward their streak.
+  const [studyDays, setStudyDays] = useState<number[]>([]);
+  const [savingStudyDays, setSavingStudyDays] = useState(false);
 
   // Earned badges for either identity kind. Fails soft: if the read is
   // blocked (PIN students hold no session for the table's rules to check),
@@ -67,6 +74,7 @@ export default function StudentProfile() {
 
         if (data) {
           setProfile(data);
+          setStudyDays(Array.isArray(data.study_days) ? data.study_days : []);
         } else {
           // FAILSAFE: Use local session data instead of logging out
           setProfile({
@@ -98,6 +106,7 @@ export default function StudentProfile() {
           setProfile({ ...data, display_name: data.display_name || 'Individual Learner' });
           setCountry(data.country || '');
           setRegion(data.region || '');
+          setStudyDays(Array.isArray(data.study_days) ? data.study_days : []);
           setIsEmailUser(true);
           await loadBadges(session.user.id);
           setLoading(false);
@@ -137,6 +146,36 @@ export default function StudentProfile() {
       Alert.alert('Error', error.message);
     } finally {
       setSavingLocation(false);
+    }
+  };
+
+  const handleSaveStudyDays = async () => {
+    if (!profile?.id || !isValidStudyDays(studyDays)) return;
+    setSavingStudyDays(true);
+    try {
+      const days = [...studyDays].sort((a, b) => a - b);
+      if (isEmailUser) {
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ study_days: days })
+          .eq('id', profile.id);
+        if (error) throw error;
+      } else {
+        // PIN students hold no session: the client-asserted RPC
+        // (migration 16) checks the sub-account exists and is active.
+        const { data: ok, error } = await supabase.rpc('update_student_study_days', {
+          p_student_id: profile.id,
+          p_days: days,
+        });
+        if (error) throw error;
+        if (!ok) throw new Error('Your study days could not be saved. Please try again.');
+      }
+      setProfile({ ...profile, study_days: days });
+      showAlert('Saved!', 'Your study days are set. Only these days count for your streak now — every other day is free practice.');
+    } catch (error: any) {
+      showAlert('Could not save', error.message || 'Please try again.');
+    } finally {
+      setSavingStudyDays(false);
     }
   };
 
@@ -262,6 +301,23 @@ export default function StudentProfile() {
             </View>
           </View>
         )}
+
+        {/* Study Days (migration 16) */}
+        <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <Text className="text-xl font-bold text-[#0A192F] mb-2">My Study Days 📅</Text>
+          <Text className="text-slate-500 mb-4">
+            Pick the days you plan to study each week. Your streak and streak badges only count these days — rest days never break your streak, and you can still practise on any day you like.
+          </Text>
+          <StudyDaysPicker value={studyDays} onChange={setStudyDays} />
+          <View className="mt-4">
+            <AnimatedButton
+              title={savingStudyDays ? 'Saving...' : 'Save My Study Days'}
+              onPress={handleSaveStudyDays}
+              disabled={savingStudyDays || !isValidStudyDays(studyDays)}
+              variant="primary"
+            />
+          </View>
+        </View>
 
         {/* Earned Badges (hidden until the student earns one) */}
         {earnedBadges.length > 0 && (
