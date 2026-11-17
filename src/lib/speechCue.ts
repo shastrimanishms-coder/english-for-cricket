@@ -55,6 +55,15 @@ export function toSpeechText(text: string): string {
 // can never open the microphone on the wrong slide.
 let speakSeq = 0;
 
+// Earliest moment the microphone may open after the most recent
+// model line STARTED, as a wall-clock timestamp. Some voices report
+// "done" (and drop their speechSynthesis.speaking flag) while the
+// last words are still coming out of the speakers; neither signal
+// can be trusted on its own, so the mic additionally waits out a
+// duration floor estimated from the line's word count. Set by
+// speakWithCallback; consumed by waitUntilSafeToListen.
+let micFloorUntil = 0;
+
 /**
  * Speak text aloud and call onDone exactly once when the line is
  * over - via the utterance's own done/stopped/error events when the
@@ -75,6 +84,11 @@ export function speakWithCallback(text: string, onDone?: () => void): void {
     onDone?.();
   };
   const words = spoken.split(/\s+/).length;
+  // Mic floor for this line: typical speech runs ~400ms per word;
+  // the floor adds a margin and is clamped so a one-word line still
+  // gets a safe pause and a long line cannot stall the flow forever.
+  micFloorUntil =
+    Date.now() + Math.min(9000, Math.max(900, words * 420 + 500));
   // Generous on purpose: network voices (Chrome on Linux especially)
   // can speak much slower than this estimate, and firing early opens
   // the microphone while the model line is still playing - the
@@ -137,9 +151,35 @@ export function waitForSpeechIdle(maxMs = 3500): Promise<void> {
   });
 }
 
+/**
+ * Wait until it is genuinely safe to open the microphone: the
+ * duration floor of the most recent model line has passed AND the
+ * browser's speech queue reports idle. Either signal alone has
+ * proven unreliable (Chrome's network voices on Linux report both
+ * "done" and not-speaking while audio is still playing, and the
+ * recogniser then transcribes the app itself and passes the slide
+ * without the learner saying a word). Resolves anyway after maxMs
+ * so a stuck floor can never hang a slide.
+ */
+export function waitUntilSafeToListen(maxMs = 10000): Promise<void> {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const check = () => {
+      const floorLeft = micFloorUntil - Date.now();
+      if (floorLeft <= 0 || Date.now() - startedAt >= maxMs) {
+        void waitForSpeechIdle(2500).then(resolve);
+        return;
+      }
+      setTimeout(check, Math.min(120, floorLeft));
+    };
+    check();
+  });
+}
+
 /** Stop any cue speech and invalidate its pending completion. */
 export function cancelSpeechCue(): void {
   speakSeq++;
+  micFloorUntil = 0;
   try {
     Speech.stop();
   } catch {

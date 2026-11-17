@@ -49,7 +49,7 @@ import {
   probeVoicesAvailable,
   speakWithCallback,
   toSpeechText,
-  waitForSpeechIdle,
+  waitUntilSafeToListen,
 } from '../../lib/speechCue';
 import {
   speechErrorMessage,
@@ -399,7 +399,10 @@ function GridSpeakSlide({
             // The model voice must be genuinely finished - not just
             // reported finished - before the mic opens, or the
             // recogniser hears the app itself through the speakers.
-            void waitForSpeechIdle().then(() => {
+            // waitUntilSafeToListen also waits out a word-count
+            // duration floor, because the idle flags themselves can
+            // drop early on some voices.
+            void waitUntilSafeToListen().then(() => {
               if (token.cancelled || runRef.current !== run) return;
               timerRef.current = setTimeout(() => {
                 if (token.cancelled || runRef.current !== run) return;
@@ -739,9 +742,11 @@ function SpeakRepeatSlide({
             // TTS is a nicety, never a blocker.
           }
           // Wait for the model voice to be genuinely silent before
-          // opening the mic (see waitForSpeechIdle): a "done" event
-          // can arrive while the last word is still playing.
-          void waitForSpeechIdle().then(() => {
+          // opening the mic (see waitUntilSafeToListen): a "done"
+          // event can arrive while the last word is still playing,
+          // and the idle flags can drop early too, so a word-count
+          // duration floor applies as well.
+          void waitUntilSafeToListen().then(() => {
             if (cancelled) return;
             timer = setTimeout(() => {
               if (cancelled) return;
@@ -1330,14 +1335,19 @@ export default function LessonPlayer() {
   const currentAnswered = currentAttempt.answered;
   const currentWasCorrect = currentAttempt.wasCorrect;
   const currentIsScored = currentSlide ? SCORED_TYPES.includes(currentSlide.slide_type) : false;
+  const currentIsSpeak = currentSlide?.slide_type === 'speak_repeat';
   useEffect(() => {
     if (finished || !currentIsScored || !currentAnswered) return;
-    const delay = currentWasCorrect ? 1500 : 3000;
+    // A missed speaking slide needs longer: the learner has to read
+    // the word-by-word feedback AND still have time to tap
+    // "Try Again Now" before the slide re-queues - at 3s it vanished
+    // first, which felt like the whole lesson had reset.
+    const delay = currentWasCorrect ? 1500 : currentIsSpeak ? 6500 : 3000;
     const timer = setTimeout(() => {
       void advanceRef.current();
     }, delay);
     return () => clearTimeout(timer);
-  }, [finished, currentIsScored, currentAnswered, currentWasCorrect, currentSlideId, queuePos]);
+  }, [finished, currentIsScored, currentAnswered, currentWasCorrect, currentIsSpeak, currentSlideId, queuePos]);
 
   const handleExit = useCallback(() => {
     if (finished) {

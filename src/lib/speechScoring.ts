@@ -141,6 +141,24 @@ export function scoreSpeech(target: string, transcript: string): SpeechScore {
     }
   }
 
+  // Lone-word targets get one extra fairness step: a near-twin
+  // counts as close even when its opening sound differs - either it
+  // is within two letter changes, or it keeps the word's ending and
+  // is within half its length ("pitch" heard as "beach": the classic
+  // short/long-vowel swap, same final sound). In a sentence the
+  // stricter rule above applies, because the surrounding words carry
+  // context; a single spoken word has nothing else to earn credit
+  // from, and recognisers routinely swap an opening consonant.
+  if (m === 1 && words[0].status === 'wrong' && words[0].heard) {
+    const t = targetWords[0];
+    const h = words[0].heard;
+    const dist = charDistance(t, h);
+    const keepsEnding = t[t.length - 1] === h[h.length - 1];
+    if (dist <= 2 || (keepsEnding && dist <= Math.ceil(Math.max(t.length, h.length) / 2))) {
+      words[0] = { ...words[0], status: 'close' };
+    }
+  }
+
   let credit = 0;
   for (const w of words) {
     if (w.status === 'correct') credit += 1;
