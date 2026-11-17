@@ -516,7 +516,7 @@ export default function HelpCenterManager() {
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Help Center & FAQ Manager</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Help Center & FAQ Manager</Text>
       </View>
 
       {/* Messages Inbox - contact-form submissions from the Support page,
@@ -525,26 +525,26 @@ export default function HelpCenterManager() {
           stored in support_message_replies, and emailed via the
           send-support-email Edge Function (owner's SMTP) once that
           function is deployed. */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <View className="flex-row items-center gap-3 p-4 border-b border-slate-100">
-          <Text className="text-lg font-bold text-[#0A192F]">📩 Messages</Text>
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
+        <View className="flex-row items-center gap-3 p-4 border-b border-inkline">
+          <Text className="font-display text-xl font-semibold text-navy">📩 Messages</Text>
           {inboxReady && unreadCount > 0 && (
-            <Text className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">
+            <Text className="text-xs bg-gold text-navy px-2 py-0.5 rounded-full font-bold">
               {unreadCount} unread
             </Text>
           )}
         </View>
         {inboxReady && !messagesLoading && messages.length > 0 && (
-          <View className="flex-row items-center gap-3 px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <View className="flex-row items-center gap-3 px-4 py-3 border-b border-inkline bg-canvas">
             <TextInput
-              className="flex-1 bg-white px-4 py-2.5 rounded-xl border border-slate-200"
+              className="flex-1 bg-white px-4 py-2.5 rounded-xl border border-inkline"
               placeholder="Search by name, email, subject or message text..."
               value={messageSearch}
               onChangeText={setMessageSearch}
               autoCapitalize="none"
             />
             {isSearching && (
-              <Pressable onPress={() => setMessageSearch('')} className="px-3 py-2 bg-slate-200 rounded-lg">
+              <Pressable onPress={() => setMessageSearch('')} className="px-3 py-2 bg-slate-100 rounded-full border border-inkline">
                 <Text className="text-sm font-semibold text-slate-600">Clear</Text>
               </Pressable>
             )}
@@ -575,7 +575,7 @@ export default function HelpCenterManager() {
             return (
               <View
                 key={conversation.key}
-                className={`${index !== visibleConversations.length - 1 ? 'border-b border-slate-200' : ''} ${conversation.unreadCount > 0 ? 'bg-blue-50' : ''}`}
+                className={`${index !== visibleConversations.length - 1 ? 'border-b border-inkline' : ''} ${conversation.unreadCount > 0 ? 'bg-gold-light/40' : ''}`}
               >
                 <Pressable
                   onPress={() => toggleConversation(conversation.key)}
@@ -586,9 +586,9 @@ export default function HelpCenterManager() {
                       <Text className={`text-base text-text-primary ${conversation.unreadCount > 0 ? 'font-extrabold' : 'font-bold'}`}>
                         {conversation.name}
                       </Text>
-                      <Text className="text-sm text-action font-semibold">{conversation.email}</Text>
+                      <Text className="text-sm text-navy font-semibold">{conversation.email}</Text>
                       {conversation.unreadCount > 0 && (
-                        <Text className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">
+                        <Text className="text-xs bg-gold text-navy px-2 py-0.5 rounded-full font-bold">
                           {conversation.unreadCount} unread
                         </Text>
                       )}
@@ -608,7 +608,7 @@ export default function HelpCenterManager() {
                     <View className="gap-3">
                       {conversation.timeline.map((entry) =>
                         entry.kind === 'user' ? (
-                          <View key={entry.key} className="self-start max-w-[85%] bg-white border border-slate-200 rounded-xl px-3 py-2.5">
+                          <View key={entry.key} className="self-start max-w-[85%] bg-white border border-inkline rounded-2xl px-3 py-2.5">
                             <Text className="text-xs font-bold text-text-secondary mb-1">
                               {conversation.name} · {new Date(entry.created_at).toLocaleString()}
                             </Text>
@@ -623,7 +623,7 @@ export default function HelpCenterManager() {
                             </View>
                           </View>
                         ) : (
-                          <View key={entry.key} className="self-end max-w-[85%] bg-[#0A192F] rounded-xl px-3 py-2.5">
+                          <View key={entry.key} className="self-end max-w-[85%] bg-navy rounded-2xl px-3 py-2.5">
                             <Text className="text-xs font-bold text-slate-300 mb-1">
                               You (noreply@englishforcricket.com) · {new Date(entry.created_at).toLocaleString()}
                             </Text>
@@ -642,13 +642,13 @@ export default function HelpCenterManager() {
                     <View className="flex-row items-center gap-3 mt-4 flex-wrap">
                       <Pressable
                         onPress={() => (composerOpen ? handleCancelReply() : handleOpenReply(conversation.key))}
-                        className="px-3 py-1.5 bg-[#0A192F] rounded border border-[#0A192F]"
+                        className="px-3 py-1.5 bg-navy rounded-full border border-navy"
                       >
                         <Text className="text-white text-sm font-semibold">Reply in panel</Text>
                       </Pressable>
                       <Pressable
                         onPress={() => handleToggleConversationRead(conversation)}
-                        className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200"
+                        className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline"
                       >
                         <Text className="text-text-secondary text-sm font-semibold">
                           {conversation.unreadCount > 0 ? 'Mark all read' : 'Mark all unread'}
@@ -660,12 +660,12 @@ export default function HelpCenterManager() {
                     </View>
 
                     {composerOpen && (
-                      <View className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                      <View className="mt-4 bg-canvas border border-inkline rounded-xl p-4">
                         <Text className="text-sm font-semibold text-text-secondary mb-2">
                           Reply to {conversation.name} ({conversation.email}) - sent from noreply@englishforcricket.com
                         </Text>
                         <TextInput
-                          className="w-full bg-white p-4 rounded-xl border border-slate-200 min-h-[100px]"
+                          className="w-full bg-white p-4 rounded-xl border border-inkline min-h-[100px]"
                           placeholder="Write your reply..."
                           value={replyDraft}
                           onChangeText={setReplyDraft}
@@ -703,8 +703,8 @@ export default function HelpCenterManager() {
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">
           {editId ? 'Edit Support Item' : 'Add Support Item'}
         </Text>
         
@@ -712,7 +712,7 @@ export default function HelpCenterManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Section / Category</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline mb-2"
               placeholder="e.g., Getting Started, Gameplay"
               value={sectionName}
               onChangeText={setSectionName}
@@ -723,7 +723,7 @@ export default function HelpCenterManager() {
                   <Pressable 
                     key={sec} 
                     onPress={() => setSectionName(sec)}
-                    className="px-3 py-1.5 bg-slate-100 rounded-md border border-slate-200 mr-2"
+                    className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline mr-2"
                   >
                     <Text className="text-xs font-bold text-slate-600">{sec}</Text>
                   </Pressable>
@@ -734,7 +734,7 @@ export default function HelpCenterManager() {
           <View className="w-full md:w-32">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Order Index</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="0"
               keyboardType="numeric"
               value={orderIndex}
@@ -746,7 +746,7 @@ export default function HelpCenterManager() {
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Question / Topic</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
             placeholder="e.g., How do I reset a student PIN?"
             value={question}
             onChangeText={setQuestion}
@@ -756,7 +756,7 @@ export default function HelpCenterManager() {
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Answer</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 min-h-[100px]"
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline min-h-[100px]"
             placeholder="Provide the step-by-step answer..."
             value={answer}
             onChangeText={setAnswer}
@@ -768,7 +768,7 @@ export default function HelpCenterManager() {
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Embedded Video URL (Optional)</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
             placeholder="https://youtube.com/watch?v=..."
             value={videoUrl}
             onChangeText={setVideoUrl}
@@ -776,7 +776,7 @@ export default function HelpCenterManager() {
           />
         </View>
 
-        <View className="flex-row justify-end gap-4 mt-2 border-t border-slate-100 pt-4">
+        <View className="flex-row justify-end gap-4 mt-2 border-t border-inkline pt-4">
           {editId && (
             <View className="w-24">
               <AnimatedButton title="Cancel" onPress={cancelEdit} variant="outline" size="sm" />
@@ -795,7 +795,7 @@ export default function HelpCenterManager() {
       </View>
 
       {/* FAQs List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : faqs.length === 0 ? (
@@ -806,22 +806,22 @@ export default function HelpCenterManager() {
           faqs.map((faq, index) => (
             <View 
               key={faq.id} 
-              className={`flex-col md:flex-row justify-between items-start p-4 gap-4 ${index !== faqs.length - 1 ? 'border-b border-slate-100' : ''}`}
+              className={`flex-col md:flex-row justify-between items-start p-4 gap-4 ${index !== faqs.length - 1 ? 'border-b border-inkline' : ''}`}
             >
               <View className="flex-1 pr-4">
                 <View className="flex-row items-center gap-2 mb-1">
-                  <Text className="text-xs font-bold text-brand uppercase tracking-wider">{faq.section_name}</Text>
-                  {faq.video_url && <Text className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">Has Video</Text>}
+                  <Text className="text-xs font-bold text-pitch uppercase tracking-wider">{faq.section_name}</Text>
+                  {faq.video_url && <Text className="text-xs bg-navy/10 text-navy px-2 py-0.5 rounded-full font-bold">Has Video</Text>}
                 </View>
                 <Text className="font-bold text-text-primary text-base mb-1">{faq.question}</Text>
                 <Text className="text-sm text-slate-500" numberOfLines={2}>{faq.answer}</Text>
               </View>
               
               <View className="flex-row gap-3 mt-2 md:mt-0">
-                <Pressable onPress={() => handleEdit(faq)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                <Pressable onPress={() => handleEdit(faq)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                   <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(faq.id)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                <Pressable onPress={() => handleDelete(faq.id)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                   <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                 </Pressable>
               </View>

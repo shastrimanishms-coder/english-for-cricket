@@ -14,7 +14,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedButton from '../../components/ui/AnimatedButton';
+import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import {
@@ -359,89 +359,77 @@ export default function StudentManagement() {
 
   if (loading || guardStatus !== 'authorized') {
     return (
-      <View className="flex-1 bg-surface-background justify-center items-center">
-        <ActivityIndicator size="large" color="#047857" />
+      <View className="flex-1 bg-canvas justify-center items-center">
+        <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-surface-background">
-      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
-        <View className="max-w-5xl w-full mx-auto flex-row justify-between items-center p-6">
-          <Text className="text-xl md:text-2xl font-bold text-text-primary">My Students</Text>
-          <View className="w-40 md:w-48">
-            <AnimatedButton 
-              title="Back to Dashboard" 
-              onPress={() => router.push('/manager')} 
-              variant="outline" 
-              size="sm" 
-            />
-          </View>
-        </View>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-canvas">
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader title="My Students" onBack={() => router.push('/manager')} />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="max-w-5xl w-full mx-auto space-y-8 gap-8">
           
           <View className="flex-row justify-between items-center flex-wrap gap-4">
-            <Text className="text-text-secondary text-lg">
+            <Text className="font-sans text-slate-500 text-lg">
               Manage student accounts. You can edit their profiles, view their PINs, or copy credentials below.
             </Text>
             {!showForm && (
               <View className="flex-row gap-3">
                 {students.length > 0 && (
-                  <View className="w-36 md:w-40">
-                    <AnimatedButton
-                      title="🖨 Print Slips"
-                      onPress={() => setShowSlips(true)}
-                      variant="outline"
-                    />
-                  </View>
+                  <Pressable
+                    onPress={() => setShowSlips(true)}
+                    className="items-center justify-center rounded-full border border-inkline bg-white px-5 py-3 active:opacity-90"
+                  >
+                    <Text className="font-sans text-sm font-semibold text-slate-600">🖨 Print Slips</Text>
+                  </Pressable>
                 )}
-                <View className="w-full md:w-48">
-                  <AnimatedButton
-                    title="+ Add New Student"
-                    onPress={openAddForm}
-                    variant="primary"
-                  />
-                </View>
+                <Pressable
+                  onPress={openAddForm}
+                  className="items-center justify-center rounded-full border-b-4 border-gold-dark bg-gold px-5 py-3 active:opacity-90"
+                >
+                  <Text className="font-sans text-sm font-bold text-navy">+ Add New Student</Text>
+                </Pressable>
               </View>
             )}
           </View>
 
           {/* Form for Add/Edit */}
           {showForm && (
-            <View className="bg-brand/5 p-6 rounded-2xl border border-brand/20 space-y-4 gap-4">
-              <Text className="text-lg font-bold text-brand">
+            <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-4 gap-4">
+              <Text className="font-display text-lg font-semibold text-navy">
                 {editId ? 'Edit Student Account' : 'Create New Student Account'}
               </Text>
-              
+
               <View className="flex-col md:flex-row gap-4">
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-text-secondary mb-2">Display Name</Text>
+                  <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Display Name</Text>
                   <TextInput
-                    className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary"
+                    className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy"
                     placeholder="Student's First Name"
                     value={newName}
                     onChangeText={setNewName}
                   />
                 </View>
                 <View className="w-full md:w-40">
-                  <Text className="text-sm font-semibold text-text-secondary mb-2">Date of Birth</Text>
+                  <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Date of Birth</Text>
                   <TextInput
-                    className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary"
+                    className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy"
                     placeholder="YYYY-MM-DD"
                     value={newDob}
-                    onChangeText={handleDobFormat} 
-                    keyboardType="number-pad" 
-                    maxLength={10} 
+                    onChangeText={handleDobFormat}
+                    keyboardType="number-pad"
+                    maxLength={10}
                   />
                 </View>
                 <View className="w-full md:w-32">
-                  <Text className="text-sm font-semibold text-text-secondary mb-2">4-Digit PIN</Text>
+                  <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">4-Digit PIN</Text>
                   <TextInput
-                    className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary font-mono tracking-widest"
+                    className="w-full bg-canvas p-4 rounded-xl border border-inkline text-navy font-mono tracking-widest"
                     value={customPin}
                     onChangeText={setCustomPin}
                     keyboardType="number-pad"
@@ -451,15 +439,15 @@ export default function StudentManagement() {
               </View>
 
               <View>
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Gender (For Avatars & Voice AI)</Text>
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Gender (For Avatars & Voice AI)</Text>
                 <View className="flex-row gap-2">
                   {['Male', 'Female', 'Other'].map((g) => (
                     <Pressable
                       key={g}
                       onPress={() => setNewGender(g as any)}
-                      className={`flex-1 py-3 rounded-xl border items-center ${newGender === g ? 'border-brand bg-brand' : 'border-slate-200 bg-white'}`}
+                      className={`flex-1 py-3 rounded-xl border items-center ${newGender === g ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                     >
-                      <Text className={`font-semibold ${newGender === g ? 'text-white' : 'text-text-secondary'}`}>
+                      <Text className={`font-sans font-semibold ${newGender === g ? 'text-white' : 'text-slate-500'}`}>
                         {g === 'Male' ? '👦' : g === 'Female' ? '👧' : '🏏'} {g}
                       </Text>
                     </Pressable>
@@ -468,23 +456,23 @@ export default function StudentManagement() {
               </View>
 
               <View>
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Class / Group / Team (optional)</Text>
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Class / Group / Team (optional)</Text>
                 <TextInput
-                  className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary"
+                  className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy"
                   placeholder="e.g. Class 3-A, U12 Team, Saturday Group…"
                   value={newClassName}
                   onChangeText={setNewClassName}
                 />
                 {distinctClassNames(students).length > 0 && (
                   <View className="flex-row flex-wrap gap-2 mt-2">
-                    <Text className="text-xs text-text-secondary py-1.5">Tap to reuse:</Text>
+                    <Text className="font-sans text-xs text-slate-500 py-1.5">Tap to reuse:</Text>
                     {distinctClassNames(students).map((name) => (
                       <Pressable
                         key={name}
                         onPress={() => setNewClassName(name)}
-                        className={`px-3 py-1.5 rounded-full border ${newClassName === name ? 'bg-brand border-brand' : 'bg-white border-slate-200'}`}
+                        className={`px-3 py-1.5 rounded-full border ${newClassName === name ? 'bg-navy border-navy' : 'bg-white border-inkline'}`}
                       >
-                        <Text className={`text-xs font-semibold ${newClassName === name ? 'text-white' : 'text-text-secondary'}`}>{name}</Text>
+                        <Text className={`font-sans text-xs font-semibold ${newClassName === name ? 'text-white' : 'text-slate-500'}`}>{name}</Text>
                       </Pressable>
                     ))}
                   </View>
@@ -492,37 +480,38 @@ export default function StudentManagement() {
               </View>
 
               <View>
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Study Days (optional)</Text>
-                <Text className="text-xs text-text-secondary mb-2">
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Study Days (optional)</Text>
+                <Text className="font-sans text-xs text-slate-500 mb-2">
                   The days this student plans to study. Only these days count for their streak — or let the student choose in their own profile.
                 </Text>
                 <StudyDaysPicker value={newStudyDays} onChange={setNewStudyDays} />
               </View>
 
-              <View className="flex-row justify-end gap-4 mt-4">
-                <View className="w-32">
-                  <AnimatedButton title="Cancel" onPress={closeForm} variant="outline" size="sm" />
-                </View>
-                <View className="w-40">
-                  <AnimatedButton 
-                    title={saving ? "Saving..." : "Save Account"} 
-                    onPress={handleSaveStudent} 
-                    disabled={saving} 
-                    variant="primary" 
-                    size="sm" 
-                  />
-                </View>
+              <View className="flex-row justify-end gap-3 mt-4">
+                <Pressable
+                  onPress={closeForm}
+                  className="items-center justify-center rounded-full border border-inkline bg-white px-6 py-3 active:opacity-90"
+                >
+                  <Text className="font-sans text-sm font-semibold text-slate-600">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleSaveStudent}
+                  disabled={saving}
+                  className={`items-center justify-center rounded-full border-b-4 border-gold-dark bg-gold px-6 py-3 ${saving ? 'opacity-50' : 'active:opacity-90'}`}
+                >
+                  <Text className="font-sans text-sm font-bold text-navy">{saving ? "Saving..." : "Save Account"}</Text>
+                </Pressable>
               </View>
             </View>
           )}
 
           {/* Students List */}
-          <View className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <View className="bg-white rounded-[20px] shadow-sm border border-inkline overflow-hidden">
             {students.length === 0 ? (
               <View className="p-12 items-center justify-center">
                 <Text className="text-6xl mb-4">🎒</Text>
-                <Text className="text-lg font-bold text-text-primary mb-2">No Students Yet</Text>
-                <Text className="text-text-secondary text-center">
+                <Text className="font-display text-lg font-semibold text-navy mb-2">No Students Yet</Text>
+                <Text className="font-sans text-slate-500 text-center">
                   Click the &quot;Add New Student&quot; button above to generate your first sub-account.
                 </Text>
               </View>
@@ -535,31 +524,31 @@ export default function StudentManagement() {
                       {/* Class / group / team header - tap to collapse */}
                       <Pressable
                         onPress={() => toggleGroup(group.label)}
-                        className="flex-row items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100"
+                        className="flex-row items-center justify-between px-4 py-3 bg-canvas border-b border-inkline"
                       >
-                        <Text className="font-bold text-[#0A192F] text-sm">
+                        <Text className="font-sans font-bold text-navy text-sm">
                           {groupOpen ? '▾' : '▸'} 📚 {group.label}
                         </Text>
-                        <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <MicroLabel>
                           {group.students.length} {group.students.length === 1 ? 'student' : 'students'}
-                        </Text>
+                        </MicroLabel>
                       </Pressable>
 
                       {groupOpen && group.students.map((student) => {
                         const rowOpen = !!expandedStudents[student.id];
                         return (
-                          <View key={student.id} className="border-b border-slate-50">
+                          <View key={student.id} className="border-b border-inkline">
                             {/* Collapsed row: name + ID only */}
                             <Pressable
                               onPress={() => toggleStudentExpanded(student.id)}
-                              className="flex-row items-center gap-3 px-4 py-3 hover:bg-slate-50"
+                              className="flex-row items-center gap-3 px-4 py-3 hover:bg-canvas"
                             >
-                              <View className="w-10 h-10 bg-slate-100 rounded-full items-center justify-center border border-slate-200">
+                              <View className="w-10 h-10 bg-gold-light rounded-full items-center justify-center border border-gold/40">
                                 <Text className="text-xl">{getMascot(student.gender, student.avatar_url)}</Text>
                               </View>
                               <View className="flex-1">
-                                <Text className="font-bold text-text-primary text-base">{student.display_name}</Text>
-                                <Text className="text-text-secondary text-xs font-mono">{student.username}</Text>
+                                <Text className="font-sans font-bold text-navy text-base">{student.display_name}</Text>
+                                <Text className="text-slate-400 text-xs font-mono">{student.username}</Text>
                               </View>
                               <Text className="text-slate-400 text-sm">{rowOpen ? '▾' : '▸'}</Text>
                             </Pressable>
@@ -567,28 +556,28 @@ export default function StudentManagement() {
                             {/* Expanded detail: age/gender, credentials, actions */}
                             {rowOpen && (
                               <View className="flex-col md:flex-row px-4 pb-4 md:items-center justify-between gap-4">
-                                <Text className="text-text-secondary text-xs min-w-[200px]">
+                                <Text className="font-sans text-slate-500 text-xs min-w-[200px]">
                                   {calculateAge(student.date_of_birth)} yrs • {student.gender}
                                 </Text>
 
                                 {/* Credentials */}
                                 <View className="flex-row items-center flex-wrap gap-2">
-                                  <View className="bg-slate-100 px-3 py-1 rounded-md">
+                                  <View className="bg-canvas border border-inkline px-3 py-1 rounded-full">
                                     <Text className="font-mono text-xs text-slate-600">User: {student.username}</Text>
                                   </View>
                                   <Pressable
                                     onPress={() => togglePinReveal(student.id)}
-                                    className="bg-green-100 px-3 py-1 rounded-md"
+                                    className="bg-pitch-light border border-pitch/30 px-3 py-1 rounded-full"
                                   >
-                                    <Text className="font-mono text-xs text-green-800 font-bold">
+                                    <Text className="font-mono text-xs text-pitch-dark font-bold">
                                       PIN: {revealedPins[student.id] ? student.hashed_pin : '••••'} {revealedPins[student.id] ? '🙈' : '👁'}
                                     </Text>
                                   </Pressable>
                                   <Pressable
                                     onPress={() => copyCredentials(student.username, student.hashed_pin)}
-                                    className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-md"
+                                    className="px-3 py-1 bg-navy border border-navy rounded-full"
                                   >
-                                    <Text className="text-blue-600 font-bold text-xs">Copy Login</Text>
+                                    <Text className="font-sans text-white font-bold text-xs">Copy Login</Text>
                                   </Pressable>
                                 </View>
 
@@ -596,21 +585,21 @@ export default function StudentManagement() {
                                 <View className="flex-row gap-3">
                                   <Pressable
                                     onPress={() => openEditForm(student)}
-                                    className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200"
+                                    className="px-4 py-2 bg-white rounded-full border border-inkline"
                                   >
-                                    <Text className="text-text-secondary font-semibold text-sm">Edit</Text>
+                                    <Text className="font-sans text-slate-600 font-semibold text-sm">Edit</Text>
                                   </Pressable>
                                   <Pressable
                                     onPress={() => resetPlacement(student.id, student.display_name)}
-                                    className="px-4 py-2 bg-amber-50 rounded-lg border border-amber-100"
+                                    className="px-4 py-2 bg-gold-light/60 rounded-full border border-gold/40"
                                   >
-                                    <Text className="text-amber-700 font-semibold text-sm">Reset Placement</Text>
+                                    <Text className="font-sans text-gold-dark font-semibold text-sm">Reset Placement</Text>
                                   </Pressable>
                                   <Pressable
                                     onPress={() => handleDelete(student.id, student.display_name)}
-                                    className="px-4 py-2 bg-red-50 rounded-lg border border-red-100"
+                                    className="px-4 py-2 bg-red-50 rounded-full border border-red-200"
                                   >
-                                    <Text className="text-red-600 font-semibold text-sm">Delete</Text>
+                                    <Text className="font-sans text-red-600 font-semibold text-sm">Delete</Text>
                                   </Pressable>
                                 </View>
                               </View>
@@ -634,23 +623,23 @@ export default function StudentManagement() {
           slips reach the paper. On native this is a preview only. */}
       <Modal visible={showSlips} animationType="slide" onRequestClose={() => setShowSlips(false)}>
         <SafeAreaView className="flex-1 bg-white">
-          <View className="flex-row justify-between items-center p-4 border-b border-slate-200">
-            <Text className="text-lg font-bold text-text-primary">Login Slips ({students.length})</Text>
+          <View className="flex-row justify-between items-center p-4 border-b border-inkline">
+            <Text className="font-display text-lg font-semibold text-navy">Login Slips ({students.length})</Text>
             <View className="flex-row gap-3">
               {Platform.OS === 'web' && (
-                <Pressable onPress={() => window.print()} className="px-4 py-2 bg-brand rounded-lg">
-                  <Text className="text-white font-bold text-sm">Print</Text>
+                <Pressable onPress={() => window.print()} className="px-5 py-2.5 bg-gold border-b-4 border-gold-dark rounded-full active:opacity-90">
+                  <Text className="font-sans text-navy font-bold text-sm">Print</Text>
                 </Pressable>
               )}
-              <Pressable onPress={() => setShowSlips(false)} className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200">
-                <Text className="text-text-secondary font-bold text-sm">Close</Text>
+              <Pressable onPress={() => setShowSlips(false)} className="px-5 py-2.5 bg-white rounded-full border border-inkline active:opacity-90">
+                <Text className="font-sans text-slate-600 font-bold text-sm">Close</Text>
               </Pressable>
             </View>
           </View>
 
           {Platform.OS !== 'web' && (
-            <View className="mx-4 mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <Text className="text-amber-800 text-sm">
+            <View className="mx-4 mt-4 bg-gold-light/50 border border-gold/40 rounded-xl p-3">
+              <Text className="font-sans text-gold-dark text-sm">
                 Printing works from the web version — open this page in a browser to print the slips. You can still read every login below.
               </Text>
             </View>

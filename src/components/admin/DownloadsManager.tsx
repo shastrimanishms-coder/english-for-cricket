@@ -233,12 +233,12 @@ export default function DownloadsManager() {
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Downloads & Workbooks CMS</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Downloads & Workbooks CMS</Text>
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">
           {editId ? 'Edit Document' : 'Upload New Document'}
         </Text>
         
@@ -246,7 +246,7 @@ export default function DownloadsManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Title</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="e.g., Level 1 Workbook PDF"
               value={title}
               onChangeText={setTitle}
@@ -262,7 +262,7 @@ export default function DownloadsManager() {
                   <Pressable
                     key={cat.id}
                     onPress={() => setCategoryId(cat.id)}
-                    className={`mr-2 px-4 py-3 rounded-xl border ${categoryId === cat.id ? 'border-brand bg-brand' : 'border-slate-200 bg-slate-50'}`}
+                    className={`mr-2 px-4 py-3 rounded-full border ${categoryId === cat.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                   >
                     <Text className={`font-semibold text-sm ${categoryId === cat.id ? 'text-white' : 'text-slate-600'}`}>
                       {cat.name}
@@ -275,7 +275,7 @@ export default function DownloadsManager() {
         </View>
 
         {taggingAvailable ? (
-          <View className="border-t border-slate-100 pt-4">
+          <View className="border-t border-inkline pt-4">
             <BelongsToPicker value={lessonId} onChange={setLessonId} />
           </View>
         ) : null}
@@ -283,7 +283,7 @@ export default function DownloadsManager() {
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Description</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
             placeholder="Briefly describe this resource..."
             value={description}
             onChangeText={setDescription}
@@ -295,13 +295,13 @@ export default function DownloadsManager() {
           <View className="flex-row items-center gap-4">
             <Pressable 
               onPress={pickDocument}
-              className="px-4 py-3 bg-[#0A192F] rounded-lg"
+              className="px-4 py-3 bg-navy rounded-full"
             >
               <Text className="text-white font-bold text-sm">Choose File</Text>
             </Pressable>
             <View className="flex-1">
               {selectedFile ? (
-                <Text className="text-brand font-semibold" numberOfLines={1}>Selected: {selectedFile.name}</Text>
+                <Text className="text-pitch font-semibold" numberOfLines={1}>Selected: {selectedFile.name}</Text>
               ) : fileUrl ? (
                 <Text className="text-slate-600" numberOfLines={1}>Current File Linked.</Text>
               ) : (
@@ -311,7 +311,7 @@ export default function DownloadsManager() {
           </View>
         </View>
 
-        <View className="flex-row justify-end gap-4 mt-2 border-t border-slate-100 pt-4">
+        <View className="flex-row justify-end gap-4 mt-2 border-t border-inkline pt-4">
           {editId && (
             <View className="w-24">
               <AnimatedButton title="Cancel" onPress={cancelEdit} variant="outline" size="sm" />
@@ -330,7 +330,7 @@ export default function DownloadsManager() {
       </View>
 
       {/* List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : downloads.length === 0 ? (
@@ -343,24 +343,24 @@ export default function DownloadsManager() {
             return (
               <View 
                 key={dl.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== downloads.length - 1 ? 'border-b border-slate-100' : ''}`}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== downloads.length - 1 ? 'border-b border-inkline' : ''}`}
               >
                 <View className="flex-1">
                   <Text className="font-bold text-text-primary text-base">{dl.title}</Text>
-                  <Text className="text-brand text-xs font-bold uppercase tracking-wider mt-1">{catName}</Text>
+                  <Text className="text-pitch text-xs font-bold uppercase tracking-wider mt-1">{catName}</Text>
                   {dl.description ? <Text className="text-sm text-slate-500 mt-1">{dl.description}</Text> : null}
                 </View>
                 
                 <View className="flex-row gap-3">
                   <Pressable onPress={() => {
                     if (Platform.OS === 'web') window.open(dl.file_url, '_blank');
-                  }} className="px-3 py-1.5 bg-blue-50 rounded border border-blue-100">
-                    <Text className="text-blue-600 text-sm font-semibold">View File</Text>
+                  }} className="px-3 py-1.5 bg-canvas rounded-full border border-inkline">
+                    <Text className="text-navy text-sm font-semibold">View File</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleEdit(dl)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                  <Pressable onPress={() => handleEdit(dl)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                     <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleDelete(dl.id, dl.title, dl.file_url)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                  <Pressable onPress={() => handleDelete(dl.id, dl.title, dl.file_url)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                     <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                   </Pressable>
                 </View>

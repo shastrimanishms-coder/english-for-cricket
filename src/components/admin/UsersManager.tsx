@@ -422,23 +422,23 @@ export default function UsersManager() {
       <>
         <View className="items-end">
           <Text className="text-xs font-bold text-slate-400 uppercase">Top Activity</Text>
-          <Text className="text-sm font-bold text-brand">{stats ? topActivityLabel(stats) : 'None yet'}</Text>
+          <Text className="text-sm font-bold text-pitch">{stats ? topActivityLabel(stats) : 'None yet'}</Text>
         </View>
         <View className="items-end w-24">
           <Text className="text-xs font-bold text-slate-400 uppercase">Total Time</Text>
-          <Text className="text-sm font-bold text-[#0A192F]">{stats ? formatDuration(stats.total_seconds) : '0 mins'}</Text>
+          <Text className="text-sm font-bold text-navy">{stats ? formatDuration(stats.total_seconds) : '0 mins'}</Text>
         </View>
         <View className="items-end w-20">
           <Text className="text-xs font-bold text-slate-400 uppercase">Lessons</Text>
-          <Text className="text-sm font-bold text-[#0A192F]">{stats ? stats.lessons_completed : 0}</Text>
+          <Text className="text-sm font-bold text-navy">{stats ? stats.lessons_completed : 0}</Text>
         </View>
         <View className="items-end w-20">
           <Text className="text-xs font-bold text-slate-400 uppercase">Accuracy</Text>
-          <Text className="text-sm font-bold text-[#0A192F]">{stats?.avg_accuracy !== null && stats?.avg_accuracy !== undefined ? `${stats.avg_accuracy}%` : '—'}</Text>
+          <Text className="text-sm font-bold text-navy">{stats?.avg_accuracy !== null && stats?.avg_accuracy !== undefined ? `${stats.avg_accuracy}%` : '—'}</Text>
         </View>
         <View className="items-end w-24">
           <Text className="text-xs font-bold text-slate-400 uppercase">Last Active</Text>
-          <Text className="text-sm font-bold text-[#0A192F]">{formatLastActive(stats?.last_active_at)}</Text>
+          <Text className="text-sm font-bold text-navy">{formatLastActive(stats?.last_active_at)}</Text>
         </View>
       </>
     );
@@ -536,12 +536,12 @@ export default function UsersManager() {
     const rowOpen = searching || !!expandedStudents[student.id];
 
     return (
-      <View key={student.id} className={`border p-3 rounded-xl ml-2 ${isMarked ? 'bg-red-50 border-red-200' : student.is_archived ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
+      <View key={student.id} className={`border p-3 rounded-2xl ml-2 ${isMarked ? 'bg-red-50 border-red-200' : student.is_archived ? 'bg-slate-100 border-inkline' : 'bg-canvas border-inkline'}`}>
         <Pressable onPress={() => toggleStudent(student.id)} className="flex-row items-center justify-between flex-wrap gap-3">
           <View className="flex-row items-center gap-4 flex-1">
             <Text className="text-slate-400 font-mono">└──</Text>
             <View className="flex-1">
-              <Text className="font-bold text-[#0A192F] text-base">{student.display_name || student.username}</Text>
+              <Text className="font-bold text-navy text-base">{student.display_name || student.username}</Text>
               <Text className="text-xs text-slate-400 font-mono">{student.username}{orgName ? ` • ${orgName}` : ''}{managerProfile?.country ? ` • 📍 ${managerProfile.region ? managerProfile.region + ', ' : ''}${managerProfile.country}` : ''}</Text>
               {isMarked && <Text className="text-[10px] font-bold text-red-600 uppercase mt-0.5">Marked for Deletion</Text>}
               {student.is_archived && <Text className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">Archived</Text>}
@@ -549,7 +549,7 @@ export default function UsersManager() {
           </View>
           <View className="flex-row items-center gap-2">
             {daysInactive < 7 ? (
-              <Text className="text-xs font-bold text-emerald-600">Active</Text>
+              <Text className="text-xs font-bold text-pitch">Active</Text>
             ) : (
               <Text className={`text-xs font-bold ${isMarked ? 'text-red-600' : 'text-amber-600'}`}>{daysInactive}d ago</Text>
             )}
@@ -564,7 +564,7 @@ export default function UsersManager() {
               <View className="items-end w-20">
                 <Text className="text-xs font-bold text-slate-400 uppercase">Status</Text>
                 {daysInactive < 7 ? (
-                  <Text className="text-sm font-bold text-emerald-600">Active</Text>
+                  <Text className="text-sm font-bold text-pitch">Active</Text>
                 ) : (
                   <Text className={`text-sm font-bold ${isMarked ? 'text-red-600' : 'text-amber-600'}`}>{daysInactive}d ago</Text>
                 )}
@@ -572,10 +572,10 @@ export default function UsersManager() {
             </View>
 
             <View className="flex-row justify-end gap-3 mt-3">
-              <Pressable onPress={() => toggleSubArchive(student)} className="px-3 py-1.5 bg-white rounded-lg border border-slate-200">
+              <Pressable onPress={() => toggleSubArchive(student)} className="px-3 py-1.5 bg-white rounded-full border border-inkline">
                 <Text className="text-text-secondary font-semibold text-xs">{student.is_archived ? 'Unarchive' : 'Archive'}</Text>
               </Pressable>
-              <Pressable onPress={() => deleteSubAccountNow(student)} className="px-3 py-1.5 bg-red-50 rounded-lg border border-red-100">
+              <Pressable onPress={() => deleteSubAccountNow(student)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                 <Text className="text-red-600 font-semibold text-xs">Delete Now</Text>
               </Pressable>
             </View>
@@ -626,13 +626,13 @@ export default function UsersManager() {
     const isEditing = editingId === profile.id;
 
     return (
-      <View key={profile.id} className={profile.is_archived ? 'bg-slate-50' : 'bg-white'}>
+      <View key={profile.id} className={profile.is_archived ? 'bg-canvas' : 'bg-white'}>
         <View className="flex-col md:flex-row justify-between items-start mb-4 gap-4 md:gap-0">
           <View className="flex-1">
             <View className="flex-row items-center gap-3 mb-2 flex-wrap">
-              <Text className="font-bold text-lg text-[#0A192F]">{profile.display_name || 'Unnamed User'}</Text>
-              <View className={`px-2.5 py-1 rounded-md ${isSuperAdmin ? 'bg-[#D4AF37]/20' : 'bg-slate-200'}`}>
-                <Text className={`text-xs font-bold uppercase ${isSuperAdmin ? 'text-[#D4AF37]' : 'text-slate-600'}`}>
+              <Text className="font-display font-semibold text-lg text-navy">{profile.display_name || 'Unnamed User'}</Text>
+              <View className={`px-2.5 py-1 rounded-md ${isSuperAdmin ? 'bg-gold/20' : 'bg-slate-200'}`}>
+                <Text className={`text-xs font-bold uppercase ${isSuperAdmin ? 'text-gold-dark' : 'text-slate-600'}`}>
                   {profile.role.replace('_', ' ')}
                 </Text>
               </View>
@@ -661,13 +661,13 @@ export default function UsersManager() {
 
           {!isEditing && (
             <View className="flex-row gap-3">
-              <Pressable onPress={() => openEdit(profile)} className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200">
+              <Pressable onPress={() => openEdit(profile)} className="px-4 py-2 bg-slate-100 rounded-full border border-inkline">
                 <Text className="text-text-secondary font-semibold text-sm">Edit</Text>
               </Pressable>
               <Pressable
                 onPress={() => deleteMasterAccount(profile)}
                 disabled={processing}
-                className="px-4 py-2 bg-red-50 rounded-lg border border-red-100"
+                className="px-4 py-2 bg-red-50 rounded-full border border-red-100"
               >
                 <Text className="text-red-600 font-semibold text-sm">Delete Account</Text>
               </Pressable>
@@ -677,11 +677,11 @@ export default function UsersManager() {
 
         {/* Edit form for the master account */}
         {isEditing && (
-          <View className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 space-y-4 gap-4">
+          <View className="bg-canvas border border-inkline rounded-2xl p-4 mb-4 space-y-4 gap-4">
             <View>
               <Text className="text-sm font-semibold text-text-secondary mb-2">Display Name</Text>
               <TextInput
-                className="w-full bg-white p-3 rounded-xl border border-slate-200 text-text-primary"
+                className="w-full bg-white p-3 rounded-xl border border-inkline text-text-primary"
                 value={editDisplayName}
                 onChangeText={setEditDisplayName}
                 placeholder="Full name"
@@ -694,7 +694,7 @@ export default function UsersManager() {
                   <Pressable
                     key={r}
                     onPress={() => setEditRole(r)}
-                    className={`px-3 py-2 rounded-xl border ${editRole === r ? 'border-brand bg-brand' : 'border-slate-200 bg-white'}`}
+                    className={`px-3 py-2 rounded-full border ${editRole === r ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                   >
                     <Text className={`font-semibold text-sm ${editRole === r ? 'text-white' : 'text-text-secondary'}`}>
                       {r.replace('_', ' ')}
@@ -707,7 +707,7 @@ export default function UsersManager() {
               <View className="flex-1">
                 <Text className="text-sm font-semibold text-text-secondary mb-2">Country</Text>
                 <TextInput
-                  className="w-full bg-white p-3 rounded-xl border border-slate-200 text-text-primary"
+                  className="w-full bg-white p-3 rounded-xl border border-inkline text-text-primary"
                   value={editCountry}
                   onChangeText={setEditCountry}
                   placeholder="e.g., Japan"
@@ -716,7 +716,7 @@ export default function UsersManager() {
               <View className="flex-1">
                 <Text className="text-sm font-semibold text-text-secondary mb-2">Region</Text>
                 <TextInput
-                  className="w-full bg-white p-3 rounded-xl border border-slate-200 text-text-primary"
+                  className="w-full bg-white p-3 rounded-xl border border-inkline text-text-primary"
                   value={editRegion}
                   onChangeText={setEditRegion}
                   placeholder="e.g., Osaka"
@@ -724,13 +724,13 @@ export default function UsersManager() {
               </View>
             </View>
             <View className="flex-row justify-end gap-3">
-              <Pressable onPress={cancelEdit} className="px-4 py-2 bg-white rounded-lg border border-slate-200">
+              <Pressable onPress={cancelEdit} className="px-4 py-2 bg-white rounded-full border border-inkline">
                 <Text className="text-text-secondary font-semibold text-sm">Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={saveEdit}
                 disabled={savingEdit}
-                className="px-4 py-2 bg-brand rounded-lg"
+                className="px-4 py-2 bg-navy rounded-full border-b-4 border-navy-deep"
               >
                 <Text className="text-white font-semibold text-sm">{savingEdit ? 'Saving...' : 'Save Changes'}</Text>
               </Pressable>
@@ -744,32 +744,32 @@ export default function UsersManager() {
   return (
     <View className="space-y-6 pb-12">
       <View className="flex-row justify-between items-center mb-2">
-        <Text className="text-2xl font-bold text-text-primary">Users & Analytics Tree</Text>
-        <Pressable onPress={fetchData} className="px-4 py-2 bg-slate-200 rounded-lg">
+        <Text className="font-display text-3xl font-semibold text-navy">Users & Analytics Tree</Text>
+        <Pressable onPress={fetchData} className="px-4 py-2 bg-slate-100 rounded-full border border-inkline">
           <Text className="font-bold text-slate-700">↻ Refresh</Text>
         </Pressable>
       </View>
 
       {/* SUMMARY NUMBERS */}
       <View className="flex-row flex-wrap gap-4">
-        <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+        <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[200px]">
           <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Schools / Orgs Registered</Text>
-          <Text className="text-3xl font-bold text-[#0A192F]">{loading ? '—' : organizations.length}</Text>
+          <Text className="font-display text-3xl font-semibold text-navy">{loading ? '—' : organizations.length}</Text>
         </View>
-        <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+        <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[200px]">
           <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Individual Users Registered</Text>
-          <Text className="text-3xl font-bold text-[#0A192F]">{loading ? '—' : managers.length}</Text>
+          <Text className="font-display text-3xl font-semibold text-navy">{loading ? '—' : managers.length}</Text>
         </View>
-        <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+        <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[200px]">
           <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Students</Text>
-          <Text className="text-3xl font-bold text-[#0A192F]">{loading ? '—' : students.length}</Text>
+          <Text className="font-display text-3xl font-semibold text-navy">{loading ? '—' : students.length}</Text>
         </View>
       </View>
 
       {/* SEARCH */}
       <View className="flex-row items-center gap-3">
         <TextInput
-          className="flex-1 bg-white p-3 rounded-xl border border-slate-200 text-text-primary"
+          className="flex-1 bg-white p-3 rounded-xl border border-inkline text-text-primary"
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder="Search schools/orgs, manager or user names, emails, student names, usernames, or IDs…"
@@ -777,7 +777,7 @@ export default function UsersManager() {
           autoCorrect={false}
         />
         {searching && (
-          <Pressable onPress={() => setSearchQuery('')} className="px-4 py-3 bg-slate-200 rounded-xl">
+          <Pressable onPress={() => setSearchQuery('')} className="px-4 py-3 bg-slate-100 rounded-full border border-inkline">
             <Text className="font-bold text-slate-700">✕ Clear</Text>
           </Pressable>
         )}
@@ -792,25 +792,25 @@ export default function UsersManager() {
       )}
 
       {/* RETENTION ENGINE COCKPIT */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-2">
-        <View className="bg-brand p-4">
-          <Text className="text-white font-bold text-lg">Automated Retention Engine</Text>
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden mb-2">
+        <View className="bg-navy p-4">
+          <Text className="font-display text-white font-semibold text-lg">Automated Retention Engine</Text>
           <Text className="text-white/80 text-xs mt-1">Review and process inactive accounts safely.</Text>
         </View>
         <View className="p-6 space-y-4">
 
           {/* Action Row 1: Reminders */}
-          <View className="flex-row items-center justify-between bg-blue-50 border border-blue-200 p-4 rounded-xl">
+          <View className="flex-row items-center justify-between bg-navy/5 border border-inkline p-4 rounded-2xl">
             <View>
-              <Text className="font-bold text-blue-900 text-base">Send Reminder Emails</Text>
-              <Text className="text-sm text-blue-700 mt-1">7, 14, 21, and 28-day notices.</Text>
+              <Text className="font-sans font-bold text-navy text-base">Send Reminder Emails</Text>
+              <Text className="text-sm text-slate-500 mt-1">7, 14, 21, and 28-day notices.</Text>
             </View>
             <View className="flex-row items-center gap-4">
-              <Text className="font-bold text-2xl text-blue-900">{pendingReminders.length}</Text>
+              <Text className="font-display font-semibold text-2xl text-navy">{pendingReminders.length}</Text>
               <Pressable
                 onPress={processReminders}
                 disabled={processing || pendingReminders.length === 0}
-                className={`px-4 py-2 rounded-lg ${pendingReminders.length > 0 ? 'bg-blue-600' : 'bg-slate-300'}`}
+                className={`px-4 py-2 rounded-full ${pendingReminders.length > 0 ? 'bg-navy' : 'bg-slate-300'}`}
               >
                 <Text className="text-white font-bold">Process</Text>
               </Pressable>
@@ -824,11 +824,11 @@ export default function UsersManager() {
               <Text className="text-sm text-amber-700 mt-1">Flags accounts inactive for 30+ days.</Text>
             </View>
             <View className="flex-row items-center gap-4">
-              <Text className="font-bold text-2xl text-amber-900">{pendingDeletions.length}</Text>
+              <Text className="font-display font-semibold text-2xl text-amber-900">{pendingDeletions.length}</Text>
               <Pressable
                 onPress={processDeletionMarks}
                 disabled={processing || pendingDeletions.length === 0}
-                className={`px-4 py-2 rounded-lg ${pendingDeletions.length > 0 ? 'bg-amber-600' : 'bg-slate-300'}`}
+                className={`px-4 py-2 rounded-full ${pendingDeletions.length > 0 ? 'bg-amber-600' : 'bg-slate-300'}`}
               >
                 <Text className="text-white font-bold">Process</Text>
               </Pressable>
@@ -842,11 +842,11 @@ export default function UsersManager() {
               <Text className="text-sm text-red-700 mt-1">Deletes accounts flagged 90+ days ago.</Text>
             </View>
             <View className="flex-row items-center gap-4">
-              <Text className="font-bold text-2xl text-red-900">{pendingHardDeletes.length}</Text>
+              <Text className="font-display font-semibold text-2xl text-red-900">{pendingHardDeletes.length}</Text>
               <Pressable
                 onPress={processHardDeletes}
                 disabled={processing || pendingHardDeletes.length === 0}
-                className={`px-4 py-2 rounded-lg ${pendingHardDeletes.length > 0 ? 'bg-red-600' : 'bg-slate-300'}`}
+                className={`px-4 py-2 rounded-full ${pendingHardDeletes.length > 0 ? 'bg-red-600' : 'bg-slate-300'}`}
               >
                 <Text className="text-white font-bold">Execute</Text>
               </Pressable>
@@ -857,9 +857,9 @@ export default function UsersManager() {
       </View>
 
       {/* ORGANIZATIONAL TREE */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <View className="bg-[#0A192F] p-4 flex-row justify-between items-center">
-          <Text className="text-white font-bold">Organizational Tree & Telemetry</Text>
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
+        <View className="bg-navy p-4 flex-row justify-between items-center">
+          <Text className="font-display text-white font-semibold text-lg">Organizational Tree & Telemetry</Text>
           <Text className="text-slate-300 text-xs font-bold">
             {organizations.length} orgs • {managers.length} users • {students.length} students
           </Text>
@@ -881,14 +881,14 @@ export default function UsersManager() {
               const { org, manager, allStudents, studentsToShow } = branch;
               const isOpen = searching || !!expandedOrgs[org.id];
               return (
-                <View key={org.id} className="border-b border-slate-200">
+                <View key={org.id} className="border-b border-inkline">
                   <Pressable
                     onPress={() => toggleOrg(org.id)}
-                    className="flex-row items-center justify-between px-6 py-4 bg-slate-50 hover:bg-slate-100"
+                    className="flex-row items-center justify-between px-6 py-4 bg-canvas hover:bg-slate-100"
                   >
                     <View className="flex-row items-center gap-3 flex-1 flex-wrap">
                       <Text className="text-slate-500 text-sm">{isOpen ? '▼' : '▶'}</Text>
-                      <Text className="font-bold text-lg text-[#0A192F]">🏫 {org.name}</Text>
+                      <Text className="font-display font-semibold text-lg text-navy">🏫 {org.name}</Text>
                       {org.org_code ? (
                         <View className="px-2.5 py-1 rounded-md bg-slate-200">
                           <Text className="text-xs font-bold text-slate-600 font-mono">{org.org_code}</Text>
@@ -916,7 +916,7 @@ export default function UsersManager() {
                       )}
 
                       {/* Sub Accounts Analytics Tree */}
-                      <View className="ml-4 pl-4 border-l-2 border-slate-200 py-2">
+                      <View className="ml-4 pl-4 border-l-2 border-inkline py-2">
                         <Text className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">
                           {studentsToShow.length} Connected Sub-Accounts
                           {searching && studentsToShow.length !== allStudents.length ? ` (filtered from ${allStudents.length})` : ''}
@@ -940,11 +940,11 @@ export default function UsersManager() {
               <View>
                 <Pressable
                   onPress={() => setIndividualsExpanded(prev => !prev)}
-                  className="flex-row items-center justify-between px-6 py-4 bg-slate-50 hover:bg-slate-100"
+                  className="flex-row items-center justify-between px-6 py-4 bg-canvas hover:bg-slate-100"
                 >
                   <View className="flex-row items-center gap-3 flex-1 flex-wrap">
                     <Text className="text-slate-500 text-sm">{individualsOpen ? '▼' : '▶'}</Text>
-                    <Text className="font-bold text-lg text-[#0A192F]">👤 Individual Users</Text>
+                    <Text className="font-display font-semibold text-lg text-navy">👤 Individual Users</Text>
                     <Text className="text-xs text-slate-400">Admins, managers without a school/org, and standalone learners</Text>
                   </View>
                   <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -958,7 +958,7 @@ export default function UsersManager() {
                       <Text className="text-slate-400 text-sm italic py-4">No individual users — every account manages an organization.</Text>
                     ) : (
                       individualProfiles.map((profile, index) => (
-                        <View key={profile.id} className={`py-4 ${index !== individualProfiles.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                        <View key={profile.id} className={`py-4 ${index !== individualProfiles.length - 1 ? 'border-b border-inkline' : ''}`}>
                           {renderProfileBlock(profile)}
                         </View>
                       ))
@@ -978,7 +978,7 @@ export default function UsersManager() {
                 >
                   <View className="flex-row items-center gap-3 flex-1 flex-wrap">
                     <Text className="text-slate-500 text-sm">{unassignedOpen ? '▼' : '▶'}</Text>
-                    <Text className="font-bold text-lg text-[#0A192F]">⚠️ Unassigned Students</Text>
+                    <Text className="font-display font-semibold text-lg text-navy">⚠️ Unassigned Students</Text>
                     <Text className="text-xs text-slate-500">Their organization record is missing</Text>
                   </View>
                   <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">

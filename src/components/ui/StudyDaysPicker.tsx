@@ -52,17 +52,17 @@ export default function StudyDaysPicker({
               key={day}
               onPress={() => toggle(day)}
               className={`px-4 py-2.5 rounded-full border ${
-                selected ? 'bg-[#0A192F] border-[#0A192F]' : 'bg-white border-slate-300'
+                selected ? 'bg-navy border-navy' : 'bg-white border-inkline'
               }`}
             >
-              <Text className={`font-bold text-sm ${selected ? 'text-white' : 'text-slate-600'}`}>
+              <Text className={`font-sans font-bold text-sm ${selected ? 'text-white' : 'text-slate-600'}`}>
                 {label}
               </Text>
             </Pressable>
           );
         })}
       </View>
-      <Text className={`text-sm mt-3 ${value.length >= MIN_STUDY_DAYS ? 'text-emerald-600' : 'text-slate-500'}`}>
+      <Text className={`font-sans text-sm mt-3 ${value.length >= MIN_STUDY_DAYS ? 'text-pitch' : 'text-slate-500'}`}>
         {value.length >= MIN_STUDY_DAYS
           ? `✅ ${value.length} study days chosen. Only these days count for your streak — you can still practise on any other day too.`
           : `Choose at least ${MIN_STUDY_DAYS} days (${value.length} chosen so far).`}

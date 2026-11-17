@@ -268,7 +268,7 @@ export default function SlideBuilder() {
   const renderPanelEditor = (index: number, showCorrectRadio = false) => {
     const p = panels[index];
     return (
-      <View key={index} className={`flex-1 min-w-[250px] p-4 rounded-xl border ${p.isCorrect && showCorrectRadio ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+      <View key={index} className={`flex-1 min-w-[250px] p-4 rounded-xl border ${p.isCorrect && showCorrectRadio ? 'border-emerald-500 bg-emerald-50' : 'border-inkline bg-canvas'}`}>
         <View className="flex-row justify-between items-center mb-3">
           <Text className="font-bold text-slate-700">Panel {index + 1}</Text>
           {showCorrectRadio && (
@@ -277,14 +277,14 @@ export default function SlideBuilder() {
               newPanels.forEach(np => np.isCorrect = false);
               newPanels[index].isCorrect = true;
               setPanels(newPanels);
-            }} className={`px-3 py-1 rounded-full border ${p.isCorrect ? 'bg-emerald-500 border-emerald-600' : 'bg-white border-slate-300'}`}>
+            }} className={`px-3 py-1 rounded-full border ${p.isCorrect ? 'bg-pitch border-pitch-dark' : 'bg-white border-inkline'}`}>
               <Text className={p.isCorrect ? 'text-white text-xs font-bold' : 'text-slate-400 text-xs'}>Target Answer</Text>
             </Pressable>
           )}
         </View>
 
         <TextInput
-          className="w-full bg-white p-3 rounded-lg border border-slate-200 mb-3"
+          className="w-full bg-white p-3 rounded-xl border border-inkline mb-3"
           placeholder="Text (e.g., 'a boy')"
           value={p.text}
           onChangeText={(val) => updatePanel(index, 'text', val)}
@@ -300,8 +300,8 @@ export default function SlideBuilder() {
         </View>
         
         <View className="flex-row gap-2">
-          {(p.localImage || p.mediaUrl) ? <Text className="text-xs text-brand font-bold">✓ Img</Text> : null}
-          {(p.localAudio || p.audioUrl) ? <Text className="text-xs text-emerald-600 font-bold">✓ Aud</Text> : null}
+          {(p.localImage || p.mediaUrl) ? <Text className="text-xs text-pitch font-bold">✓ Img</Text> : null}
+          {(p.localAudio || p.audioUrl) ? <Text className="text-xs text-pitch font-bold">✓ Aud</Text> : null}
         </View>
       </View>
     );
@@ -310,51 +310,51 @@ export default function SlideBuilder() {
   return (
     <View className="space-y-6">
       <View className="flex-row justify-between items-center mb-2">
-        <Text className="text-2xl font-bold text-text-primary">Rosetta Slide Builder</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Rosetta Slide Builder</Text>
       </View>
 
       {/* Target Selector */}
-      <View className="bg-[#0A192F] p-4 rounded-xl flex-col md:flex-row gap-4 items-center z-10 shadow-sm">
-        <Text className="text-white font-bold whitespace-nowrap">Editing Target:</Text>
+      <View className="bg-navy p-4 rounded-[20px] flex-col md:flex-row gap-4 items-center z-10 shadow-sm">
+        <Text className="font-sans text-white font-bold whitespace-nowrap">Editing Target:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 max-h-12 bg-white/10 rounded-lg p-1">
           {modules.map(mod => (
-            <Pressable key={mod.id} onPress={() => handleSelectModule(mod.id)} className={`px-3 py-1.5 rounded-md ${selectedModuleId === mod.id ? 'bg-brand' : 'hover:bg-white/10'}`}>
-              <Text className={`text-sm ${selectedModuleId === mod.id ? 'text-white font-bold' : 'text-slate-300'}`}>{mod.title}</Text>
+            <Pressable key={mod.id} onPress={() => handleSelectModule(mod.id)} className={`px-3 py-1.5 rounded-full ${selectedModuleId === mod.id ? 'bg-gold' : 'hover:bg-white/10'}`}>
+              <Text className={`text-sm ${selectedModuleId === mod.id ? 'text-navy font-bold' : 'text-slate-300'}`}>{mod.title}</Text>
             </Pressable>
           ))}
         </ScrollView>
         <Text className="text-white font-bold">›</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 max-h-12 bg-white/10 rounded-lg p-1">
           {lessons.map(les => (
-            <Pressable key={les.id} onPress={() => setSelectedLessonId(les.id)} className={`px-3 py-1.5 rounded-md ${selectedLessonId === les.id ? 'bg-brand' : 'hover:bg-white/10'}`}>
-              <Text className={`text-sm ${selectedLessonId === les.id ? 'text-white font-bold' : 'text-slate-300'}`}>{les.title}</Text>
+            <Pressable key={les.id} onPress={() => setSelectedLessonId(les.id)} className={`px-3 py-1.5 rounded-full ${selectedLessonId === les.id ? 'bg-gold' : 'hover:bg-white/10'}`}>
+              <Text className={`text-sm ${selectedLessonId === les.id ? 'text-navy font-bold' : 'text-slate-300'}`}>{les.title}</Text>
             </Pressable>
           ))}
         </ScrollView>
       </View>
 
       {!selectedLessonId ? (
-        <View className="bg-white p-12 rounded-xl border border-slate-200 items-center justify-center">
+        <View className="bg-white p-12 rounded-[20px] border border-inkline items-center justify-center">
           <Text className="text-slate-500 text-lg">Select a Module and Lesson to build interactive slides.</Text>
         </View>
       ) : (
         <>
           {/* Editor Form */}
-          <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+          <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6">
             <View className="flex-row justify-between items-center">
-              <Text className="text-lg font-bold text-[#0A192F]">{editId ? 'Edit Slide' : 'Create New Slide'}</Text>
+              <Text className="font-display text-xl font-semibold text-navy">{editId ? 'Edit Slide' : 'Create New Slide'}</Text>
               <View className="flex-row items-center gap-2">
                 <Text className="text-sm font-semibold text-text-secondary">Sequence #</Text>
-                <TextInput className="bg-slate-50 p-2 rounded-lg border border-slate-200 w-16 text-center" keyboardType="numeric" value={orderIndex} onChangeText={setOrderIndex} />
+                <TextInput className="bg-canvas p-2 rounded-lg border border-inkline w-16 text-center" keyboardType="numeric" value={orderIndex} onChangeText={setOrderIndex} />
               </View>
             </View>
             
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-3 pb-2 border-b border-slate-100">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-3 pb-2 border-b border-inkline">
               {TEMPLATES.map((type) => (
                 <Pressable
                   key={type.id}
                   onPress={() => setSlideType(type.id)}
-                  className={`mr-2 px-4 py-3 rounded-xl border ${slideType === type.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                  className={`mr-2 px-4 py-3 rounded-xl border ${slideType === type.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                 >
                   <View className="flex-row items-center gap-2 mb-1">
                     <Text className="text-lg">{type.icon}</Text>
@@ -372,10 +372,10 @@ export default function SlideBuilder() {
                   {renderPanelEditor(0)}
                   
                   {(slideType === 'focus_1up' || slideType === 'typing') && (
-                    <View className="bg-brand/5 p-4 rounded-xl border border-brand/20 mt-4">
-                      <Text className="text-sm font-bold text-brand mb-2">🎙️ Target Answer (Required for Voice AI / Typing Verification)</Text>
+                    <View className="bg-pitch/5 p-4 rounded-xl border border-pitch/20 mt-4">
+                      <Text className="text-sm font-bold text-pitch mb-2">🎙️ Target Answer (Required for Voice AI / Typing Verification)</Text>
                       <TextInput
-                        className="w-full bg-white p-4 rounded-xl border border-slate-200"
+                        className="w-full bg-white p-4 rounded-xl border border-inkline"
                         placeholder="e.g., The boy is eating."
                         value={correctAnswer}
                         onChangeText={setCorrectAnswer}
@@ -389,10 +389,10 @@ export default function SlideBuilder() {
                 <View className="space-y-4">
                   <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider">Main Presentation Content</Text>
                   {renderPanelEditor(0)}
-                  <View className="bg-brand/5 p-4 rounded-xl border border-brand/20 mt-4">
-                    <Text className="text-sm font-bold text-brand mb-2">🎙️ Phrase the student must say (Required)</Text>
+                  <View className="bg-pitch/5 p-4 rounded-xl border border-pitch/20 mt-4">
+                    <Text className="text-sm font-bold text-pitch mb-2">🎙️ Phrase the student must say (Required)</Text>
                     <TextInput
-                      className="w-full bg-white p-4 rounded-xl border border-slate-200"
+                      className="w-full bg-white p-4 rounded-xl border border-inkline"
                       placeholder="e.g., The bowler bowls the ball."
                       value={correctAnswer}
                       onChangeText={setCorrectAnswer}
@@ -403,7 +403,7 @@ export default function SlideBuilder() {
                       Add an instruction below only if you want different wording shown above the phrase.
                     </Text>
                     <TextInput
-                      className="w-full bg-white p-4 rounded-xl border border-slate-200 mt-3"
+                      className="w-full bg-white p-4 rounded-xl border border-inkline mt-3"
                       placeholder="Optional instruction, e.g., Say it like a commentator!"
                       value={promptText}
                       onChangeText={setPromptText}
@@ -415,10 +415,10 @@ export default function SlideBuilder() {
               {(slideType === 'grid_4up' || slideType === 'quiz_4up') && (
                 <View className="space-y-4">
                   {slideType === 'quiz_4up' && (
-                    <View className="mb-4 bg-blue-50 p-4 rounded-xl border border-blue-200">
-                      <Text className="text-sm font-bold text-blue-800 mb-2">🎯 Main Quiz Prompt (Bottom Area)</Text>
+                    <View className="mb-4 bg-gold-light/40 p-4 rounded-xl border border-gold/40">
+                      <Text className="text-sm font-bold text-navy mb-2">🎯 Main Quiz Prompt (Bottom Area)</Text>
                       <TextInput
-                        className="w-full bg-white p-4 rounded-xl border border-blue-100"
+                        className="w-full bg-white p-4 rounded-xl border border-inkline"
                         placeholder="e.g., The girl is drinking. (Select the matching image above)"
                         value={promptText}
                         onChangeText={setPromptText}
@@ -437,14 +437,14 @@ export default function SlideBuilder() {
               )}
             </View>
 
-            <View className="flex-row justify-end gap-4 mt-4 border-t border-slate-100 pt-4">
+            <View className="flex-row justify-end gap-4 mt-4 border-t border-inkline pt-4">
               {editId && <View className="w-24"><AnimatedButton title="Cancel" onPress={cancelEdit} variant="outline" size="sm" /></View>}
               <View className="w-48"><AnimatedButton title={saving ? "Uploading Assets..." : "Save Interactive Slide"} onPress={handleSave} disabled={saving} variant="primary" size="sm" /></View>
             </View>
           </View>
 
           {/* List of Slides */}
-          <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
             {loading ? <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
             : slides.length === 0 ? <View className="p-8 items-center"><Text className="text-slate-500">No slides built for this lesson yet.</Text></View>
             : slides.map((slide, index) => {
@@ -453,7 +453,7 @@ export default function SlideBuilder() {
                 const pCount = isGrid && slide.options?.panels ? slide.options.panels.length : 1;
 
                 return (
-                  <View key={slide.id} className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 ${index !== slides.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                  <View key={slide.id} className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 ${index !== slides.length - 1 ? 'border-b border-inkline' : ''}`}>
                     <View className="flex-row items-center gap-4 flex-1">
                       <View className="w-10 h-10 rounded-full bg-slate-100 items-center justify-center">
                         <Text className="font-bold text-slate-500">{slide.order_index}</Text>
@@ -461,7 +461,7 @@ export default function SlideBuilder() {
                       
                       <View className="flex-1">
                         <View className="flex-row items-center gap-2 mb-1">
-                          <Text className="text-xs uppercase font-bold tracking-wider text-[#0A192F]">{typeInfo.icon} {typeInfo.label}</Text>
+                          <Text className="text-xs uppercase font-bold tracking-wider text-navy">{typeInfo.icon} {typeInfo.label}</Text>
                           <Text className="text-xs text-slate-400">| {pCount} Panels</Text>
                         </View>
                         <Text className="font-bold text-text-primary text-base" numberOfLines={2}>
@@ -471,10 +471,10 @@ export default function SlideBuilder() {
                     </View>
                     
                     <View className="flex-row gap-3">
-                      <Pressable onPress={() => handleEdit(slide)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                      <Pressable onPress={() => handleEdit(slide)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                         <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                       </Pressable>
-                      <Pressable onPress={() => handleDelete(slide.id)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                      <Pressable onPress={() => handleDelete(slide.id)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                         <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                       </Pressable>
                     </View>

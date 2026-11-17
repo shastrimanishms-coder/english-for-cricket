@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ElegantCard } from '../../components/ui/Elegant';
 import { supabase } from '../../lib/supabase';
 
 /**
@@ -52,21 +53,21 @@ function renderRichText(content: string): ReactNode {
       const line = lines[0];
       if (line.startsWith('### ')) {
         return (
-          <Text key={key} className="text-lg font-bold text-[#0A192F] mt-4 mb-3">
+          <Text key={key} className="font-display text-lg font-semibold text-navy mt-4 mb-3">
             {renderInline(line.slice(4), key)}
           </Text>
         );
       }
       if (line.startsWith('## ')) {
         return (
-          <Text key={key} className="text-xl font-bold text-[#0A192F] mt-5 mb-3">
+          <Text key={key} className="font-display text-xl font-semibold text-navy mt-5 mb-3">
             {renderInline(line.slice(3), key)}
           </Text>
         );
       }
       if (line.startsWith('# ')) {
         return (
-          <Text key={key} className="text-2xl font-bold text-[#0A192F] mt-6 mb-3">
+          <Text key={key} className="font-display text-2xl font-semibold text-navy mt-6 mb-3">
             {renderInline(line.slice(2), key)}
           </Text>
         );
@@ -79,8 +80,8 @@ function renderRichText(content: string): ReactNode {
         <View key={key} className="mb-4">
           {lines.map((line, lineIndex) => (
             <View key={`${key}-${lineIndex}`} className="flex-row mb-1.5">
-              <Text className="text-base text-slate-700 leading-relaxed mr-2">•</Text>
-              <Text className="flex-1 text-base text-slate-700 leading-relaxed">
+              <Text className="font-sans text-base text-gold-dark leading-relaxed mr-2">•</Text>
+              <Text className="flex-1 font-sans text-base text-slate-600 leading-relaxed">
                 {renderInline(line.slice(2), `${key}-${lineIndex}`)}
               </Text>
             </View>
@@ -90,7 +91,7 @@ function renderRichText(content: string): ReactNode {
     }
 
     return (
-      <Text key={key} className="text-base text-slate-700 leading-relaxed mb-4">
+      <Text key={key} className="font-sans text-base text-slate-600 leading-relaxed mb-4">
         {renderInline(block, key)}
       </Text>
     );
@@ -124,7 +125,7 @@ export default function StaticPageView() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50">
+      <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
@@ -132,20 +133,22 @@ export default function StaticPageView() {
 
   if (!page) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50 p-6">
-        <Text className="text-xl font-bold text-[#0A192F]">Page Not Found</Text>
-        <Text className="text-slate-500 mt-2">The page you are looking for does not exist.</Text>
+      <View className="flex-1 items-center justify-center bg-canvas p-6">
+        <Text className="font-display text-xl font-semibold text-navy">Page Not Found</Text>
+        <Text className="font-sans text-slate-500 mt-2">The page you are looking for does not exist.</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-slate-50">
+    <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
     <ScrollView className="flex-1">
       <Stack.Screen options={{ title: page.title }} />
-      <View className="max-w-3xl w-full mx-auto p-6 md:p-12">
-        <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] mb-8">{page.title}</Text>
-        <View>{renderRichText(typeof page.content === 'string' ? page.content : '')}</View>
+      <View className="max-w-3xl w-full mx-auto p-4 md:p-8">
+        <ElegantCard className="p-6 md:p-10">
+          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy mb-8">{page.title}</Text>
+          <View>{renderRichText(typeof page.content === 'string' ? page.content : '')}</View>
+        </ElegantCard>
       </View>
     </ScrollView>
     </SafeAreaView>

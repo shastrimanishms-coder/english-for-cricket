@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GhostButton, GoldButton, ScreenHeader } from '../../components/ui/Elegant';
 import { fetchCompletedLessons } from '../../lib/completions';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -150,7 +152,7 @@ export default function LearningPath() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-white items-center justify-center">
+      <View className="flex-1 bg-canvas items-center justify-center">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
@@ -158,24 +160,21 @@ export default function LearningPath() {
 
   if (loadError) {
     return (
-      <View className="flex-1 bg-white items-center justify-center p-6">
-        <Text className="text-2xl font-bold text-[#0A192F] mb-2 text-center">
+      <View className="flex-1 bg-canvas items-center justify-center p-6">
+        <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">
           Couldn&apos;t load your learning path
         </Text>
-        <Text className="text-slate-500 text-center mb-8">{loadError}</Text>
-        <Pressable
+        <Text className="font-sans text-slate-500 text-center mb-8">{loadError}</Text>
+        <GoldButton
+          label="Try Again"
           onPress={() => {
             (async () => {
               await fetchPathData();
             })();
           }}
-          className="px-6 py-3 bg-[#D4AF37] rounded-full mb-3"
-        >
-          <Text className="text-white font-bold">Try Again</Text>
-        </Pressable>
-        <Pressable onPress={() => router.back()} className="px-6 py-3">
-          <Text className="text-slate-500 font-bold">Go Back</Text>
-        </Pressable>
+          className="mb-3"
+        />
+        <GhostButton label="Go Back" onPress={() => router.back()} />
       </View>
     );
   }
@@ -183,41 +182,31 @@ export default function LearningPath() {
   const hasModules = groups.some((g) => g.modules.length > 0);
 
   return (
-    <View className="flex-1 bg-white">
-      {/* Top Navigation Bar - Dark Navy (matches learner home) */}
-      <SafeAreaView edges={['top']} className="w-full bg-[#0A192F] shadow-sm">
-        <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-4 md:p-6">
-          <View className="flex-row items-center gap-3">
-            <Pressable onPress={() => router.back()} className="px-3 py-2 bg-white/10 rounded-lg border border-white/20">
-              <Text className="text-white font-bold text-sm">← Back</Text>
-            </Pressable>
-            <Text className="text-xl md:text-2xl font-bold text-white tracking-wider">
-              Learning Path
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
+    <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
+      <ScreenHeader title="Learning Path" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
         <View className="max-w-4xl w-full mx-auto">
           {!hasModules ? (
             <View className="items-center py-16">
-              <Text className="text-5xl mb-4">📚</Text>
-              <Text className="text-2xl font-bold text-[#0A192F] mb-2 text-center">
+              <View className="mb-4 h-20 w-20 items-center justify-center rounded-full bg-gold-light">
+                <Ionicons name="library-outline" size={36} color="#0A192F" />
+              </View>
+              <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">
                 No lessons available yet
               </Text>
-              <Text className="text-slate-500 text-center">
+              <Text className="font-sans text-slate-500 text-center">
                 Your learning path is being prepared. Please check back soon.
               </Text>
             </View>
           ) : (
             groups.map((group) => (
               <View key={group.category?.id || group.title || 'ungrouped'} className="mb-10">
-                <Text className="text-2xl md:text-3xl font-bold text-[#0A192F] mb-1">
+                <Text className="font-display text-2xl md:text-3xl font-semibold text-navy mb-1">
                   {group.title || (group.category ? group.category.name : 'More Modules')}
                 </Text>
                 {group.category?.description ? (
-                  <Text className="text-slate-500 mb-4">{group.category.description}</Text>
+                  <Text className="font-sans text-slate-500 mb-4">{group.category.description}</Text>
                 ) : null}
 
                 {group.modules.map((module) => {
@@ -227,18 +216,18 @@ export default function LearningPath() {
                   return (
                     <View
                       key={module.id}
-                      className="mb-4 bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden"
+                      className="mb-4 rounded-[20px] border border-inkline bg-white shadow-sm overflow-hidden"
                     >
                       <Pressable
                         onPress={() => toggleModule(module.id)}
                         className="flex-row justify-between items-center p-4"
                       >
                         <View className="flex-1 pr-3">
-                          <Text className="text-lg font-bold text-[#0A192F]">{module.title}</Text>
+                          <Text className="font-display text-lg font-semibold text-navy">{module.title}</Text>
                           {module.description ? (
-                            <Text className="text-sm text-slate-500">{module.description}</Text>
+                            <Text className="font-sans text-sm text-slate-500">{module.description}</Text>
                           ) : null}
-                          <Text className="text-xs text-slate-400 mt-1">
+                          <Text className="font-sans text-xs text-slate-400 mt-1">
                             {moduleLessons.length} lesson{moduleLessons.length === 1 ? '' : 's'}
                             {doneCount > 0
                               ? doneCount === moduleLessons.length
@@ -247,12 +236,16 @@ export default function LearningPath() {
                               : ''}
                           </Text>
                         </View>
-                        <Text className="text-slate-400 text-xl">{expanded ? '▾' : '▸'}</Text>
+                        <Ionicons
+                          name={expanded ? 'chevron-down' : 'chevron-forward'}
+                          size={20}
+                          color="#B8912A"
+                        />
                       </Pressable>
 
                       {expanded &&
                         (moduleLessons.length === 0 ? (
-                          <Text className="px-4 pb-4 text-sm text-slate-400">
+                          <Text className="px-4 pb-4 font-sans text-sm text-slate-400">
                             No lessons in this module yet.
                           </Text>
                         ) : (
@@ -268,26 +261,26 @@ export default function LearningPath() {
                               <Pressable
                                 key={lesson.id}
                                 onPress={() => router.push(`/lesson/${lesson.id}`)}
-                                className="flex-row justify-between items-center px-4 py-3 bg-white border-t border-slate-100"
+                                className="flex-row justify-between items-center px-4 py-3 bg-white border-t border-inkline"
                               >
                                 <View className="flex-1 pr-3">
-                                  <Text className="text-base font-semibold text-slate-800">
+                                  <Text className="font-sans text-base font-semibold text-slate-800">
                                     {lesson.title}
                                   </Text>
                                   {lesson.description ? (
-                                    <Text className="text-sm text-slate-400">{lesson.description}</Text>
+                                    <Text className="font-sans text-sm text-slate-400">{lesson.description}</Text>
                                   ) : null}
                                 </View>
                                 {completed ? (
-                                  <View className="w-7 h-7 rounded-full bg-emerald-500 items-center justify-center">
+                                  <View className="w-7 h-7 rounded-full bg-pitch items-center justify-center">
                                     <Text className="text-white font-bold text-sm">✓</Text>
                                   </View>
                                 ) : isNext ? (
-                                  <View className="px-3 py-1.5 rounded-full bg-[#D4AF37]">
-                                    <Text className="text-[#0A192F] font-bold text-sm">▶ Next</Text>
+                                  <View className="px-3 py-1.5 rounded-full bg-gold border-b-4 border-gold-dark">
+                                    <Text className="font-sans text-navy font-bold text-sm">▶ Next</Text>
                                   </View>
                                 ) : (
-                                  <Text className="text-[#D4AF37] font-bold">Start ›</Text>
+                                  <Text className="font-sans text-gold-dark font-bold">Start ›</Text>
                                 )}
                               </Pressable>
                             );
@@ -301,6 +294,6 @@ export default function LearningPath() {
           )}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

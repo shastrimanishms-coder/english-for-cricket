@@ -346,41 +346,41 @@ export default function SuperAdminDashboard() {
           : 0;
         return (
           <View className="space-y-6 gap-6">
-            <Text className="text-2xl font-bold text-text-primary mb-2">Platform Overview</Text>
+            <Text className="font-display text-3xl font-semibold text-navy mb-2">Platform Overview</Text>
 
             {/* Platform totals - tap through to Users & Organizations */}
             <View className="flex-row flex-wrap gap-4">
-              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Orgs</Text>
-                <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.orgs ?? '—'}</Text>
-                <Text className="text-xs font-semibold text-brand mt-1">Open Users & Organizations →</Text>
+                <Text className="font-display text-3xl font-semibold text-navy">{overviewCounts.orgs ?? '—'}</Text>
+                <Text className="text-xs font-semibold text-pitch mt-1">Open Users & Organizations →</Text>
               </Pressable>
-              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Active Students</Text>
-                <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.activeStudents ?? '—'}</Text>
-                <Text className="text-xs font-semibold text-brand mt-1">Open Users & Organizations →</Text>
+                <Text className="font-display text-3xl font-semibold text-navy">{overviewCounts.activeStudents ?? '—'}</Text>
+                <Text className="text-xs font-semibold text-pitch mt-1">Open Users & Organizations →</Text>
               </Pressable>
-              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-xl border border-slate-200 flex-1 min-w-[200px]">
+              <Pressable onPress={() => goToTab('organizations')} className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[200px]">
                 <Text className="text-slate-500 text-sm font-bold uppercase mb-1">Total Users</Text>
-                <Text className="text-3xl font-bold text-[#0A192F]">{overviewCounts.totalUsers ?? '—'}</Text>
-                <Text className="text-xs font-semibold text-brand mt-1">Open Users & Organizations →</Text>
+                <Text className="font-display text-3xl font-semibold text-navy">{overviewCounts.totalUsers ?? '—'}</Text>
+                <Text className="text-xs font-semibold text-pitch mt-1">Open Users & Organizations →</Text>
               </Pressable>
             </View>
 
             {/* Content counts with shortcuts into each admin section */}
             <View>
-              <Text className="text-lg font-bold text-text-primary mb-3">Content</Text>
+              <Text className="font-display text-xl font-semibold text-navy mb-3">Content</Text>
               <View className="flex-row flex-wrap gap-4">
                 {CONTENT_CARDS.map(card => (
                   <Pressable
                     key={card.key}
                     onPress={() => goToTab(card.tab)}
-                    className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]"
+                    className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[150px]"
                   >
                     <Text className="text-2xl mb-1">{card.icon}</Text>
                     <Text className="text-slate-500 text-xs font-bold uppercase mb-1">{card.label}</Text>
-                    <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.content[card.key] ?? '—'}</Text>
-                    <Text className="text-xs font-semibold text-brand mt-1">Open →</Text>
+                    <Text className="font-display text-2xl font-semibold text-navy">{overviewExtra.content[card.key] ?? '—'}</Text>
+                    <Text className="text-xs font-semibold text-pitch mt-1">Open →</Text>
                   </Pressable>
                 ))}
               </View>
@@ -388,27 +388,27 @@ export default function SuperAdminDashboard() {
 
             {/* Growth & recent activity */}
             <View>
-              <Text className="text-lg font-bold text-text-primary mb-3">Growth & Activity</Text>
+              <Text className="font-display text-xl font-semibold text-navy mb-3">Growth & Activity</Text>
               <View className="flex-row flex-wrap gap-4">
-                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                <View className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[150px]">
                   <Text className="text-slate-500 text-xs font-bold uppercase mb-1">New Users Today</Text>
-                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.newToday ?? '—'}</Text>
+                  <Text className="font-display text-2xl font-semibold text-navy">{overviewExtra.newToday ?? '—'}</Text>
                 </View>
-                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                <View className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[150px]">
                   <Text className="text-slate-500 text-xs font-bold uppercase mb-1">New Users This Week</Text>
-                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.newWeek ?? '—'}</Text>
+                  <Text className="font-display text-2xl font-semibold text-navy">{overviewExtra.newWeek ?? '—'}</Text>
                 </View>
-                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                <View className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[150px]">
                   <Text className="text-slate-500 text-xs font-bold uppercase mb-1">New Users This Month</Text>
-                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.newMonth ?? '—'}</Text>
+                  <Text className="font-display text-2xl font-semibold text-navy">{overviewExtra.newMonth ?? '—'}</Text>
                 </View>
-                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                <View className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[150px]">
                   <Text className="text-slate-500 text-xs font-bold uppercase mb-1">Active Learners Today</Text>
-                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.activeToday ?? '—'}</Text>
+                  <Text className="font-display text-2xl font-semibold text-navy">{overviewExtra.activeToday ?? '—'}</Text>
                 </View>
-                <View className="bg-white p-5 rounded-xl border border-slate-200 flex-1 min-w-[150px]">
+                <View className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm flex-1 min-w-[150px]">
                   <Text className="text-slate-500 text-xs font-bold uppercase mb-1">Active Learners This Week</Text>
-                  <Text className="text-2xl font-bold text-[#0A192F]">{overviewExtra.activeWeek ?? '—'}</Text>
+                  <Text className="font-display text-2xl font-semibold text-navy">{overviewExtra.activeWeek ?? '—'}</Text>
                 </View>
               </View>
               <Text className="text-xs text-slate-400 mt-2">
@@ -418,8 +418,8 @@ export default function SuperAdminDashboard() {
 
             {/* Most popular activities + where users are from */}
             <View className="flex-col lg:flex-row gap-4">
-              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1">
-                <Text className="font-bold text-[#0A192F] text-base">Most Popular Activities</Text>
+              <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1">
+                <Text className="font-display font-semibold text-navy text-lg">Most Popular Activities</Text>
                 <Text className="text-xs text-slate-400 mt-1 mb-4">Top 5 by recorded sessions (from the latest 5,000 activity records).</Text>
                 {overviewExtra.popular === null ? (
                   <Text className="text-slate-400">—</Text>
@@ -430,15 +430,15 @@ export default function SuperAdminDashboard() {
                     {overviewExtra.popular.map((item, i) => (
                       <View key={item.key} className="flex-row items-center justify-between gap-3">
                         <Text className="text-sm text-text-primary flex-1">{i + 1}. {item.label}</Text>
-                        <Text className="text-sm font-bold text-[#0A192F]">{item.sessions} sessions • {item.minutes} mins</Text>
+                        <Text className="text-sm font-bold text-navy">{item.sessions} sessions • {item.minutes} mins</Text>
                       </View>
                     ))}
                   </View>
                 )}
               </View>
 
-              <View className="bg-white p-6 rounded-xl border border-slate-200 flex-1">
-                <Text className="font-bold text-[#0A192F] text-base">Where Users Are From</Text>
+              <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm flex-1">
+                <Text className="font-display font-semibold text-navy text-lg">Where Users Are From</Text>
                 <Text className="text-xs text-slate-400 mt-1 mb-4">Countries recorded on registered user profiles. Students learn under their school&apos;s account, so they are counted through it.</Text>
                 {overviewExtra.countries === null ? (
                   <Text className="text-slate-400">—</Text>
@@ -450,11 +450,11 @@ export default function SuperAdminDashboard() {
                       <View key={row.country}>
                         <View className="flex-row items-center justify-between mb-1">
                           <Text className="text-sm text-text-primary">{row.country}</Text>
-                          <Text className="text-sm font-bold text-[#0A192F]">{row.count}</Text>
+                          <Text className="text-sm font-bold text-navy">{row.count}</Text>
                         </View>
                         <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
                           <View
-                            className="h-2 bg-[#D4AF37] rounded-full"
+                            className="h-2 bg-gold rounded-full"
                             style={{ width: `${maxCountryCount > 0 ? Math.round((row.count / maxCountryCount) * 100) : 0}%` }}
                           />
                         </View>
@@ -510,10 +510,10 @@ export default function SuperAdminDashboard() {
       default:
         return (
           <View>
-            <Text className="text-2xl font-bold text-text-primary mb-6 capitalize">
+            <Text className="font-display text-3xl font-semibold text-navy mb-6 capitalize">
               {activeTab.replace('_', ' ')}
             </Text>
-            <View className="bg-white rounded-xl border border-slate-200 p-8 items-center justify-center min-h-[400px]">
+            <View className="bg-white rounded-[20px] border border-inkline shadow-sm p-8 items-center justify-center min-h-[400px]">
               <Text className="text-text-secondary">Module under construction. DB Schema pending.</Text>
             </View>
           </View>
@@ -525,21 +525,21 @@ export default function SuperAdminDashboard() {
   // data is shown to logged-out or wrong-role visitors.
   if (guardStatus !== 'authorized') {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50">
+      <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 flex-col md:flex-row bg-slate-50">
-      
+    <View className="flex-1 flex-col md:flex-row bg-canvas">
+
       {/* LEFT SIDEBAR */}
-      <View style={{ paddingTop: insets.top }} className="w-full md:w-72 bg-[#0A192F] flex-col justify-between border-r border-slate-800">
+      <View style={{ paddingTop: insets.top }} className="w-full md:w-72 bg-navy flex-col justify-between border-r border-navy-deep">
         <ScrollView style={isNarrowLayout ? { maxHeight: windowHeight * 0.38 } : undefined}>
-          <View className="p-6 border-b border-slate-800 mb-4">
-            <Text className="text-xl font-bold text-white tracking-wider">KYCO</Text>
-            <Text className="text-[#D4AF37] text-xs font-bold tracking-widest uppercase mt-1">Super Admin CMS</Text>
+          <View className="p-6 border-b border-white/10 mb-4">
+            <Text className="font-display text-2xl font-semibold text-white tracking-wide">KYCO</Text>
+            <Text className="font-sans text-gold text-[11px] font-bold tracking-[2.5px] uppercase mt-1">Super Admin CMS</Text>
           </View>
 
           <View className="px-4 space-y-1 gap-1 pb-6">
@@ -553,11 +553,11 @@ export default function SuperAdminDashboard() {
                   {/* Primary Menu Item */}
                   <Pressable
                     onPress={() => hasSubItems ? toggleMenu(item.id) : setActiveTab(item.id)}
-                    className={`flex-row items-center justify-between px-4 py-3 rounded-lg ${isActivePrimary && !hasSubItems ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                    className={`flex-row items-center justify-between px-4 py-3 rounded-xl ${isActivePrimary && !hasSubItems ? 'bg-gold/15' : 'hover:bg-white/5'}`}
                   >
                     <View className="flex-row items-center">
                       <Text className="text-xl mr-3">{item.icon}</Text>
-                      <Text className={`font-semibold text-sm ${isActivePrimary ? 'text-white' : 'text-slate-400'}`}>
+                      <Text className={`font-sans font-semibold text-sm ${isActivePrimary && !hasSubItems ? 'text-gold' : isActivePrimary ? 'text-white' : 'text-slate-400'}`}>
                         {item.label}
                       </Text>
                     </View>
@@ -568,16 +568,16 @@ export default function SuperAdminDashboard() {
 
                   {/* Collapsible Sub-Items */}
                   {hasSubItems && isExpanded && (
-                    <View className="mt-1 mb-2 ml-10 space-y-1 gap-1 border-l-2 border-slate-700 pl-3">
+                    <View className="mt-1 mb-2 ml-10 space-y-1 gap-1 border-l-2 border-white/15 pl-3">
                       {item.subItems.map((subItem) => {
                         const isSubActive = activeTab === subItem.id;
                         return (
                           <Pressable
                             key={subItem.id}
                             onPress={() => setActiveTab(subItem.id)}
-                            className={`py-2 px-3 rounded-lg ${isSubActive ? 'bg-[#D4AF37]/20' : 'hover:bg-white/5'}`}
+                            className={`py-2 px-3 rounded-xl ${isSubActive ? 'bg-gold/20' : 'hover:bg-white/5'}`}
                           >
-                            <Text className={`text-sm ${isSubActive ? 'text-[#D4AF37] font-bold' : 'text-slate-400'}`}>
+                            <Text className={`font-sans text-sm ${isSubActive ? 'text-gold font-bold' : 'text-slate-400'}`}>
                               {subItem.label}
                             </Text>
                           </Pressable>
@@ -591,13 +591,13 @@ export default function SuperAdminDashboard() {
           </View>
         </ScrollView>
 
-        <View className="p-4 border-t border-slate-800 mt-auto">
-          <Pressable 
+        <View className="p-4 border-t border-white/10 mt-auto">
+          <Pressable
             onPress={handleLogout}
-            className="flex-row items-center px-4 py-3 rounded-lg hover:bg-white/5"
+            className="flex-row items-center px-4 py-3 rounded-xl hover:bg-white/5"
           >
             <Text className="text-xl mr-3">🚪</Text>
-            <Text className="font-semibold text-sm text-slate-400">Log Out</Text>
+            <Text className="font-sans font-semibold text-sm text-slate-400">Log Out</Text>
           </Pressable>
         </View>
       </View>

@@ -260,23 +260,23 @@ export default function CurriculumManager() {
       {/* Header Area */}
       <View className="flex-row justify-between items-center">
         {isModuleView ? (
-          <Text className="text-2xl font-bold text-text-primary">Curriculum Modules</Text>
+          <Text className="font-display text-3xl font-semibold text-navy">Curriculum Modules</Text>
         ) : (
           <View className="flex-row items-center gap-4">
-            <Pressable onPress={goBackToModules} className="p-2 bg-slate-200 rounded-lg">
+            <Pressable onPress={goBackToModules} className="px-3 py-2 bg-slate-100 rounded-full border border-inkline">
               <Text className="font-bold text-slate-700">← Back</Text>
             </Pressable>
             <View>
-              <Text className="text-xs font-bold text-brand uppercase tracking-wider">Managing Lessons For</Text>
-              <Text className="text-2xl font-bold text-text-primary">{selectedModule?.title}</Text>
+              <Text className="text-xs font-bold text-pitch uppercase tracking-wider">Managing Lessons For</Text>
+              <Text className="font-display text-3xl font-semibold text-navy">{selectedModule?.title}</Text>
             </View>
           </View>
         )}
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">
           {editId 
             ? `Edit ${isModuleView ? 'Module' : 'Lesson'}` 
             : `Add New ${isModuleView ? 'Module' : 'Lesson'}`
@@ -287,7 +287,7 @@ export default function CurriculumManager() {
           <View className="flex-2">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Title</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder={isModuleView ? "e.g., Level 1: The Pitch" : "e.g., Lesson 1: Vocabulary"}
               value={title}
               onChangeText={setTitle}
@@ -296,7 +296,7 @@ export default function CurriculumManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Order / Sequence Number</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="0"
               keyboardType="numeric"
               value={orderIndex}
@@ -308,7 +308,7 @@ export default function CurriculumManager() {
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Description</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
             placeholder="Briefly describe what this covers..."
             value={description}
             onChangeText={setDescription}
@@ -321,7 +321,7 @@ export default function CurriculumManager() {
             <View className="flex-row flex-wrap gap-2">
               <Pressable
                 onPress={() => setFormStageId(null)}
-                className={`px-3 py-2 rounded-full border ${formStageId === null ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                className={`px-3 py-2 rounded-full border ${formStageId === null ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
               >
                 <Text className={`text-xs font-semibold ${formStageId === null ? 'text-white' : 'text-slate-600'}`}>No stage</Text>
               </Pressable>
@@ -329,7 +329,7 @@ export default function CurriculumManager() {
                 <Pressable
                   key={s.id}
                   onPress={() => setFormStageId(s.id)}
-                  className={`px-3 py-2 rounded-full border ${formStageId === s.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                  className={`px-3 py-2 rounded-full border ${formStageId === s.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                 >
                   <Text className={`text-xs font-semibold ${formStageId === s.id ? 'text-white' : 'text-slate-600'}`}>{s.title}</Text>
                 </Pressable>
@@ -358,8 +358,8 @@ export default function CurriculumManager() {
 
       {/* Stages Manager (modules view only) */}
       {isModuleView ? (
-        <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
-          <Text className="text-lg font-bold text-[#0A192F]">Stages</Text>
+        <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm gap-4">
+          <Text className="font-display text-xl font-semibold text-navy">Stages</Text>
           {!stagesAvailable ? (
             <Text className="text-sm text-slate-500">
               Stages live above modules (Stage → Module → Lesson). Run migration 17 in Supabase to switch them on — modules keep working without stages until then.
@@ -370,7 +370,7 @@ export default function CurriculumManager() {
                 <View className="flex-2">
                   <Text className="text-sm font-semibold text-text-secondary mb-2">Stage Title</Text>
                   <TextInput
-                    className="w-full bg-slate-50 p-3 rounded-xl border border-slate-200"
+                    className="w-full bg-canvas p-3 rounded-xl border border-inkline"
                     placeholder="e.g., Stage 1: The Foundation"
                     value={stageTitle}
                     onChangeText={setStageTitle}
@@ -379,7 +379,7 @@ export default function CurriculumManager() {
                 <View className="flex-1">
                   <Text className="text-sm font-semibold text-text-secondary mb-2">Order</Text>
                   <TextInput
-                    className="w-full bg-slate-50 p-3 rounded-xl border border-slate-200"
+                    className="w-full bg-canvas p-3 rounded-xl border border-inkline"
                     placeholder="0"
                     keyboardType="numeric"
                     value={stageOrder}
@@ -410,18 +410,18 @@ export default function CurriculumManager() {
                 <Text className="text-sm text-slate-500">No stages yet. Create Stage 1, then pick it on each module below.</Text>
               ) : (
                 stages.map((s) => (
-                  <View key={s.id} className="flex-row items-center justify-between border-t border-slate-100 pt-3">
+                  <View key={s.id} className="flex-row items-center justify-between border-t border-inkline pt-3">
                     <Text className="font-semibold text-text-primary">{s.order_index}. {s.title}
                       <Text className="text-slate-400 font-normal">  ·  {modules.filter((m) => m.stage_id === s.id).length} modules</Text>
                     </Text>
                     <View className="flex-row gap-3">
                       <Pressable
                         onPress={() => { setStageEditId(s.id); setStageTitle(s.title); setStageOrder(s.order_index.toString()); }}
-                        className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200"
+                        className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline"
                       >
                         <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                       </Pressable>
-                      <Pressable onPress={() => deleteStage(s)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                      <Pressable onPress={() => deleteStage(s)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                         <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                       </Pressable>
                     </View>
@@ -434,7 +434,7 @@ export default function CurriculumManager() {
       ) : null}
 
       {/* Dynamic List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : (isModuleView ? modules : lessons).length === 0 ? (
@@ -447,16 +447,16 @@ export default function CurriculumManager() {
             return (
               <View 
                 key={item.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== arrLength - 1 ? 'border-b border-slate-100' : ''}`}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== arrLength - 1 ? 'border-b border-inkline' : ''}`}
               >
                 <View className="flex-row items-center gap-4 flex-1">
-                  <View className="w-10 h-10 rounded-full bg-brand/10 items-center justify-center">
-                    <Text className="font-bold text-brand">{item.order_index}</Text>
+                  <View className="w-10 h-10 rounded-full bg-pitch/10 items-center justify-center">
+                    <Text className="font-bold text-pitch">{item.order_index}</Text>
                   </View>
                   <View>
                     <Text className="font-bold text-text-primary text-base">{item.title}</Text>
                     {isModuleView && item.stage_id ? (
-                      <Text className="text-xs font-bold text-brand mt-0.5">
+                      <Text className="text-xs font-bold text-pitch mt-0.5">
                         {stages.find((s) => s.id === item.stage_id)?.title || 'Stage'}
                       </Text>
                     ) : null}
@@ -466,14 +466,14 @@ export default function CurriculumManager() {
                 
                 <View className="flex-row gap-3">
                   {isModuleView && (
-                    <Pressable onPress={() => openLessonsView(item)} className="px-3 py-1.5 bg-blue-50 rounded border border-blue-100">
-                      <Text className="text-blue-600 text-sm font-semibold">Manage Lessons →</Text>
+                    <Pressable onPress={() => openLessonsView(item)} className="px-3 py-1.5 bg-canvas rounded-full border border-inkline">
+                      <Text className="text-navy text-sm font-semibold">Manage Lessons →</Text>
                     </Pressable>
                   )}
-                  <Pressable onPress={() => handleEdit(item)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                  <Pressable onPress={() => handleEdit(item)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                     <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleDelete(item.id, item.title)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                  <Pressable onPress={() => handleDelete(item.id, item.title)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                     <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                   </Pressable>
                 </View>

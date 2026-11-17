@@ -11,7 +11,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedButton from '../components/ui/AnimatedButton';
+import { ElegantCard, GoldButton } from '../components/ui/Elegant';
 import { supabase } from '../lib/supabase';
 
 export default function RegisterScreen() {
@@ -106,70 +106,71 @@ export default function RegisterScreen() {
   // SUCCESS STATE
   if (isSuccess) {
     return (
-      <View className="flex-1 bg-surface-background justify-center items-center p-6">
-        <View className="w-full max-w-md bg-white p-8 rounded-3xl shadow-sm items-center">
-          <View className="w-20 h-20 bg-green-100 rounded-full justify-center items-center mb-6">
+      <View className="flex-1 bg-canvas justify-center items-center p-6">
+        <ElegantCard className="w-full max-w-md p-8 items-center">
+          <View className="w-20 h-20 bg-pitch-light rounded-full justify-center items-center mb-6">
             <Text className="text-4xl">✉️</Text>
           </View>
-          <Text className="text-3xl font-bold text-text-primary mb-4 text-center">
+          <Text className="font-display text-3xl font-semibold text-navy mb-4 text-center">
             Check Your Inbox
           </Text>
-          <Text className="text-text-secondary text-center mb-8 leading-relaxed text-lg">
-            We&apos;ve sent a verification link to <Text className="font-bold text-text-primary">{email}</Text>. 
+          <Text className="font-sans text-slate-500 text-center mb-8 leading-relaxed text-lg">
+            We&apos;ve sent a verification link to <Text className="font-bold text-navy">{email}</Text>.
             Please verify your email address to activate your account.
           </Text>
           <Link href="/login" asChild>
-            <AnimatedButton title="Proceed to Login" onPress={() => {}} variant="primary" />
+            <GoldButton label="Proceed to Login" onPress={() => {}} className="w-full" />
           </Link>
-        </View>
+        </ElegantCard>
       </View>
     );
   }
 
   // REGISTRATION FORM STATE
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-surface-background"
+      className="flex-1 bg-canvas"
     >
       <SafeAreaView edges={['top']} className="flex-1">
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <View className="w-full max-w-lg mx-auto">
-          
+        <ElegantCard className="p-6 md:p-8">
+
           <View className="mb-10">
-            <Text className="text-3xl md:text-4xl font-bold text-text-primary mb-3">
+            <Text className="font-display text-3xl md:text-4xl font-semibold text-navy mb-3">
               Create an Account
             </Text>
-            <Text className="text-text-secondary text-lg">
+            <Text className="font-sans text-slate-500 text-lg">
               Join English For Cricket completely free.
             </Text>
           </View>
 
           {/* SMART ROLE TOGGLE */}
-          <Text className="text-text-primary font-bold mb-3 ml-1">Who is this account for?</Text>
+          <Text className="font-sans text-navy font-bold mb-3 ml-1">Who is this account for?</Text>
           <View className="flex-row gap-4 mb-8">
-            <Pressable 
+            <Pressable
               onPress={() => setRole('individual_learner')}
-              className={`flex-1 p-4 rounded-2xl border-2 transition-all justify-center items-center ${role === 'individual_learner' ? 'border-brand bg-green-50' : 'border-slate-200 bg-white'}`}
+              className={`flex-1 p-4 rounded-2xl border-2 transition-all justify-center items-center ${role === 'individual_learner' ? 'border-gold bg-gold-light/30' : 'border-inkline bg-white'}`}
             >
               <Text className="text-2xl mb-2">🎓</Text>
-              <Text className={`font-bold text-center ${role === 'individual_learner' ? 'text-brand' : 'text-text-secondary'}`}>
+              <Text className={`font-sans font-bold text-center ${role === 'individual_learner' ? 'text-gold-dark' : 'text-slate-500'}`}>
                 I&apos;m a Student
               </Text>
-              <Text className={`text-xs text-center mt-1 ${role === 'individual_learner' ? 'text-brand' : 'text-slate-400'}`}>
+              <Text className={`font-sans text-xs text-center mt-1 ${role === 'individual_learner' ? 'text-gold-dark' : 'text-slate-400'}`}>
                 (for individual account)
               </Text>
             </Pressable>
-            
-            <Pressable 
+
+            <Pressable
               onPress={() => setRole('manager')}
-              className={`flex-1 p-4 rounded-2xl border-2 transition-all justify-center items-center ${role === 'manager' ? 'border-action bg-blue-50' : 'border-slate-200 bg-white'}`}
+              className={`flex-1 p-4 rounded-2xl border-2 transition-all justify-center items-center ${role === 'manager' ? 'border-navy bg-navy/5' : 'border-inkline bg-white'}`}
             >
               <Text className="text-2xl mb-2">👨‍👩‍👧‍👦</Text>
-              <Text className={`font-bold text-center ${role === 'manager' ? 'text-action' : 'text-text-secondary'}`}>
+              <Text className={`font-sans font-bold text-center ${role === 'manager' ? 'text-navy' : 'text-slate-500'}`}>
                 Parent / Teacher
               </Text>
-              <Text className={`text-xs text-center mt-1 ${role === 'manager' ? 'text-action' : 'text-slate-400'}`}>
+              <Text className={`font-sans text-xs text-center mt-1 ${role === 'manager' ? 'text-navy' : 'text-slate-400'}`}>
                 (for multiple student accounts)
               </Text>
             </Pressable>
@@ -178,7 +179,7 @@ export default function RegisterScreen() {
           {/* CORE FORM FIELDS */}
           <View className="space-y-4 gap-4 mb-8">
             <TextInput
-              className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+              className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
               placeholder={role === 'manager' ? "Organization or Full Name" : "Your Full Name"}
               placeholderTextColor="#94A3B8"
               value={displayName}
@@ -186,7 +187,7 @@ export default function RegisterScreen() {
               autoCapitalize="words"
             />
             <TextInput
-              className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+              className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
               placeholder="Email Address"
               placeholderTextColor="#94A3B8"
               value={email}
@@ -195,7 +196,7 @@ export default function RegisterScreen() {
               autoCapitalize="none"
             />
             <TextInput
-              className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+              className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
               placeholder="Password (min. 8 characters)"
               placeholderTextColor="#94A3B8"
               value={password}
@@ -204,7 +205,7 @@ export default function RegisterScreen() {
             />
             <View className="flex-row gap-4">
               <TextInput
-                className="flex-1 bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                className="flex-1 bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                 placeholder="Country (optional)"
                 placeholderTextColor="#94A3B8"
                 value={country}
@@ -212,7 +213,7 @@ export default function RegisterScreen() {
                 autoCapitalize="words"
               />
               <TextInput
-                className="flex-1 bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                className="flex-1 bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                 placeholder="Region (optional)"
                 placeholderTextColor="#94A3B8"
                 value={region}
@@ -223,13 +224,13 @@ export default function RegisterScreen() {
 
             {/* CONDITIONAL DEMOGRAPHICS (Only for Students) */}
             {role === 'individual_learner' && (
-              <View className="p-4 bg-slate-50 rounded-xl border border-slate-100 mt-2 gap-4">
-                <Text className="text-sm font-semibold text-text-secondary mb-1">
+              <View className="p-4 bg-canvas rounded-xl border border-inkline mt-2 gap-4">
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-1">
                   Required for voice recognition calibration:
                 </Text>
-                
+
                 <TextInput
-                  className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                  className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                   placeholder="Age"
                   placeholderTextColor="#94A3B8"
                   value={age}
@@ -243,9 +244,9 @@ export default function RegisterScreen() {
                     <Pressable
                       key={g}
                       onPress={() => setGender(g as any)}
-                      className={`flex-1 py-3 rounded-lg border items-center ${gender === g ? 'border-brand bg-brand' : 'border-slate-200 bg-white'}`}
+                      className={`flex-1 py-3 rounded-xl border items-center ${gender === g ? 'border-gold bg-gold' : 'border-inkline bg-white'}`}
                     >
-                      <Text className={`font-semibold ${gender === g ? 'text-white' : 'text-text-secondary'}`}>
+                      <Text className={`font-sans font-semibold ${gender === g ? 'text-navy' : 'text-slate-500'}`}>
                         {g}
                       </Text>
                     </Pressable>
@@ -256,37 +257,38 @@ export default function RegisterScreen() {
           </View>
 
           {/* SUBMIT BUTTON */}
-          <AnimatedButton 
-            title={loading ? "Creating Account..." : "Create Account"} 
-            onPress={handleRegister} 
-            disabled={loading} 
-            variant="primary" 
+          <GoldButton
+            label={loading ? "Creating Account..." : "Create Account"}
+            onPress={handleRegister}
+            disabled={loading}
+            className="w-full"
           />
 
           {/* --- NEW GOOGLE AUTH BUTTON SECTION --- */}
           <View className="flex-row items-center my-6">
-            <View className="flex-1 h-[1px] bg-slate-200" />
-            <Text className="mx-4 text-slate-400 font-bold">OR</Text>
-            <View className="flex-1 h-[1px] bg-slate-200" />
+            <View className="flex-1 h-[1px] bg-inkline" />
+            <Text className="mx-4 text-slate-400 font-sans font-bold">OR</Text>
+            <View className="flex-1 h-[1px] bg-inkline" />
           </View>
 
           <Pressable
             onPress={handleGoogleAuth}
             disabled={loading}
-            className="w-full bg-white flex-row items-center justify-center p-4 rounded-xl border border-slate-200 shadow-sm"
+            className="w-full bg-white flex-row items-center justify-center p-4 rounded-xl border border-inkline shadow-sm"
           >
             <Text className="text-xl mr-3">🇬</Text>
-            <Text className="font-bold text-slate-700 text-lg">Continue with Google</Text>
+            <Text className="font-sans font-bold text-slate-700 text-lg">Continue with Google</Text>
           </Pressable>
           {/* --- END GOOGLE AUTH BUTTON SECTION --- */}
 
           <View className="flex-row justify-center mt-8">
-            <Text className="text-text-secondary text-base">Already have an account? </Text>
+            <Text className="font-sans text-slate-500 text-base">Already have an account? </Text>
             <Link href="/login" asChild>
-              <Text className="text-action font-bold text-base">Log in here</Text>
+              <Text className="font-sans text-gold-dark font-bold text-base">Log in here</Text>
             </Link>
           </View>
 
+        </ElegantCard>
         </View>
       </ScrollView>
       </SafeAreaView>

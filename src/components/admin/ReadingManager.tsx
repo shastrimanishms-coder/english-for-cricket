@@ -182,23 +182,23 @@ export default function ReadingManager() {
   return (
     <View className="gap-6">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Smart Reading Stories</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Smart Reading Stories</Text>
         {!showForm ? (
-          <Pressable onPress={openCreateForm} className="px-4 py-2.5 bg-[#0A192F] rounded-lg">
+          <Pressable onPress={openCreateForm} className="px-4 py-2.5 bg-navy rounded-full">
             <Text className="text-white font-bold text-sm">+ New Story</Text>
           </Pressable>
         ) : null}
       </View>
 
       {showForm ? (
-        <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-5">
-          <Text className="text-lg font-bold text-[#0A192F]">{editId ? 'Edit Story' : 'New Story'}</Text>
+        <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm gap-5">
+          <Text className="font-display text-xl font-semibold text-navy">{editId ? 'Edit Story' : 'New Story'}</Text>
 
           <View className="flex-col md:flex-row gap-4">
             <View className="flex-2">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Title</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                 placeholder="e.g., The Brave Little Bowler"
                 value={title}
                 onChangeText={setTitle}
@@ -207,7 +207,7 @@ export default function ReadingManager() {
             <View className="flex-1">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Emoji</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                 value={emoji}
                 onChangeText={setEmoji}
               />
@@ -215,7 +215,7 @@ export default function ReadingManager() {
             <View className="flex-1">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Level Label</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                 placeholder="e.g., Stage 1"
                 value={level}
                 onChangeText={setLevel}
@@ -226,7 +226,7 @@ export default function ReadingManager() {
           <View>
             <Text className="text-sm font-semibold text-text-secondary mb-2">Short Description</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="One line shown on the story card"
               value={description}
               onChangeText={setDescription}
@@ -238,7 +238,7 @@ export default function ReadingManager() {
             <View className="flex-row flex-wrap gap-2">
               <Pressable
                 onPress={() => setCategoryId('')}
-                className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
               >
                 <Text className={`text-xs font-semibold ${categoryId === '' ? 'text-white' : 'text-slate-600'}`}>None</Text>
               </Pressable>
@@ -246,7 +246,7 @@ export default function ReadingManager() {
                 <Pressable
                   key={c.id}
                   onPress={() => setCategoryId(c.id)}
-                  className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                  className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                 >
                   <Text className={`text-xs font-semibold ${categoryId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
                 </Pressable>
@@ -270,7 +270,7 @@ export default function ReadingManager() {
                   ) : null}
                 </View>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                  className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                   placeholder="Write this page of the story..."
                   value={page}
                   onChangeText={(t) => setPages(pages.map((p, j) => (j === i ? t : p)))}
@@ -280,29 +280,29 @@ export default function ReadingManager() {
                 />
               </View>
             ))}
-            <Pressable onPress={() => setPages([...pages, ''])} className="self-start px-3 py-2 bg-slate-100 rounded-lg border border-slate-200">
+            <Pressable onPress={() => setPages([...pages, ''])} className="self-start px-3 py-2 bg-slate-100 rounded-full border border-inkline">
               <Text className="text-sm font-semibold text-slate-600">+ Add page</Text>
             </Pressable>
           </View>
 
           {taggingAvailable ? (
-            <View className="border-t border-slate-100 pt-4">
+            <View className="border-t border-inkline pt-4">
               <BelongsToPicker value={lessonId} onChange={setLessonId} />
             </View>
           ) : null}
 
           <View className="flex-row justify-end gap-3">
-            <Pressable onPress={cancelEdit} className="px-5 py-3 bg-slate-100 border border-slate-200 rounded-xl">
+            <Pressable onPress={cancelEdit} className="px-5 py-3 bg-white border border-inkline rounded-full">
               <Text className="font-bold text-slate-600">Cancel</Text>
             </Pressable>
-            <Pressable onPress={handleSave} className="px-5 py-3 bg-[#0A192F] rounded-xl">
+            <Pressable onPress={handleSave} className="px-5 py-3 bg-navy rounded-full border-b-4 border-navy-deep">
               <Text className="font-bold text-white">{saving ? 'Saving...' : 'Save Story'}</Text>
             </Pressable>
           </View>
         </View>
       ) : null}
 
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : stories.length === 0 ? (
@@ -313,12 +313,12 @@ export default function ReadingManager() {
           stories.map((row, index) => (
             <View
               key={row.id}
-              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-3 ${index !== stories.length - 1 ? 'border-b border-slate-100' : ''}`}
+              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-3 ${index !== stories.length - 1 ? 'border-b border-inkline' : ''}`}
             >
               <View className="flex-row items-center gap-3 flex-1">
                 <Text className="text-2xl">{row.emoji}</Text>
                 <View>
-                  <Text className="font-bold text-text-primary">{row.title}</Text>
+                  <Text className="font-display font-semibold text-navy text-base">{row.title}</Text>
                   <Text className="text-sm text-slate-500">
                     {(Array.isArray(row.pages) ? row.pages.length : 0)} pages
                     {row.level ? ` · ${row.level}` : ''}
@@ -330,16 +330,16 @@ export default function ReadingManager() {
               <View className="flex-row gap-2">
                 <Pressable
                   onPress={() => togglePublish(row)}
-                  className={`px-3 py-1.5 rounded border ${row.is_published ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'}`}
+                  className={`px-3 py-1.5 rounded-full border ${row.is_published ? 'bg-pitch-light border-pitch/30' : 'bg-slate-100 border-inkline'}`}
                 >
-                  <Text className={`text-sm font-semibold ${row.is_published ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  <Text className={`text-sm font-semibold ${row.is_published ? 'text-pitch-dark' : 'text-slate-500'}`}>
                     {row.is_published ? 'Published' : 'Hidden'}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => openEditForm(row)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                <Pressable onPress={() => openEditForm(row)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                   <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(row)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                <Pressable onPress={() => handleDelete(row)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                   <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                 </Pressable>
               </View>

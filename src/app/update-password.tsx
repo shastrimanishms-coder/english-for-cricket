@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedButton from '../components/ui/AnimatedButton';
+import { ElegantCard, GoldButton } from '../components/ui/Elegant';
 import { supabase } from '../lib/supabase';
 
 export default function UpdatePassword() {
@@ -50,20 +50,21 @@ export default function UpdatePassword() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-background justify-center px-6 py-12 md:px-12">
-      <View className="max-w-md w-full mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+    <SafeAreaView className="flex-1 bg-canvas justify-center px-6 py-12 md:px-12">
+      <ElegantCard className="max-w-md w-full mx-auto p-8 space-y-6">
         <View className="mb-2">
-          <Text className="text-3xl font-bold text-[#0A192F] mb-2">Create New Password</Text>
-          <Text className="text-slate-500 text-sm">
+          <Text className="font-display text-3xl font-semibold text-navy mb-2">Create New Password</Text>
+          <Text className="font-sans text-slate-500 text-sm">
             Please enter your new password below. Make sure it&apos;s secure.
           </Text>
         </View>
 
         <View>
-          <Text className="text-sm font-bold text-slate-700 mb-2">New Password</Text>
+          <Text className="font-sans text-sm font-bold text-navy mb-2">New Password</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-white p-4 rounded-xl border border-inkline font-sans text-navy"
             placeholder="••••••••"
+            placeholderTextColor="#94A3B8"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -71,10 +72,11 @@ export default function UpdatePassword() {
         </View>
 
         <View>
-          <Text className="text-sm font-bold text-slate-700 mb-2">Confirm New Password</Text>
+          <Text className="font-sans text-sm font-bold text-navy mb-2">Confirm New Password</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-white p-4 rounded-xl border border-inkline font-sans text-navy"
             placeholder="••••••••"
+            placeholderTextColor="#94A3B8"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
@@ -82,14 +84,14 @@ export default function UpdatePassword() {
         </View>
 
         <View className="mt-4">
-          <AnimatedButton 
-            title={loading ? "Updating..." : "Update Password"} 
-            onPress={handleUpdate} 
-            disabled={loading} 
-            variant="primary" 
+          <GoldButton
+            label={loading ? "Updating..." : "Update Password"}
+            onPress={handleUpdate}
+            disabled={loading}
+            className="w-full"
           />
         </View>
-      </View>
+      </ElegantCard>
     </SafeAreaView>
   );
 }

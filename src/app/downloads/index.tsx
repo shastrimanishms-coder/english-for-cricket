@@ -1,6 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ElegantCard, GoldButton, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { awardExtraIfTagged } from '../../lib/extras';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -76,15 +78,13 @@ export default function DownloadsGallery() {
   };
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
+    <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
+      <ScreenHeader title="Resources" onBack={goBack} />
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="w-full max-w-5xl mx-auto">
-        <Pressable onPress={goBack} className="self-start px-4 py-2 bg-slate-200 rounded-lg mb-4">
-          <Text className="font-bold text-slate-700">← Back</Text>
-        </Pressable>
         <View className="mb-8">
-          <Text className="text-4xl font-bold text-text-primary mb-2">Resources</Text>
-          <Text className="text-lg text-text-secondary">Download worksheets, guides, and study materials.</Text>
+          <MicroLabel className="mb-2">Downloads</MicroLabel>
+          <Text className="font-sans text-lg text-slate-500">Download worksheets, guides, and study materials.</Text>
         </View>
 
         {loading ? (
@@ -92,40 +92,41 @@ export default function DownloadsGallery() {
             <ActivityIndicator size="large" color="#0A192F" />
           </View>
         ) : downloads.length === 0 ? (
-          <View className="py-20 items-center justify-center bg-white rounded-2xl border border-slate-200">
-            <Text className="text-6xl mb-4">📄</Text>
-            <Text className="text-xl font-bold text-text-primary mb-2">No Files Yet</Text>
-            <Text className="text-text-secondary">Check back soon for new resources!</Text>
-          </View>
+          <ElegantCard className="py-20 items-center justify-center px-6">
+            <View className="w-20 h-20 rounded-full bg-navy items-center justify-center mb-4">
+              <Ionicons name="document-text-outline" size={36} color="#D4AF37" />
+            </View>
+            <Text className="font-display text-xl font-semibold text-navy mb-2">No Files Yet</Text>
+            <Text className="font-sans text-slate-500">Check back soon for new resources!</Text>
+          </ElegantCard>
         ) : (
           <View className="flex-col gap-4">
             {downloads.map((item) => (
-              <View key={item.id} className="flex-col md:flex-row items-start md:items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm gap-4">
-                <View className="w-16 h-16 bg-blue-50 rounded-xl items-center justify-center border border-blue-100">
-                  <Text className="text-3xl">📥</Text>
+              <ElegantCard key={item.id} className="flex-col md:flex-row items-start md:items-center p-5 gap-4">
+                <View className="w-14 h-14 rounded-full bg-navy items-center justify-center">
+                  <Ionicons name="download-outline" size={26} color="#D4AF37" />
                 </View>
-                
+
                 <View className="flex-1">
                   {item.category && (
-                    <Text className="text-xs font-bold text-brand uppercase tracking-wider mb-1">
+                    <Text className="font-sans text-[11px] font-bold text-gold-dark uppercase tracking-[2px] mb-1">
                       {item.category}
                     </Text>
                   )}
-                  <Text className="text-lg font-bold text-text-primary mb-1">
+                  <Text className="font-sans text-lg font-bold text-navy mb-1">
                     {item.title}
                   </Text>
-                  <Text className="text-text-secondary text-sm" numberOfLines={2}>
+                  <Text className="font-sans text-slate-500 text-sm" numberOfLines={2}>
                     {item.description}
                   </Text>
                 </View>
 
-                <Pressable 
+                <GoldButton
+                  label="Download"
                   onPress={() => handleDownload(item)}
-                  className="w-full md:w-auto px-6 py-3 bg-[#0A192F] rounded-lg items-center justify-center mt-2 md:mt-0"
-                >
-                  <Text className="text-white font-bold text-sm">Download</Text>
-                </Pressable>
-              </View>
+                  className="w-full md:w-auto mt-2 md:mt-0"
+                />
+              </ElegantCard>
             ))}
           </View>
         )}

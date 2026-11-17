@@ -82,7 +82,7 @@ export default function TrickyWordsPractice({ words, lessonId, onClose }: Props)
         {fixed.size > 0 ? (
           <Text className="text-xl font-bold text-[#D4AF37] mb-6">+{fixed.size * POINTS.RED_WORD_STARS} ⭐ earned</Text>
         ) : null}
-        <Pressable onPress={() => onClose(fixed.size)} className="px-8 py-4 bg-brand rounded-full items-center">
+        <Pressable onPress={() => onClose(fixed.size)} className="px-8 py-4 bg-navy border-b-4 border-navy-deep rounded-full items-center">
           <Text className="text-white font-bold text-base">Done</Text>
         </Pressable>
       </View>
@@ -117,7 +117,7 @@ export default function TrickyWordsPractice({ words, lessonId, onClose }: Props)
       <View className="flex-row gap-3 mb-4">
         <Pressable
           onPress={() => speakWithCallback(current.word)}
-          className="flex-1 px-4 py-3 bg-slate-100 border border-slate-200 rounded-full items-center"
+          className="flex-1 px-4 py-3 bg-white border border-inkline rounded-full items-center"
         >
           <Text className="font-bold text-slate-700">🔊 Listen</Text>
         </Pressable>
@@ -130,7 +130,7 @@ export default function TrickyWordsPractice({ words, lessonId, onClose }: Props)
               speakWithCallback(current.word);
             }
           }}
-          className="flex-1 px-4 py-3 bg-slate-100 border border-slate-200 rounded-full items-center"
+          className="flex-1 px-4 py-3 bg-white border border-inkline rounded-full items-center"
         >
           <Text className="font-bold text-slate-700">🐢 Listen slowly</Text>
         </Pressable>
@@ -162,7 +162,7 @@ export default function TrickyWordsPractice({ words, lessonId, onClose }: Props)
           onPress={() => {
             if (!speech.listening) speech.start();
           }}
-          className={`px-6 py-4 rounded-full items-center mb-3 ${speech.listening ? 'bg-red-400' : 'bg-brand'}`}
+          className={`px-6 py-4 rounded-full items-center mb-3 ${speech.listening ? 'bg-red-400' : 'bg-gold border-b-4 border-gold-dark'}`}
         >
           <Text className="text-white font-bold text-base">
             {speech.listening ? '🎙️ Listening… speak now!' : '🎤 Try it — tap and say the word'}
@@ -174,7 +174,7 @@ export default function TrickyWordsPractice({ words, lessonId, onClose }: Props)
       ) : null}
 
       <View className="flex-row gap-3">
-        <Pressable onPress={next} className="flex-1 px-4 py-3 bg-slate-100 border border-slate-200 rounded-full items-center">
+        <Pressable onPress={next} className="flex-1 px-4 py-3 bg-white border border-inkline rounded-full items-center">
           <Text className="font-bold text-slate-600">{isFixed ? 'Next word →' : 'Skip for now'}</Text>
         </Pressable>
         <Pressable

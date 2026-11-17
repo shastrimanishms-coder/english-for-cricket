@@ -126,12 +126,12 @@ export default function PageManager() {
   return (
     <View className="space-y-8 gap-8 h-full">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Legal & Static Pages</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Legal & Static Pages</Text>
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6 flex-shrink-0">
-        <Text className="text-lg font-bold text-[#0A192F]">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6 flex-shrink-0">
+        <Text className="font-display text-xl font-semibold text-navy">
           {editId ? 'Edit Page' : 'Create New Page'}
         </Text>
         
@@ -139,7 +139,7 @@ export default function PageManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Page Title</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="e.g., Privacy Policy"
               value={title}
               onChangeText={handleTitleChange}
@@ -148,7 +148,7 @@ export default function PageManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">URL Slug</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-slate-500"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline text-slate-500"
               placeholder="privacy-policy"
               value={slug}
               onChangeText={setSlug}
@@ -160,7 +160,7 @@ export default function PageManager() {
         <View className="flex-1 min-h-[250px]">
           <Text className="text-sm font-semibold text-text-secondary mb-2">Page Content (Supports basic HTML structure)</Text>
           <TextInput
-            className="w-full flex-1 bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full flex-1 bg-canvas p-4 rounded-xl border border-inkline"
             placeholder="Type your policy or FAQ content here..."
             value={content}
             onChangeText={setContent}
@@ -169,7 +169,7 @@ export default function PageManager() {
           />
         </View>
 
-        <View className="flex-row justify-end gap-4 mt-2 border-t border-slate-100 pt-4">
+        <View className="flex-row justify-end gap-4 mt-2 border-t border-inkline pt-4">
           {editId && (
             <View className="w-24">
               <AnimatedButton title="Cancel" onPress={cancelEdit} variant="outline" size="sm" />
@@ -188,7 +188,7 @@ export default function PageManager() {
       </View>
 
       {/* Pages List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden flex-shrink-0">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : pages.length === 0 ? (
@@ -199,18 +199,18 @@ export default function PageManager() {
           pages.map((page, index) => (
             <View 
               key={page.id} 
-              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== pages.length - 1 ? 'border-b border-slate-100' : ''}`}
+              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== pages.length - 1 ? 'border-b border-inkline' : ''}`}
             >
               <View>
-                <Text className="font-bold text-text-primary text-base">{page.title}</Text>
-                <Text className="text-brand text-xs font-mono mt-1">/pages/{page.slug}</Text>
+                <Text className="font-sans font-bold text-text-primary text-base">{page.title}</Text>
+                <Text className="text-pitch text-xs font-mono mt-1">/pages/{page.slug}</Text>
               </View>
               
               <View className="flex-row gap-3">
-                <Pressable onPress={() => handleEdit(page)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                <Pressable onPress={() => handleEdit(page)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                   <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(page.id, page.title)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                <Pressable onPress={() => handleDelete(page.id, page.title)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                   <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                 </Pressable>
               </View>

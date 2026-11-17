@@ -12,7 +12,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedButton from '../components/ui/AnimatedButton';
+import { ElegantCard, GoldButton } from '../components/ui/Elegant';
 import { supabase } from '../lib/supabase';
 
 export default function LoginScreen() {
@@ -152,45 +152,46 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-surface-background"
+      className="flex-1 bg-canvas"
     >
       <SafeAreaView edges={['top']} className="flex-1">
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <View className="w-full max-w-lg mx-auto">
-          
+        <ElegantCard className="p-6 md:p-8">
+
           <View className="mb-8 items-center">
             {loginMode === 'pin' ? (
               <Text className="text-6xl mb-4">🏏</Text>
             ) : (
               <View className="h-16" />
             )}
-            <Text className="text-3xl md:text-4xl font-bold text-text-primary mb-2 text-center">
+            <Text className="font-display text-3xl md:text-4xl font-semibold text-navy mb-2 text-center">
               Welcome Back
             </Text>
-            <Text className="text-text-secondary text-lg text-center px-4">
-              {loginMode === 'pin' 
-                ? "For kids logging in with a Username and PIN." 
+            <Text className="font-sans text-slate-500 text-lg text-center px-4">
+              {loginMode === 'pin'
+                ? "For kids logging in with a Username and PIN."
                 : "For parents, teachers, and individual learners."}
             </Text>
           </View>
 
           {/* LOGIN TOGGLE */}
-          <View className="flex-row bg-slate-200 p-1 rounded-xl mb-8">
+          <View className="flex-row bg-canvas border border-inkline p-1 rounded-xl mb-8">
             <Pressable
               onPress={() => setLoginMode('email')}
               className={`flex-1 py-3 rounded-lg items-center ${loginMode === 'email' ? 'bg-white shadow-sm' : ''}`}
             >
-              <Text className={`font-bold text-base ${loginMode === 'email' ? 'text-text-primary' : 'text-text-secondary'}`}>
+              <Text className={`font-sans font-bold text-base ${loginMode === 'email' ? 'text-navy' : 'text-slate-500'}`}>
                 Email Account
               </Text>
             </Pressable>
             <Pressable
               onPress={() => setLoginMode('pin')}
-              className={`flex-1 py-3 rounded-lg items-center ${loginMode === 'pin' ? 'bg-brand shadow-sm' : ''}`}
+              className={`flex-1 py-3 rounded-lg items-center ${loginMode === 'pin' ? 'bg-navy shadow-sm' : ''}`}
             >
-              <Text className={`font-bold text-base ${loginMode === 'pin' ? 'text-white' : 'text-text-secondary'}`}>
+              <Text className={`font-sans font-bold text-base ${loginMode === 'pin' ? 'text-white' : 'text-slate-500'}`}>
                 Student PIN
               </Text>
             </Pressable>
@@ -198,11 +199,11 @@ export default function LoginScreen() {
 
           {/* DYNAMIC FORM */}
           {loginMode === 'pin' ? (
-            <View className="space-y-4 gap-4 mb-8">
+            <View className="space-y-4 gap-4 mb-2">
               <View>
-                <Text className="text-sm font-bold text-text-secondary mb-2 ml-1">Username</Text>
+                <Text className="font-sans text-sm font-bold text-slate-500 mb-2 ml-1">Username</Text>
                 <TextInput
-                  className="w-full bg-white p-5 rounded-2xl border-2 border-slate-200 text-text-primary text-xl font-mono"
+                  className="w-full bg-white p-5 rounded-xl border border-inkline text-navy text-xl font-mono"
                   placeholder="e.g. kenji-sha-123"
                   placeholderTextColor="#94A3B8"
                   value={username}
@@ -212,9 +213,9 @@ export default function LoginScreen() {
                 />
               </View>
               <View>
-                <Text className="text-sm font-bold text-text-secondary mb-2 ml-1">Secret PIN</Text>
+                <Text className="font-sans text-sm font-bold text-slate-500 mb-2 ml-1">Secret PIN</Text>
                 <TextInput
-                  className="w-full bg-white p-5 rounded-2xl border-2 border-slate-200 text-text-primary text-2xl font-mono tracking-widest text-center"
+                  className="w-full bg-white p-5 rounded-xl border border-inkline text-navy text-2xl font-mono tracking-widest text-center"
                   placeholder="****"
                   placeholderTextColor="#94A3B8"
                   value={pin}
@@ -224,17 +225,17 @@ export default function LoginScreen() {
                   maxLength={4}
                 />
               </View>
-              <AnimatedButton 
-                title={loading ? "Checking..." : "Let's Go! 🚀"} 
-                onPress={handlePinLogin} 
-                disabled={loading} 
-                variant="primary" 
+              <GoldButton
+                label={loading ? "Checking..." : "Let's Go! 🚀"}
+                onPress={handlePinLogin}
+                disabled={loading}
+                className="w-full"
               />
             </View>
           ) : (
             <View className="space-y-4 gap-4 mb-2">
               <TextInput
-                className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                 placeholder="Email Address"
                 placeholderTextColor="#94A3B8"
                 value={email}
@@ -243,7 +244,7 @@ export default function LoginScreen() {
                 autoCapitalize="none"
               />
               <TextInput
-                className="w-full bg-white p-4 rounded-xl border border-slate-200 text-text-primary text-lg"
+                className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                 placeholder="Password"
                 placeholderTextColor="#94A3B8"
                 value={password}
@@ -252,43 +253,44 @@ export default function LoginScreen() {
               />
               <View className="flex-row justify-end mb-4 mt-2">
                 <Link href="/forgot-password" asChild>
-                  <Text className="text-sm font-bold text-brand hover:underline">Forgot Password?</Text>
+                  <Text className="font-sans text-sm font-bold text-gold-dark hover:underline">Forgot Password?</Text>
                 </Link>
               </View>
-              <AnimatedButton 
-                title={loading ? "Logging in..." : "Log In"} 
-                onPress={handleEmailLogin} 
-                disabled={loading} 
-                variant="primary" 
+              <GoldButton
+                label={loading ? "Logging in..." : "Log In"}
+                onPress={handleEmailLogin}
+                disabled={loading}
+                className="w-full"
               />
 
               {/* --- NEW GOOGLE AUTH BUTTON SECTION --- */}
               <View className="flex-row items-center my-6">
-                <View className="flex-1 h-[1px] bg-slate-200" />
-                <Text className="mx-4 text-slate-400 font-bold">OR</Text>
-                <View className="flex-1 h-[1px] bg-slate-200" />
+                <View className="flex-1 h-[1px] bg-inkline" />
+                <Text className="mx-4 text-slate-400 font-sans font-bold">OR</Text>
+                <View className="flex-1 h-[1px] bg-inkline" />
               </View>
 
               <Pressable
                 onPress={handleGoogleAuth}
                 disabled={loading}
-                className="w-full bg-white flex-row items-center justify-center p-4 rounded-xl border border-slate-200 shadow-sm"
+                className="w-full bg-white flex-row items-center justify-center p-4 rounded-xl border border-inkline shadow-sm"
               >
                 <Text className="text-xl mr-3">🇬</Text>
-                <Text className="font-bold text-slate-700 text-lg">Continue with Google</Text>
+                <Text className="font-sans font-bold text-slate-700 text-lg">Continue with Google</Text>
               </Pressable>
               {/* --- END GOOGLE AUTH BUTTON SECTION --- */}
 
               <View className="flex-row justify-center mt-6">
-                <Text className="text-text-secondary text-base">Don&apos;t have an account? </Text>
+                <Text className="font-sans text-slate-500 text-base">Don&apos;t have an account? </Text>
                 <Link href="/register" asChild>
-                  <Text className="text-brand font-bold text-base">Register here</Text>
+                  <Text className="font-sans text-gold-dark font-bold text-base">Register here</Text>
                 </Link>
               </View>
             </View>
-            
+
           )}
 
+        </ElegantCard>
         </View>
       </ScrollView>
       </SafeAreaView>

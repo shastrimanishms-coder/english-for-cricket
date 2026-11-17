@@ -31,8 +31,33 @@ module.exports = {
         text: {
           primary: '#1E293B', 
           secondary: '#64748B', 
-        }
-      }
+        },
+        // Elegant redesign tokens (Shastri-approved direction,
+        // 2026-11-17): navy kit anchor, gold kept precious (stars,
+        // XP, the one main action), pitch green for go/correct,
+        // warm off-white canvas, hairline warm borders.
+        navy: {
+          DEFAULT: '#0A192F',
+          deep: '#060F1F',
+          soft: '#16263F',
+        },
+        gold: {
+          light: '#F3E5BE',
+          DEFAULT: '#D4AF37',
+          dark: '#B8912A',
+        },
+        pitch: {
+          light: '#E3EFE3',
+          DEFAULT: '#2E7D32',
+          dark: '#1B5E20',
+        },
+        canvas: '#FAF8F4',
+        inkline: '#E9E2D4',
+      },
+      fontFamily: {
+        display: ['Fraunces', 'Georgia', 'serif'],
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
+      },
     },
   },
   plugins: [],

@@ -244,16 +244,16 @@ export default function SpeakingManager() {
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center flex-wrap gap-4">
-        <Text className="text-2xl font-bold text-text-primary">Speaking Practice CMS</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Speaking Practice CMS</Text>
         {!showForm && !tableMissing && (
-          <Pressable onPress={openCreateForm} className="px-5 py-3 bg-brand rounded-xl">
-            <Text className="text-white font-bold text-sm">+ New Scenario</Text>
+          <Pressable onPress={openCreateForm} className="px-5 py-3 bg-gold rounded-full border-b-4 border-gold-dark">
+            <Text className="text-navy font-bold text-sm">+ New Scenario</Text>
           </Pressable>
         )}
       </View>
 
-      <View className="bg-[#0A192F] p-5 rounded-xl">
-        <Text className="text-white font-bold mb-1">🎙️ Speaking-only content</Text>
+      <View className="bg-navy p-5 rounded-[20px]">
+        <Text className="font-display text-lg font-semibold text-white mb-1">🎙️ Speaking-only content</Text>
         <Text className="text-slate-300 text-sm">
           These scenarios power the learner&apos;s Speaking Practice area (Interviews &amp; Small
           Talk). The app plays the other person; the student speaks their own lines and gets a
@@ -274,8 +274,8 @@ export default function SpeakingManager() {
           </Text>
         </View>
       ) : showForm ? (
-        <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-          <Text className="text-lg font-bold text-[#0A192F]">
+        <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+          <Text className="font-display text-xl font-semibold text-navy">
             {editId ? 'Edit Scenario' : 'Create New Scenario'}
           </Text>
 
@@ -283,7 +283,7 @@ export default function SpeakingManager() {
             <View className="flex-1">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Title</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                 placeholder="e.g., Post-Match Interview"
                 value={title}
                 onChangeText={setTitle}
@@ -292,7 +292,7 @@ export default function SpeakingManager() {
             <View className="w-full md:w-24">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Emoji</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-center"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline text-center"
                 value={emoji}
                 onChangeText={setEmoji}
                 maxLength={4}
@@ -303,7 +303,7 @@ export default function SpeakingManager() {
                 The app plays… (name)
               </Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                 placeholder="e.g., Reporter, Coach, Teammate"
                 value={otherName}
                 onChangeText={setOtherName}
@@ -319,7 +319,7 @@ export default function SpeakingManager() {
                   <Pressable
                     key={cat}
                     onPress={() => setCategory(cat)}
-                    className={`px-4 py-3 rounded-xl border ${category === cat ? 'bg-brand border-brand' : 'bg-slate-50 border-slate-200'}`}
+                    className={`px-4 py-3 rounded-full border ${category === cat ? 'bg-navy border-navy' : 'bg-white border-inkline'}`}
                   >
                     <Text className={`font-bold text-sm ${category === cat ? 'text-white' : 'text-text-secondary'}`}>
                       {cat === 'Interview' ? '🎙️ Interview' : '💬 Small Talk'}
@@ -331,7 +331,7 @@ export default function SpeakingManager() {
             <View className="flex-1">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Short Description</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
                 placeholder="One line shown on the scenario card"
                 value={description}
                 onChangeText={setDescription}
@@ -340,14 +340,14 @@ export default function SpeakingManager() {
           </View>
 
           {taggingAvailable ? (
-            <View className="gap-4 border-t border-slate-100 pt-4">
+            <View className="gap-4 border-t border-inkline pt-4">
               {speakingCats.length > 0 ? (
                 <View>
                   <Text className="text-sm font-semibold text-text-secondary mb-2">Shelf Category (optional)</Text>
                   <View className="flex-row flex-wrap gap-2">
                     <Pressable
                       onPress={() => setCategoryId('')}
-                      className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                      className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                     >
                       <Text className={`text-xs font-semibold ${categoryId === '' ? 'text-white' : 'text-slate-600'}`}>None</Text>
                     </Pressable>
@@ -355,7 +355,7 @@ export default function SpeakingManager() {
                       <Pressable
                         key={c.id}
                         onPress={() => setCategoryId(c.id)}
-                        className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                        className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                       >
                         <Text className={`text-xs font-semibold ${categoryId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
                       </Pressable>
@@ -379,14 +379,14 @@ export default function SpeakingManager() {
                     onPress={() =>
                       updateTurn(i, { speaker: turn.speaker === 'other' ? 'learner' : 'other' })
                     }
-                    className={`px-3 py-3 rounded-xl border w-28 items-center ${turn.speaker === 'other' ? 'bg-slate-100 border-slate-200' : 'bg-brand/10 border-brand/30'}`}
+                    className={`px-3 py-3 rounded-xl border w-28 items-center ${turn.speaker === 'other' ? 'bg-slate-100 border-inkline' : 'bg-pitch/10 border-pitch/30'}`}
                   >
                     <Text className="font-bold text-xs text-text-secondary">
                       {turn.speaker === 'other' ? '👤 Them' : '🗣️ You'}
                     </Text>
                   </Pressable>
                   <TextInput
-                    className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-200"
+                    className="flex-1 bg-canvas p-3 rounded-xl border border-inkline"
                     placeholder={
                       turn.speaker === 'other' ? 'What they say…' : 'What the student says…'
                     }
@@ -411,15 +411,15 @@ export default function SpeakingManager() {
             <View className="flex-row gap-2 mt-3">
               <Pressable
                 onPress={() => addTurn('other')}
-                className="px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg"
+                className="px-4 py-2 bg-slate-100 border border-inkline rounded-full"
               >
                 <Text className="text-text-secondary font-bold text-xs">+ 👤 Their line</Text>
               </Pressable>
               <Pressable
                 onPress={() => addTurn('learner')}
-                className="px-4 py-2 bg-brand/10 border border-brand/30 rounded-lg"
+                className="px-4 py-2 bg-pitch/10 border border-pitch/30 rounded-full"
               >
-                <Text className="text-brand font-bold text-xs">+ 🗣️ Student line</Text>
+                <Text className="text-pitch font-bold text-xs">+ 🗣️ Student line</Text>
               </Pressable>
             </View>
             <Text className="text-xs text-slate-400 mt-2">
@@ -428,13 +428,13 @@ export default function SpeakingManager() {
           </View>
 
           <View className="flex-row justify-end gap-3">
-            <Pressable onPress={cancelEdit} className="px-5 py-3 bg-slate-100 border border-slate-200 rounded-xl">
+            <Pressable onPress={cancelEdit} className="px-5 py-3 bg-white border border-inkline rounded-full">
               <Text className="text-text-secondary font-bold text-sm">Cancel</Text>
             </Pressable>
             <Pressable
               onPress={() => void handleSave()}
               disabled={saving}
-              className="px-5 py-3 bg-brand rounded-xl"
+              className="px-5 py-3 bg-navy rounded-full border-b-4 border-navy-deep"
             >
               <Text className="text-white font-bold text-sm">{saving ? 'Saving…' : 'Save Scenario'}</Text>
             </Pressable>
@@ -445,9 +445,9 @@ export default function SpeakingManager() {
           <ActivityIndicator size="large" color="#0A192F" />
         </View>
       ) : scenarios.length === 0 ? (
-        <View className="bg-white rounded-xl border border-slate-200 p-12 items-center">
+        <View className="bg-white rounded-[20px] border border-inkline p-12 items-center">
           <Text className="text-5xl mb-4">🎙️</Text>
-          <Text className="text-lg font-bold text-text-primary mb-2">No Scenarios Yet</Text>
+          <Text className="font-display text-xl font-semibold text-navy mb-2">No Scenarios Yet</Text>
           <Text className="text-text-secondary text-center">
             Create your first interview or small-talk scenario with the button above.
           </Text>
@@ -455,18 +455,18 @@ export default function SpeakingManager() {
       ) : (
         <View className="gap-4">
           {scenarios.map(row => (
-            <View key={row.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <View key={row.id} className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm">
               <View className="flex-row items-start justify-between gap-4 flex-wrap">
                 <View className="flex-row items-start gap-3 flex-1 min-w-[240px]">
                   <Text className="text-3xl">{row.emoji || '🎙️'}</Text>
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2 flex-wrap">
-                      <Text className="font-bold text-[#0A192F] text-lg">{row.title}</Text>
+                      <Text className="font-display font-semibold text-navy text-lg">{row.title}</Text>
                       <View className="px-2 py-0.5 rounded-md bg-slate-100">
                         <Text className="text-[11px] font-bold text-slate-500 uppercase">{row.category}</Text>
                       </View>
-                      <View className={`px-2 py-0.5 rounded-md ${row.is_published ? 'bg-emerald-50' : 'bg-amber-50'}`}>
-                        <Text className={`text-[11px] font-bold uppercase ${row.is_published ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      <View className={`px-2 py-0.5 rounded-md ${row.is_published ? 'bg-pitch-light' : 'bg-amber-50'}`}>
+                        <Text className={`text-[11px] font-bold uppercase ${row.is_published ? 'text-pitch-dark' : 'text-amber-600'}`}>
                           {row.is_published ? 'Live' : 'Hidden'}
                         </Text>
                       </View>
@@ -483,7 +483,7 @@ export default function SpeakingManager() {
                 <View className="flex-row gap-2">
                   <Pressable
                     onPress={() => void togglePublish(row)}
-                    className="px-3 py-2 bg-slate-100 rounded-lg border border-slate-200"
+                    className="px-3 py-2 bg-slate-100 rounded-full border border-inkline"
                   >
                     <Text className="text-text-secondary font-semibold text-xs">
                       {row.is_published ? 'Hide' : 'Publish'}
@@ -491,13 +491,13 @@ export default function SpeakingManager() {
                   </Pressable>
                   <Pressable
                     onPress={() => openEditForm(row)}
-                    className="px-3 py-2 bg-slate-100 rounded-lg border border-slate-200"
+                    className="px-3 py-2 bg-slate-100 rounded-full border border-inkline"
                   >
                     <Text className="text-text-secondary font-semibold text-xs">Edit</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleDelete(row)}
-                    className="px-3 py-2 bg-red-50 rounded-lg border border-red-100"
+                    className="px-3 py-2 bg-red-50 rounded-full border border-red-100"
                   >
                     <Text className="text-red-600 font-semibold text-xs">Delete</Text>
                   </Pressable>

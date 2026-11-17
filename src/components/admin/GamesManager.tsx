@@ -265,12 +265,12 @@ export default function GamesManager() {
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Games & Arcade CMS</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Games & Arcade CMS</Text>
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">
           {editId ? 'Edit Game Module' : 'Upload New Game'}
         </Text>
         
@@ -278,7 +278,7 @@ export default function GamesManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Game Title</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="e.g., Jumping Bird"
               value={title}
               onChangeText={setTitle}
@@ -294,7 +294,7 @@ export default function GamesManager() {
                   <Pressable
                     key={cat.id}
                     onPress={() => setCategoryId(cat.id)}
-                    className={`mr-2 px-4 py-3 rounded-xl border ${categoryId === cat.id ? 'border-brand bg-brand' : 'border-slate-200 bg-slate-50'}`}
+                    className={`mr-2 px-4 py-3 rounded-full border ${categoryId === cat.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                   >
                     <Text className={`font-semibold text-sm ${categoryId === cat.id ? 'text-white' : 'text-slate-600'}`}>
                       {cat.name}
@@ -307,7 +307,7 @@ export default function GamesManager() {
         </View>
 
         {taggingAvailable ? (
-          <View className="border-t border-slate-100 pt-4">
+          <View className="border-t border-inkline pt-4">
             <BelongsToPicker value={lessonId} onChange={setLessonId} />
           </View>
         ) : null}
@@ -315,27 +315,27 @@ export default function GamesManager() {
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Short Intro / How to Play</Text>
           <TextInput
-            className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
             placeholder="Briefly describe how to play..."
             value={description}
             onChangeText={setDescription}
           />
         </View>
 
-        <View className="flex-col md:flex-row gap-6 border-t border-slate-100 pt-6">
+        <View className="flex-col md:flex-row gap-6 border-t border-inkline pt-6">
           {/* Game File Upload */}
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">1. Upload Game File (.html or .zip)</Text>
             <View className="flex-row items-center gap-4">
               <Pressable 
                 onPress={pickGameFile}
-                className="px-4 py-3 bg-[#0A192F] rounded-lg"
+                className="px-4 py-3 bg-navy rounded-full"
               >
                 <Text className="text-white font-bold text-sm">Choose File</Text>
               </Pressable>
               <View className="flex-1">
                 {selectedGameFile ? (
-                  <Text className="text-brand font-semibold text-xs" numberOfLines={1}>Selected: {selectedGameFile.name}</Text>
+                  <Text className="text-pitch font-semibold text-xs" numberOfLines={1}>Selected: {selectedGameFile.name}</Text>
                 ) : gameUrl ? (
                   <Text className="text-emerald-600 text-xs font-semibold" numberOfLines={1}>Game file active in storage.</Text>
                 ) : (
@@ -351,15 +351,15 @@ export default function GamesManager() {
             <View className="flex-row items-center gap-4">
               <Pressable 
                 onPress={pickImage}
-                className="px-4 py-3 bg-[#0A192F] rounded-lg"
+                className="px-4 py-3 bg-navy rounded-full"
               >
                 <Text className="text-white font-bold text-sm">Upload Image</Text>
               </Pressable>
               <View>
                 {selectedImage ? (
-                  <Text className="text-brand font-semibold text-xs" numberOfLines={1}>{selectedImage.name}</Text>
+                  <Text className="text-pitch font-semibold text-xs" numberOfLines={1}>{selectedImage.name}</Text>
                 ) : thumbnailUrl ? (
-                  <Image source={{ uri: thumbnailUrl }} className="w-12 h-12 rounded-md border border-slate-200" />
+                  <Image source={{ uri: thumbnailUrl }} className="w-12 h-12 rounded-md border border-inkline" />
                 ) : (
                   <Text className="text-slate-400 text-xs">No thumbnail</Text>
                 )}
@@ -368,7 +368,7 @@ export default function GamesManager() {
           </View>
         </View>
 
-        <View className="flex-row justify-end gap-4 mt-2 border-t border-slate-100 pt-4">
+        <View className="flex-row justify-end gap-4 mt-2 border-t border-inkline pt-4">
           {editId && (
             <View className="w-24">
               <AnimatedButton title="Cancel" onPress={cancelEdit} variant="outline" size="sm" />
@@ -387,7 +387,7 @@ export default function GamesManager() {
       </View>
 
       {/* List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : games.length === 0 ? (
@@ -400,7 +400,7 @@ export default function GamesManager() {
             return (
               <View 
                 key={game.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== games.length - 1 ? 'border-b border-slate-100' : ''}`}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== games.length - 1 ? 'border-b border-inkline' : ''}`}
               >
                 <View className="flex-row items-center gap-4 flex-1">
                   {game.thumbnail_url ? (
@@ -412,20 +412,20 @@ export default function GamesManager() {
                   )}
                   <View>
                     <Text className="font-bold text-text-primary text-base">{game.title}</Text>
-                    <Text className="text-brand text-xs font-bold uppercase tracking-wider mt-1">{catName}</Text>
+                    <Text className="text-pitch text-xs font-bold uppercase tracking-wider mt-1">{catName}</Text>
                   </View>
                 </View>
                 
                 <View className="flex-row gap-3">
                   <Pressable onPress={() => {
                     if (Platform.OS === 'web') window.open(game.game_url, '_blank');
-                  }} className="px-3 py-1.5 bg-blue-50 rounded border border-blue-100">
-                    <Text className="text-blue-600 text-sm font-semibold">Play/Test</Text>
+                  }} className="px-3 py-1.5 bg-canvas rounded-full border border-inkline">
+                    <Text className="text-navy text-sm font-semibold">Play/Test</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleEdit(game)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                  <Pressable onPress={() => handleEdit(game)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                     <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleDelete(game.id, game.title, game.thumbnail_url, game.game_url)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                  <Pressable onPress={() => handleDelete(game.id, game.title, game.thumbnail_url, game.game_url)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                     <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                   </Pressable>
                 </View>

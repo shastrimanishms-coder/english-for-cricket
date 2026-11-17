@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GhostButton, GoldButton, MicroLabel, NavyButton } from '../components/ui/Elegant';
 import { supabase } from '../lib/supabase';
 
 interface FAQ {
@@ -124,16 +125,16 @@ export default function SupportScreen() {
   });
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
+    <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="max-w-3xl w-full mx-auto">
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-3xl md:text-4xl font-bold text-text-primary">Help & Support</Text>
-            <Pressable onPress={() => router.back()} className="px-4 py-2 bg-slate-200 rounded-lg">
-              <Text className="font-bold text-slate-700">← Back</Text>
+            <Text className="font-display text-3xl md:text-4xl font-semibold text-navy">Help & Support</Text>
+            <Pressable onPress={() => router.back()} className="px-4 py-2 bg-white border border-inkline rounded-full">
+              <Text className="font-sans font-bold text-navy">← Back</Text>
             </Pressable>
           </View>
-          <Text className="text-text-secondary text-lg mb-8">
+          <Text className="font-sans text-slate-500 text-lg mb-8">
             Answers to common questions about learning with English for Cricket.
           </Text>
 
@@ -142,35 +143,35 @@ export default function SupportScreen() {
               <ActivityIndicator size="large" color="#0A192F" />
             </View>
           ) : faqs.length === 0 ? (
-            <View className="py-16 items-center justify-center bg-white rounded-2xl border border-slate-200 px-6">
+            <View className="py-16 items-center justify-center bg-white rounded-[20px] border border-inkline shadow-sm px-6">
               <Text className="text-5xl mb-4">❓</Text>
-              <Text className="text-xl font-bold text-text-primary mb-2">No FAQs Yet</Text>
-              <Text className="text-text-secondary text-center">
+              <Text className="font-sans text-xl font-bold text-navy mb-2">No FAQs Yet</Text>
+              <Text className="font-sans text-slate-500 text-center">
                 Help articles are on the way. If you need a hand right now, contact us below.
               </Text>
             </View>
           ) : (
             sections.map((section) => (
               <View key={section.name} className="mb-8">
-                <Text className="text-sm font-bold text-brand uppercase tracking-wider mb-3">{section.name}</Text>
-                <View className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <MicroLabel className="mb-3">{section.name}</MicroLabel>
+                <View className="bg-white rounded-[20px] border border-inkline shadow-sm overflow-hidden">
                   {section.items.map((faq, idx) => {
                     const expanded = expandedId === faq.id;
                     return (
-                      <View key={faq.id} className={idx !== section.items.length - 1 ? 'border-b border-slate-100' : ''}>
+                      <View key={faq.id} className={idx !== section.items.length - 1 ? 'border-b border-inkline' : ''}>
                         <Pressable
                           onPress={() => setExpandedId(expanded ? null : faq.id)}
                           className="flex-row items-center justify-between p-4"
                         >
-                          <Text className="font-bold text-text-primary text-base flex-1 pr-4">{faq.question}</Text>
-                          <Text className="text-slate-400 font-bold">{expanded ? '▲' : '▼'}</Text>
+                          <Text className="font-sans font-bold text-navy text-base flex-1 pr-4">{faq.question}</Text>
+                          <Text className="text-gold-dark font-bold">{expanded ? '▲' : '▼'}</Text>
                         </Pressable>
                         {expanded && (
                           <View className="px-4 pb-4">
-                            <Text className="text-text-secondary leading-relaxed">{faq.answer}</Text>
+                            <Text className="font-sans text-slate-500 leading-relaxed">{faq.answer}</Text>
                             {faq.video_url ? (
                               <Pressable onPress={() => Linking.openURL(faq.video_url!)}>
-                                <Text className="text-action font-bold mt-3">▶ Watch the video guide</Text>
+                                <Text className="font-sans text-gold-dark font-bold mt-3">▶ Watch the video guide</Text>
                               </Pressable>
                             ) : null}
                           </View>
@@ -186,42 +187,39 @@ export default function SupportScreen() {
           {/* Contact form - submissions land in the admin panel inbox
               (support_messages table). Shown whether or not the FAQs
               loaded, and independent of the support email below. */}
-          <View className="bg-white rounded-2xl border border-slate-200 p-6 mb-8">
-            <Text className="text-xl font-bold text-text-primary mb-2">Send us a message</Text>
+          <View className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 mb-8">
+            <Text className="font-display text-2xl font-semibold text-navy mb-2">Send us a message</Text>
             {formSent ? (
               <View className="items-center py-6">
                 <Text className="text-5xl mb-4">✅</Text>
-                <Text className="text-lg font-bold text-text-primary mb-2">Message sent</Text>
-                <Text className="text-text-secondary text-center mb-6">
+                <Text className="font-sans text-lg font-bold text-navy mb-2">Message sent</Text>
+                <Text className="font-sans text-slate-500 text-center mb-6">
                   Thank you for getting in touch - we usually reply within a few days.
                 </Text>
-                <Pressable
-                  onPress={() => setFormSent(false)}
-                  className="px-6 py-3 bg-slate-200 rounded-xl"
-                >
-                  <Text className="font-bold text-slate-700">Send another message</Text>
-                </Pressable>
+                <GhostButton label="Send another message" onPress={() => setFormSent(false)} />
               </View>
             ) : (
               <View>
-                <Text className="text-text-secondary mb-5">
+                <Text className="font-sans text-slate-500 mb-5">
                   Questions, feedback or ideas - write to us here and we will get back to you by email.
                 </Text>
 
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Your name *</Text>
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Your name *</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4"
+                  className="w-full bg-white p-4 rounded-xl border border-inkline font-sans text-navy mb-4"
                   placeholder="e.g., Yuki Tanaka"
+                  placeholderTextColor="#94A3B8"
                   value={formName}
                   onChangeText={setFormName}
                   maxLength={120}
                   editable={!formSending}
                 />
 
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Your email *</Text>
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Your email *</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4"
+                  className="w-full bg-white p-4 rounded-xl border border-inkline font-sans text-navy mb-4"
                   placeholder="you@example.com"
+                  placeholderTextColor="#94A3B8"
                   value={formEmail}
                   onChangeText={setFormEmail}
                   maxLength={254}
@@ -230,20 +228,22 @@ export default function SupportScreen() {
                   editable={!formSending}
                 />
 
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Subject (optional)</Text>
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Subject (optional)</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4"
+                  className="w-full bg-white p-4 rounded-xl border border-inkline font-sans text-navy mb-4"
                   placeholder="What is this about?"
+                  placeholderTextColor="#94A3B8"
                   value={formSubject}
                   onChangeText={setFormSubject}
                   maxLength={200}
                   editable={!formSending}
                 />
 
-                <Text className="text-sm font-semibold text-text-secondary mb-2">Message *</Text>
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Message *</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 min-h-[120px] mb-4"
+                  className="w-full bg-white p-4 rounded-xl border border-inkline font-sans text-navy min-h-[120px] mb-4"
                   placeholder="How can we help?"
+                  placeholderTextColor="#94A3B8"
                   value={formMessage}
                   onChangeText={setFormMessage}
                   maxLength={5000}
@@ -253,18 +253,15 @@ export default function SupportScreen() {
                 />
 
                 {formError && (
-                  <Text className="text-red-600 font-semibold mb-4">{formError}</Text>
+                  <Text className="font-sans text-red-600 font-semibold mb-4">{formError}</Text>
                 )}
 
-                <Pressable
+                <GoldButton
+                  label={formSending ? 'Sending...' : '📩 Send message'}
                   onPress={handleSendMessage}
                   disabled={formSending}
-                  className={`px-6 py-3 bg-brand rounded-xl self-start ${formSending ? 'opacity-60' : ''}`}
-                >
-                  <Text className="text-white font-bold">
-                    {formSending ? 'Sending...' : '📩 Send message'}
-                  </Text>
-                </Pressable>
+                  className="self-start"
+                />
               </View>
             )}
           </View>
@@ -272,17 +269,15 @@ export default function SupportScreen() {
           {/* Contact - only shown when a support email is configured
               in System Settings (site_settings.support_email). */}
           {supportEmail && (
-            <View className="bg-white rounded-2xl border border-slate-200 p-6 items-center">
-              <Text className="text-xl font-bold text-text-primary mb-2">Still stuck?</Text>
-              <Text className="text-text-secondary text-center mb-4">
+            <View className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 items-center">
+              <Text className="font-display text-2xl font-semibold text-navy mb-2">Still stuck?</Text>
+              <Text className="font-sans text-slate-500 text-center mb-4">
                 Send us an email and we will get back to you.
               </Text>
-              <Pressable
+              <NavyButton
+                label={`✉️ ${supportEmail}`}
                 onPress={() => Linking.openURL(`mailto:${supportEmail}`)}
-                className="px-6 py-3 bg-brand rounded-xl"
-              >
-                <Text className="text-white font-bold">✉️ {supportEmail}</Text>
-              </Pressable>
+              />
             </View>
           )}
         </View>

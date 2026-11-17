@@ -50,24 +50,23 @@ export default function RewardsCard() {
   const level = levelForXp(totals.xp);
 
   return (
-    <View className="bg-[#0A192F] rounded-2xl p-5 mb-8">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-3">
-          <Text className="text-3xl">{level.emoji}</Text>
-          <View>
-            <Text className="text-white font-bold text-lg">{level.name}</Text>
-            <Text className="text-white/60 text-xs font-semibold">{totals.xp} XP earned</Text>
-          </View>
+    <View className="mb-8 rounded-full border border-inkline bg-white py-3 pl-5 pr-5 shadow-sm">
+      <View className="flex-row items-center gap-3">
+        <Text className="text-xl">{level.emoji}</Text>
+        <Text className="font-sans text-sm font-bold uppercase tracking-[1.5px] text-navy">
+          {level.name} · {totals.xp} XP
+        </Text>
+        <View className="h-[3px] flex-1 overflow-hidden rounded-full bg-gold-light">
+          <View
+            className="h-full rounded-full bg-gold"
+            style={{ width: `${Math.round(level.progress * 100)}%` }}
+          />
         </View>
-        <View className="items-end">
-          <Text className="text-[#D4AF37] font-bold text-lg">⭐ {totals.stars}</Text>
-          <Text className="text-white/60 text-xs font-semibold">stars collected</Text>
-        </View>
+        <Text className="font-sans text-sm font-bold uppercase tracking-[1.5px] text-navy">
+          ⭐ {totals.stars} stars
+        </Text>
       </View>
-      <View className="h-2.5 bg-white/15 rounded-full mt-4 overflow-hidden">
-        <View className="h-full bg-[#D4AF37] rounded-full" style={{ width: `${Math.round(level.progress * 100)}%` }} />
-      </View>
-      <Text className="text-white/70 text-xs mt-2">
+      <Text className="mt-1.5 pl-9 text-xs font-medium text-slate-400">
         {level.nextAt
           ? `${level.nextAt - totals.xp} XP to the next level`
           : 'Top level — you are an MVP! 🏆'}

@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedButton from '../../components/ui/AnimatedButton';
+import { GoldButton, NavyButton, ScreenHeader } from '../../components/ui/Elegant';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
@@ -155,46 +155,34 @@ export default function OrganizationSettings() {
 
   if (loading || guardStatus !== 'authorized') {
     return (
-      <View className="flex-1 bg-surface-background justify-center items-center">
-        <ActivityIndicator size="large" color="#047857" />
+      <View className="flex-1 bg-canvas justify-center items-center">
+        <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-surface-background">
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-canvas">
       {/* Header */}
-      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
-        <View className="max-w-4xl w-full mx-auto flex-row justify-between items-center p-6">
-          <Text className="text-xl md:text-2xl font-bold text-text-primary">Organization Settings</Text>
-          
-          {/* UI FIX: Constrain header button width */}
-          <View className="w-40 md:w-48">
-            <AnimatedButton 
-              title="Back to Dashboard" 
-              onPress={() => router.back()} 
-              variant="outline" 
-              size="sm" 
-            />
-          </View>
-        </View>
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader title="Organization Settings" onBack={() => router.back()} />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="max-w-3xl w-full mx-auto space-y-8 gap-8">
           
-          <View className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4 gap-4">
+          <View className="bg-white p-6 rounded-[20px] shadow-sm border border-inkline space-y-4 gap-4">
             <View>
-              <Text className="text-lg font-bold text-text-primary mb-1">Family / School Profile</Text>
-              <Text className="text-sm text-text-secondary mb-4">
+              <Text className="font-display text-lg font-semibold text-navy mb-1">Family / School Profile</Text>
+              <Text className="font-sans text-sm text-slate-500 mb-4">
                 This entity acts as the umbrella for all your student accounts.
               </Text>
             </View>
 
             <View>
-              <Text className="text-sm font-semibold text-text-secondary mb-2">Organization Name</Text>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Organization Name</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary text-base"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy text-base"
                 placeholder="e.g., Shastri Family or Osaka Academy"
                 value={orgName}
                 onChangeText={setOrgName}
@@ -202,25 +190,25 @@ export default function OrganizationSettings() {
             </View>
 
             <View>
-              <Text className="text-sm font-semibold text-text-secondary mb-2">Organization Code (Auto-generated)</Text>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Organization Code (Auto-generated)</Text>
               <TextInput
-                className="w-full bg-slate-100 p-4 rounded-xl border border-slate-200 text-slate-500 text-base"
+                className="w-full bg-[#F1ECE1] p-4 rounded-xl border border-inkline font-sans text-slate-500 text-base"
                 value={orgCode || 'Will be generated upon saving'}
                 editable={false}
               />
-              <Text className="text-xs text-text-secondary mt-2">
+              <Text className="font-sans text-xs text-slate-500 mt-2">
                 This unique code is used to generate secure usernames for your students (e.g., kenji-{orgCode || 'abc'}-492).
               </Text>
             </View>
           </View>
 
-          <View className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4 gap-4">
-            <Text className="text-lg font-bold text-text-primary mb-2">Manager Information</Text>
-            
+          <View className="bg-white p-6 rounded-[20px] shadow-sm border border-inkline space-y-4 gap-4">
+            <Text className="font-display text-lg font-semibold text-navy mb-2">Manager Information</Text>
+
             <View>
-              <Text className="text-sm font-semibold text-text-secondary mb-2">Your Display Name</Text>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Your Display Name</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary text-base"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy text-base"
                 placeholder="Your Name"
                 value={displayName}
                 onChangeText={setDisplayName}
@@ -228,39 +216,36 @@ export default function OrganizationSettings() {
             </View>
 
             <View>
-              <Text className="text-sm font-semibold text-text-secondary mb-2">Email Address</Text>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Email Address</Text>
               <View className="flex-row items-center gap-4">
                 <TextInput
-                  className="flex-1 bg-slate-100 p-4 rounded-xl border border-slate-200 text-slate-500 text-base"
+                  className="flex-1 bg-[#F1ECE1] p-4 rounded-xl border border-inkline font-sans text-slate-500 text-base"
                   value={email}
                   editable={false}
                 />
-                
-                {/* UI FIX: Constrain inline button width */}
-                <View className="w-24 md:w-32">
-                  <AnimatedButton 
-                    title="Update" 
-                    onPress={() => Alert.alert('Coming Soon', 'Email update flow requires re-verification.')} 
-                    variant="secondary" 
-                    size="sm" 
-                  />
-                </View>
+
+                <Pressable
+                  onPress={() => Alert.alert('Coming Soon', 'Email update flow requires re-verification.')}
+                  className="items-center justify-center rounded-full border-b-4 border-navy-deep bg-navy px-5 py-3 active:opacity-90"
+                >
+                  <Text className="font-sans text-sm font-bold text-white">Update</Text>
+                </Pressable>
               </View>
             </View>
           </View>
 
-          <View className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4 gap-4">
+          <View className="bg-white p-6 rounded-[20px] shadow-sm border border-inkline space-y-4 gap-4">
             <View>
-              <Text className="text-lg font-bold text-text-primary mb-1">Change Password</Text>
-              <Text className="text-sm text-text-secondary">
+              <Text className="font-display text-lg font-semibold text-navy mb-1">Change Password</Text>
+              <Text className="font-sans text-sm text-slate-500">
                 Set a new password for your manager account. You will stay signed in here; the new password applies from your next sign-in.
               </Text>
             </View>
 
             <View>
-              <Text className="text-sm font-semibold text-text-secondary mb-2">New Password</Text>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">New Password</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary text-base"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy text-base"
                 placeholder="At least 6 characters"
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -271,9 +256,9 @@ export default function OrganizationSettings() {
             </View>
 
             <View>
-              <Text className="text-sm font-semibold text-text-secondary mb-2">Confirm New Password</Text>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Confirm New Password</Text>
               <TextInput
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary text-base"
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy text-base"
                 placeholder="Type the new password again"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -284,22 +269,22 @@ export default function OrganizationSettings() {
             </View>
 
             <View className="w-full md:w-64">
-              <AnimatedButton
-                title={changingPassword ? 'Updating...' : 'Update Password'}
+              <NavyButton
+                label={changingPassword ? 'Updating...' : 'Update Password'}
                 onPress={handleChangePassword}
                 disabled={changingPassword}
-                variant="secondary"
+                className="w-full"
               />
             </View>
           </View>
 
           {/* UI FIX: Align save button nicely on desktop */}
           <View className="mt-4 w-full md:w-64 md:self-end">
-            <AnimatedButton 
-              title={saving ? "Saving Changes..." : "Save Settings"} 
-              onPress={handleSave} 
-              disabled={saving} 
-              variant="primary" 
+            <GoldButton
+              label={saving ? "Saving Changes..." : "Save Settings"}
+              onPress={handleSave}
+              disabled={saving}
+              className="w-full"
             />
           </View>
 

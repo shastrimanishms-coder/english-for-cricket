@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AnimatedButton from '../../components/ui/AnimatedButton';
+import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { fetchExtrasDone } from '../../lib/extras';
 import { fetchPointTotals, levelForXp } from '../../lib/points';
@@ -104,9 +105,9 @@ function StudentExtras({ studentId }: { studentId: string }) {
   const level = levelForXp(info.xp);
 
   return (
-    <View className="mb-6 bg-amber-50 border border-amber-100 rounded-xl p-4">
-      <Text className="text-sm font-bold text-amber-700 uppercase mb-1">Rewards & Extras</Text>
-      <Text className="text-slate-600">
+    <View className="mb-6 bg-gold-light/50 border border-gold/40 rounded-2xl p-4">
+      <MicroLabel className="mb-1">Rewards & Extras</MicroLabel>
+      <Text className="font-sans text-slate-600">
         {level.emoji} {level.name} · {info.xp} XP · ⭐ {info.stars} stars · {info.extras} recommended extras done
         {info.readingCount > 0
           ? ` · 📖 Smart Reading: ${info.readingCount} session${info.readingCount > 1 ? 's' : ''}${info.readingBest !== null ? `, best accuracy ${info.readingBest}%` : ''}`
@@ -273,26 +274,21 @@ export default function LearningProgress() {
 
   if (loading || guardStatus !== 'authorized') {
     return (
-      <View className="flex-1 bg-surface-background justify-center items-center">
+      <View className="flex-1 bg-canvas justify-center items-center">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-surface-background">
-      <SafeAreaView edges={['top']} className="w-full bg-surface shadow-sm border-b border-slate-200">
-        <View className="max-w-5xl w-full mx-auto flex-row justify-between items-center p-6">
-          <Text className="text-xl md:text-2xl font-bold text-text-primary">Learning Progress</Text>
-          <View className="w-40 md:w-48">
-            <AnimatedButton title="Back to Dashboard" onPress={() => router.push('/manager')} variant="outline" size="sm" />
-          </View>
-        </View>
+    <View className="flex-1 bg-canvas">
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader title="Learning Progress" onBack={() => router.push('/manager')} />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         <View className="max-w-5xl w-full mx-auto space-y-6">
-          <Text className="text-text-secondary text-lg mb-4">
+          <Text className="font-sans text-slate-500 text-lg mb-4">
             Track lesson completion, accuracy, and earned badges for all your students.
           </Text>
 
@@ -306,27 +302,29 @@ export default function LearningProgress() {
                 onPress={() => setPeriod(p)}
                 className={`px-5 py-2.5 rounded-full border ${
                   period === p
-                    ? 'bg-[#0A192F] border-[#0A192F]'
-                    : 'bg-white border-slate-300'
+                    ? 'bg-navy border-navy'
+                    : 'bg-white border-inkline'
                 }`}
               >
-                <Text className={`font-bold text-sm ${period === p ? 'text-white' : 'text-slate-600'}`}>
+                <Text className={`font-sans font-bold text-sm ${period === p ? 'text-white' : 'text-slate-600'}`}>
                   {PERIOD_LABELS[p]}
                 </Text>
               </Pressable>
             ))}
           </View>
-          <Text className="text-sm text-text-secondary mb-6">
+          <Text className="font-sans text-sm text-slate-500 mb-6">
             {PERIOD_LABELS[period]}: {students.reduce((sum, s) => sum + s.lessonsCompleted, 0)} lessons
             completed • {formatPlaytime(students.reduce((sum, s) => sum + s.playtimeSeconds, 0))} total
             playtime • Badges are always all-time
           </Text>
 
           {students.length === 0 ? (
-            <View className="bg-white p-12 rounded-2xl border border-slate-200 items-center">
-              <Text className="text-5xl mb-4">📊</Text>
-              <Text className="text-xl font-bold text-text-primary">No Students Yet</Text>
-              <Text className="text-text-secondary mt-2">Add students in the &apos;My Students&apos; tab to see their progress.</Text>
+            <View className="bg-white p-12 rounded-[20px] border border-inkline shadow-sm items-center">
+              <View className="w-16 h-16 rounded-full bg-navy items-center justify-center mb-4">
+                <Ionicons name="stats-chart" size={28} color="#D4AF37" />
+              </View>
+              <Text className="font-display text-xl font-semibold text-navy">No Students Yet</Text>
+              <Text className="font-sans text-slate-500 mt-2">Add students in the &apos;My Students&apos; tab to see their progress.</Text>
             </View>
           ) : (
             studentGroups.map((group) => {
@@ -338,31 +336,31 @@ export default function LearningProgress() {
                     onPress={() => setCollapsedGroups(prev => ({ ...prev, [group.label]: !prev[group.label] }))}
                     className="flex-row items-center justify-between py-2"
                   >
-                    <Text className="font-bold text-[#0A192F]">
+                    <Text className="font-sans font-bold text-navy">
                       {groupOpen ? '▾' : '▸'} 📚 {group.label}
                     </Text>
-                    <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <MicroLabel>
                       {group.students.length} {group.students.length === 1 ? 'student' : 'students'}
-                    </Text>
+                    </MicroLabel>
                   </Pressable>
 
                   {groupOpen && group.students.map((student) => {
                     const rowOpen = !!expandedStudents[student.id];
                     return (
-                      <View key={student.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+                      <View key={student.id} className="bg-white rounded-[20px] border border-inkline shadow-sm mb-4 overflow-hidden">
                         {/* Collapsed header: name + ID + headline figures */}
                         <Pressable
                           onPress={() => setExpandedStudents(prev => ({ ...prev, [student.id]: !prev[student.id] }))}
                           className="flex-row items-center gap-4 p-5"
                         >
-                          <View className="w-12 h-12 bg-brand/10 rounded-full items-center justify-center border border-brand/20">
+                          <View className="w-12 h-12 bg-gold-light rounded-full items-center justify-center border border-gold/40">
                             <Text className="text-2xl">{getMascot(student.gender, student.avatar_url)}</Text>
                           </View>
                           <View className="flex-1">
-                            <Text className="text-lg font-bold text-[#0A192F]">{student.display_name}</Text>
+                            <Text className="font-sans text-lg font-bold text-navy">{student.display_name}</Text>
                             <Text className="text-xs text-slate-400 font-mono">{student.username}</Text>
                           </View>
-                          <Text className="text-sm font-bold text-slate-500">
+                          <Text className="font-sans text-sm font-bold text-slate-500">
                             {student.lessonsCompleted} lessons • {student.accuracyPercent !== null ? `${student.accuracyPercent}%` : '--%'}
                           </Text>
                           <Text className="text-slate-400">{rowOpen ? '▾' : '▸'}</Text>
@@ -372,36 +370,36 @@ export default function LearningProgress() {
                           <View className="px-6 pb-6">
                             {/* Telemetry Stats */}
                             <View className="flex-row flex-wrap gap-4 mb-6">
-                              <View className="flex-1 min-w-[120px] bg-slate-50 p-4 rounded-xl border border-slate-100 items-center">
-                                <Text className="text-xs font-bold text-slate-500 uppercase mb-1">Playtime</Text>
-                                <Text className="text-xl font-bold text-text-primary">{formatPlaytime(student.playtimeSeconds)}</Text>
+                              <View className="flex-1 min-w-[120px] bg-canvas p-4 rounded-xl border border-inkline items-center">
+                                <Text className="font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Playtime</Text>
+                                <Text className="font-display text-2xl font-semibold text-navy">{formatPlaytime(student.playtimeSeconds)}</Text>
                               </View>
-                              <View className="flex-1 min-w-[120px] bg-emerald-50 p-4 rounded-xl border border-emerald-100 items-center">
-                                <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Accuracy</Text>
-                                <Text className="text-xl font-bold text-emerald-800">
+                              <View className="flex-1 min-w-[120px] bg-pitch-light p-4 rounded-xl border border-pitch/20 items-center">
+                                <Text className="font-sans text-[11px] font-bold text-pitch-dark uppercase tracking-wider mb-1">Accuracy</Text>
+                                <Text className="font-display text-2xl font-semibold text-pitch-dark">
                                   {student.accuracyPercent !== null ? `${student.accuracyPercent}%` : '--%'}
                                 </Text>
                               </View>
-                              <View className="flex-1 min-w-[120px] bg-blue-50 p-4 rounded-xl border border-blue-100 items-center">
-                                <Text className="text-xs font-bold text-blue-600 uppercase mb-1">Lessons</Text>
-                                <Text className="text-xl font-bold text-blue-800">{student.lessonsCompleted}</Text>
+                              <View className="flex-1 min-w-[120px] bg-navy/5 p-4 rounded-xl border border-navy/10 items-center">
+                                <Text className="font-sans text-[11px] font-bold text-navy uppercase tracking-wider mb-1">Lessons</Text>
+                                <Text className="font-display text-2xl font-semibold text-navy">{student.lessonsCompleted}</Text>
                               </View>
                             </View>
 
                             <StudentExtras studentId={student.id} />
 
                             {/* Badges Section */}
-                            <Text className="text-sm font-bold text-text-secondary uppercase mb-3">Earned Badges</Text>
+                            <MicroLabel className="mb-3">Earned Badges</MicroLabel>
                             {student.badges.length === 0 ? (
-                              <View className="bg-slate-50 py-6 rounded-xl border border-slate-100 items-center border-dashed">
-                                <Text className="text-slate-400">No badges earned yet.</Text>
+                              <View className="bg-canvas py-6 rounded-xl border border-inkline items-center border-dashed">
+                                <Text className="font-sans text-slate-400">No badges earned yet.</Text>
                               </View>
                             ) : (
                               <View className="flex-row flex-wrap gap-3">
                                 {student.badges.map((badge, idx) => (
-                                  <View key={idx} className="bg-amber-50 px-4 py-2 rounded-lg border border-amber-200 flex-row items-center gap-2">
+                                  <View key={idx} className="bg-gold-light/60 px-4 py-2 rounded-full border border-gold/40 flex-row items-center gap-2">
                                     <Text className="text-lg">{badge.image_url || '🏆'}</Text>
-                                    <Text className="font-bold text-amber-800 text-sm">{badge.title}</Text>
+                                    <Text className="font-sans font-bold text-gold-dark text-sm">{badge.title}</Text>
                                   </View>
                                 ))}
                               </View>

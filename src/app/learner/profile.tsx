@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import { ElegantCard, ScreenHeader } from '../../components/ui/Elegant';
 import RewardsCard from '../../components/ui/RewardsCard';
 import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
 import { showAlert } from '../../lib/showAlert';
@@ -224,57 +225,53 @@ export default function StudentProfile() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-surface-background items-center justify-center">
+      <View className="flex-1 bg-canvas items-center justify-center">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
+    <View className="flex-1 bg-canvas">
+    <SafeAreaView edges={['top']} className="w-full bg-navy">
+      <ScreenHeader title="My Profile" onBack={() => router.push('/learner')} />
+    </SafeAreaView>
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
       <View className="max-w-2xl w-full mx-auto space-y-6">
-        
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-3xl font-bold text-[#0A192F]">My Profile</Text>
-          <Pressable onPress={() => router.push('/learner')} className="px-4 py-2 bg-slate-200 rounded-lg">
-            <Text className="font-bold text-slate-700">← Back</Text>
-          </Pressable>
-        </View>
 
         {/* Identity Card */}
-        <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm items-center">
-          <View className="w-24 h-24 bg-brand/10 rounded-full items-center justify-center mb-4">
+        <ElegantCard className="p-6 items-center">
+          <View className="w-24 h-24 bg-gold-light rounded-full items-center justify-center mb-4">
             <Text className="text-5xl">👤</Text>
           </View>
-          <Text className="text-2xl font-bold text-text-primary mb-1">
+          <Text className="font-display text-2xl font-semibold text-navy mb-1">
             {profile?.username || profile?.display_name}
           </Text>
           <Text className="text-slate-500 font-mono">ID: {profile?.id.split('-')[0]}</Text>
-          
+
           <View className="flex-row gap-4 mt-6 w-full">
-            <View className="flex-1 bg-emerald-50 p-4 rounded-xl border border-emerald-100 items-center">
-              <Text className="text-xs font-bold text-emerald-600 uppercase mb-1">Status</Text>
-              <Text className="text-lg font-bold text-emerald-800">Active</Text>
+            <View className="flex-1 bg-pitch-light p-4 rounded-xl border border-pitch-light items-center">
+              <Text className="font-sans text-xs font-bold text-pitch-dark uppercase mb-1">Status</Text>
+              <Text className="font-sans text-lg font-bold text-pitch-dark">Active</Text>
             </View>
-            <View className="flex-1 bg-blue-50 p-4 rounded-xl border border-blue-100 items-center">
-              <Text className="text-xs font-bold text-blue-600 uppercase mb-1">Role</Text>
-              <Text className="text-lg font-bold text-blue-800 capitalize">
+            <View className="flex-1 bg-navy/5 p-4 rounded-xl border border-inkline items-center">
+              <Text className="font-sans text-xs font-bold text-navy uppercase mb-1">Role</Text>
+              <Text className="font-sans text-lg font-bold text-navy capitalize">
                 {isEmailUser ? 'Learner' : 'Student'}
               </Text>
             </View>
           </View>
-        </View>
+        </ElegantCard>
 
         {/* Location (email learners only) */}
         {isEmailUser && (
-          <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <Text className="text-xl font-bold text-[#0A192F] mb-4">My Location</Text>
+          <ElegantCard className="p-6">
+            <Text className="font-display text-xl font-semibold text-navy mb-4">My Location</Text>
             <View className="space-y-4 gap-4">
               <View>
-                <Text className="text-sm font-bold text-slate-700 mb-2">Country</Text>
+                <Text className="font-sans text-sm font-bold text-slate-700 mb-2">Country</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary"
+                  className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy"
                   placeholder="e.g., Japan"
                   value={country}
                   onChangeText={setCountry}
@@ -282,9 +279,9 @@ export default function StudentProfile() {
                 />
               </View>
               <View>
-                <Text className="text-sm font-bold text-slate-700 mb-2">Region</Text>
+                <Text className="font-sans text-sm font-bold text-slate-700 mb-2">Region</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-text-primary"
+                  className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy"
                   placeholder="e.g., Osaka"
                   value={region}
                   onChangeText={setRegion}
@@ -300,7 +297,7 @@ export default function StudentProfile() {
                 />
               </View>
             </View>
-          </View>
+          </ElegantCard>
         )}
 
         {/* XP & Stars */}
@@ -308,38 +305,38 @@ export default function StudentProfile() {
 
         {/* My Progress: Journey map + placement test live here now
             (moved off the home grid at Shastri's request) */}
-        <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <Text className="text-xl font-bold text-[#0A192F] mb-4">My Progress</Text>
+        <ElegantCard className="p-6">
+          <Text className="font-display text-xl font-semibold text-navy mb-4">My Progress</Text>
           <Pressable
             onPress={() => router.push('/learner/journey')}
-            className="flex-row items-center justify-between py-3 border-b border-slate-100"
+            className="flex-row items-center justify-between py-3 border-b border-inkline"
           >
             <View className="flex-1 pr-3">
-              <Text className="text-base font-bold text-slate-800">🗺️ My Journey</Text>
-              <Text className="text-sm text-slate-500">
+              <Text className="font-sans text-base font-bold text-navy">🗺️ My Journey</Text>
+              <Text className="font-sans text-sm text-slate-500">
                 Your whole path on one map — lessons finished, extras collected, and what is still waiting.
               </Text>
             </View>
-            <Text className="text-[#D4AF37] font-bold text-lg">›</Text>
+            <Text className="text-gold font-bold text-lg">›</Text>
           </Pressable>
           <Pressable
             onPress={() => router.push('/learner/placement')}
             className="flex-row items-center justify-between py-3"
           >
             <View className="flex-1 pr-3">
-              <Text className="text-base font-bold text-slate-800">🎯 Find Your Start</Text>
-              <Text className="text-sm text-slate-500">
+              <Text className="font-sans text-base font-bold text-navy">🎯 Find Your Start</Text>
+              <Text className="font-sans text-sm text-slate-500">
                 Take or retake the short placement test any time. It suggests the best stage to start from — nothing is ever locked.
               </Text>
             </View>
-            <Text className="text-[#D4AF37] font-bold text-lg">›</Text>
+            <Text className="text-gold font-bold text-lg">›</Text>
           </Pressable>
-        </View>
+        </ElegantCard>
 
         {/* Study Days (migration 16) */}
-        <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <Text className="text-xl font-bold text-[#0A192F] mb-2">My Study Days 📅</Text>
-          <Text className="text-slate-500 mb-4">
+        <ElegantCard className="p-6">
+          <Text className="font-display text-xl font-semibold text-navy mb-2">My Study Days 📅</Text>
+          <Text className="font-sans text-slate-500 mb-4">
             Pick the days you plan to study each week. Your streak and streak badges only count these days — rest days never break your streak, and you can still practise on any day you like.
           </Text>
           <StudyDaysPicker value={studyDays} onChange={setStudyDays} />
@@ -351,46 +348,46 @@ export default function StudentProfile() {
               variant="primary"
             />
           </View>
-        </View>
+        </ElegantCard>
 
         {/* Earned Badges (hidden until the student earns one) */}
         {earnedBadges.length > 0 && (
-          <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <Text className="text-xl font-bold text-[#0A192F] mb-4">My Badges</Text>
+          <ElegantCard className="p-6">
+            <Text className="font-display text-xl font-semibold text-navy mb-4">My Badges</Text>
             <View className="flex-row flex-wrap gap-4">
               {earnedBadges.map((badge, idx) => (
                 <View key={idx} className="items-center w-24">
                   {badge.image_url && badge.image_url.startsWith('http') ? (
                     <Image
                       source={{ uri: badge.image_url }}
-                      className="w-16 h-16 rounded-full border border-amber-200 bg-amber-50"
+                      className="w-16 h-16 rounded-full border border-gold bg-gold-light"
                     />
                   ) : (
-                    <View className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 items-center justify-center">
+                    <View className="w-16 h-16 rounded-full bg-gold-light border border-gold items-center justify-center">
                       <Text className="text-3xl">{badge.image_url || '🏆'}</Text>
                     </View>
                   )}
-                  <Text className="font-bold text-slate-700 text-sm text-center mt-2">{badge.title}</Text>
+                  <Text className="font-sans font-bold text-navy text-sm text-center mt-2">{badge.title}</Text>
                   {badge.description ? (
-                    <Text className="text-xs text-slate-400 text-center mt-0.5">{badge.description}</Text>
+                    <Text className="font-sans text-xs text-slate-400 text-center mt-0.5">{badge.description}</Text>
                   ) : null}
                 </View>
               ))}
             </View>
-          </View>
+          </ElegantCard>
         )}
 
         {/* Security Settings (Only shown for PIN Students) */}
         {!isEmailUser && (
-          <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <Text className="text-xl font-bold text-[#0A192F] mb-4">Security Settings</Text>
-            <Text className="text-slate-500 mb-4">Update your 4-digit secret PIN to keep your account safe.</Text>
-            
+          <ElegantCard className="p-6">
+            <Text className="font-display text-xl font-semibold text-navy mb-4">Security Settings</Text>
+            <Text className="font-sans text-slate-500 mb-4">Update your 4-digit secret PIN to keep your account safe.</Text>
+
             <View className="space-y-4">
               <View>
-                <Text className="text-sm font-bold text-slate-700 mb-2">Current PIN</Text>
+                <Text className="font-sans text-sm font-bold text-slate-700 mb-2">Current PIN</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-2xl font-mono tracking-widest text-center"
+                  className="w-full bg-canvas p-4 rounded-xl border border-inkline text-2xl font-mono tracking-widest text-center text-navy"
                   placeholder="****"
                   value={currentPin}
                   onChangeText={setCurrentPin}
@@ -401,9 +398,9 @@ export default function StudentProfile() {
               </View>
 
               <View>
-                <Text className="text-sm font-bold text-slate-700 mb-2">New Secret PIN</Text>
+                <Text className="font-sans text-sm font-bold text-slate-700 mb-2">New Secret PIN</Text>
                 <TextInput
-                  className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 text-2xl font-mono tracking-widest text-center"
+                  className="w-full bg-canvas p-4 rounded-xl border border-inkline text-2xl font-mono tracking-widest text-center text-navy"
                   placeholder="****"
                   value={newPin}
                   onChangeText={setNewPin}
@@ -414,19 +411,19 @@ export default function StudentProfile() {
               </View>
 
               <View className="mt-2">
-                <AnimatedButton 
-                  title={updating ? "Updating..." : "Update PIN"} 
-                  onPress={handleUpdatePin} 
-                  disabled={updating || currentPin.length !== 4 || newPin.length !== 4} 
-                  variant="primary" 
+                <AnimatedButton
+                  title={updating ? "Updating..." : "Update PIN"}
+                  onPress={handleUpdatePin}
+                  disabled={updating || currentPin.length !== 4 || newPin.length !== 4}
+                  variant="primary"
                 />
               </View>
             </View>
-          </View>
+          </ElegantCard>
         )}
 
       </View>
     </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

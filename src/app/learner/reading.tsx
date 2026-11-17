@@ -3,6 +3,7 @@ import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenHeader } from '../../components/ui/Elegant';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { awardExtraIfTagged } from '../../lib/extras';
 import { awardPoints, POINTS } from '../../lib/points';
@@ -311,24 +312,19 @@ export default function SmartReading() {
   }, [stories, categories]);
 
   return (
-    <View className="flex-1 bg-white">
-      <SafeAreaView edges={['top']} className="w-full bg-[#0A192F] shadow-sm">
-        <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-4 md:p-6">
-          <View className="flex-row items-center gap-3">
-            <Pressable
-              onPress={() => (story ? backToShelf() : router.back())}
-              className="px-3 py-2 bg-white/10 rounded-lg border border-white/20"
-            >
-              <Text className="text-white font-bold text-sm">← Back</Text>
-            </Pressable>
-            <Text className="text-xl md:text-2xl font-bold text-white tracking-wider">Smart Reading 📖</Text>
-          </View>
-          {story && !summary ? (
-            <Text className="text-white/70 font-bold text-sm">
-              Page {pageIdx + 1} of {story.pages.length}
-            </Text>
-          ) : null}
-        </View>
+    <View className="flex-1 bg-canvas">
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader
+          title="Smart Reading 📖"
+          onBack={() => (story ? backToShelf() : router.back())}
+          right={
+            story && !summary ? (
+              <Text className="font-sans text-white/70 font-bold text-sm">
+                Page {pageIdx + 1} of {story.pages.length}
+              </Text>
+            ) : undefined
+          }
+        />
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
@@ -338,45 +334,45 @@ export default function SmartReading() {
           ) : tableMissing ? (
             <View className="items-center py-16">
               <Text className="text-5xl mb-4">📖</Text>
-              <Text className="text-2xl font-bold text-[#0A192F] mb-2 text-center">Smart Reading is coming soon</Text>
-              <Text className="text-slate-500 text-center">Stories are being prepared. Please check back soon.</Text>
+              <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">Smart Reading is coming soon</Text>
+              <Text className="font-sans text-slate-500 text-center">Stories are being prepared. Please check back soon.</Text>
             </View>
           ) : !story ? (
             <>
-              <Text className="text-slate-500 text-lg mb-6">
+              <Text className="font-sans text-slate-500 text-lg mb-6">
                 Pick a story. Listen while the words light up, or read aloud and get a score for every sentence.
               </Text>
               {groups.length === 0 ? (
                 <View className="items-center py-16">
                   <Text className="text-5xl mb-4">📚</Text>
-                  <Text className="text-xl font-bold text-[#0A192F] text-center">No stories yet</Text>
-                  <Text className="text-slate-500 text-center">Your teacher has not added any stories yet.</Text>
+                  <Text className="font-display text-xl font-semibold text-navy text-center">No stories yet</Text>
+                  <Text className="font-sans text-slate-500 text-center">Your teacher has not added any stories yet.</Text>
                 </View>
               ) : (
                 groups.map((g) => (
                   <View key={g.label} className="mb-8">
-                    <Text className="text-xl font-bold text-[#0A192F] mb-3">{g.label}</Text>
+                    <Text className="font-display text-xl font-semibold text-navy mb-3">{g.label}</Text>
                     {g.items.map((s) => {
                       const best = bestByStory[s.id];
                       return (
                         <Pressable
                           key={s.id}
                           onPress={() => openStory(s)}
-                          className="flex-row items-center gap-4 bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-3"
+                          className="flex-row items-center gap-4 bg-white border border-inkline rounded-[20px] shadow-sm p-4 mb-3"
                         >
                           <Text className="text-4xl">{s.emoji}</Text>
                           <View className="flex-1">
-                            <Text className="font-bold text-[#0A192F] text-lg">{s.title}</Text>
-                            {s.description ? <Text className="text-slate-500">{s.description}</Text> : null}
-                            <Text className="text-slate-400 text-sm">
+                            <Text className="font-display font-semibold text-navy text-lg">{s.title}</Text>
+                            {s.description ? <Text className="font-sans text-slate-500">{s.description}</Text> : null}
+                            <Text className="font-sans text-slate-400 text-sm">
                               {s.pages.length} page{s.pages.length > 1 ? 's' : ''}{s.level ? ` · ${s.level}` : ''}
                             </Text>
                           </View>
                           {best ? (
                             <View className="items-end">
-                              <Text className="text-emerald-600 font-bold">✓ Read</Text>
+                              <Text className="font-sans text-pitch font-bold">✓ Read</Text>
                               {best.accuracy !== null && best.accuracy !== undefined ? (
-                                <Text className="text-slate-400 text-sm">Best {best.accuracy}%</Text>
+                                <Text className="font-sans text-slate-400 text-sm">Best {best.accuracy}%</Text>
                               ) : null}
                             </View>
                           ) : null}
@@ -390,31 +386,31 @@ export default function SmartReading() {
           ) : summary ? (
             <View className="items-center py-10">
               <Text className="text-6xl mb-4">🎉</Text>
-              <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">Story finished!</Text>
-              <Text className="text-lg text-slate-500 mb-6 text-center">{story.title}</Text>
+              <Text className="font-display text-3xl font-semibold text-navy mb-2 text-center">Story finished!</Text>
+              <Text className="font-sans text-lg text-slate-500 mb-6 text-center">{story.title}</Text>
               {summary.accuracy !== null ? (
-                <Text className="text-xl font-bold text-brand mb-1">Reading accuracy: {summary.accuracy}%</Text>
+                <Text className="font-sans text-xl font-bold text-pitch mb-1">Reading accuracy: {summary.accuracy}%</Text>
               ) : null}
               {summary.wpm !== null ? (
-                <Text className="text-lg text-slate-500 mb-6">Speed: about {summary.wpm} words per minute</Text>
+                <Text className="font-sans text-lg text-slate-500 mb-6">Speed: about {summary.wpm} words per minute</Text>
               ) : null}
-              <Text className="text-[#D4AF37] font-bold mb-8">+{POINTS.READING_XP} XP</Text>
-              <Pressable onPress={backToShelf} className="px-8 py-4 bg-brand rounded-full items-center mb-3 w-full max-w-sm">
-                <Text className="text-white font-bold">Back to Stories</Text>
+              <Text className="font-sans text-gold-dark font-bold mb-8">+{POINTS.READING_XP} XP</Text>
+              <Pressable onPress={backToShelf} className="px-8 py-4 bg-gold border-b-4 border-gold-dark rounded-full items-center mb-3 w-full max-w-sm">
+                <Text className="font-sans text-navy font-bold">Back to Stories</Text>
               </Pressable>
               <Pressable
                 onPress={() => openStory(story)}
-                className="px-8 py-4 bg-slate-100 border border-slate-200 rounded-full items-center w-full max-w-sm"
+                className="px-8 py-4 bg-white border border-inkline rounded-full items-center w-full max-w-sm"
               >
-                <Text className="text-slate-600 font-bold">Read it again</Text>
+                <Text className="font-sans text-slate-600 font-bold">Read it again</Text>
               </Pressable>
             </View>
           ) : mode === null ? (
             <View className="items-center py-8">
               <Text className="text-6xl mb-4">{story.emoji}</Text>
-              <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">{story.title}</Text>
-              {story.description ? <Text className="text-slate-500 text-center mb-2">{story.description}</Text> : null}
-              <Text className="text-slate-400 mb-8">
+              <Text className="font-display text-3xl font-semibold text-navy mb-2 text-center">{story.title}</Text>
+              {story.description ? <Text className="font-sans text-slate-500 text-center mb-2">{story.description}</Text> : null}
+              <Text className="font-sans text-slate-400 mb-8">
                 {story.pages.length} pages · {totalSentences} sentences{story.level ? ` · ${story.level}` : ''}
               </Text>
               <Pressable
@@ -422,37 +418,37 @@ export default function SmartReading() {
                   setMode('listen');
                   startListen(0, 0);
                 }}
-                className="w-full max-w-sm px-6 py-4 bg-brand rounded-full items-center mb-3"
+                className="w-full max-w-sm px-6 py-4 bg-navy border-b-4 border-navy-deep rounded-full items-center mb-3"
               >
-                <Text className="text-white font-bold text-base">🔊 Listen &amp; Read</Text>
+                <Text className="font-sans text-white font-bold text-base">🔊 Listen &amp; Read</Text>
               </Pressable>
               <Pressable
                 onPress={() => setMode('aloud')}
-                className="w-full max-w-sm px-6 py-4 bg-[#D4AF37] rounded-full items-center"
+                className="w-full max-w-sm px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full items-center"
               >
-                <Text className="text-white font-bold text-base">🎤 Read Aloud &amp; Get Scored</Text>
+                <Text className="font-sans text-navy font-bold text-base">🎤 Read Aloud &amp; Get Scored</Text>
               </Pressable>
             </View>
           ) : (
             <View>
-              <View className="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-4 min-h-[180px] justify-center">
+              <View className="bg-white border border-inkline rounded-[20px] shadow-sm p-6 mb-4 min-h-[180px] justify-center">
                 {mode === 'listen' ? (
                   <View className="flex-row flex-wrap">
                     {sentence.split(/\s+/).filter(Boolean).map((w, i) => (
                       <Text
                         key={i}
-                        className={`text-2xl leading-10 px-1 rounded ${playing && i === wordIdx ? 'bg-[#D4AF37] text-white font-bold' : 'text-[#0A192F]'}`}
+                        className={`font-display text-2xl leading-10 px-1 rounded ${playing && i === wordIdx ? 'bg-gold-light text-navy font-bold' : 'text-navy'}`}
                       >
                         {w}
                       </Text>
                     ))}
                   </View>
                 ) : (
-                  <Text className="text-2xl leading-10 text-[#0A192F]">{sentence}</Text>
+                  <Text className="font-display text-2xl leading-10 text-navy">{sentence}</Text>
                 )}
               </View>
 
-              <Text className="text-center text-slate-400 font-bold mb-4">
+              <Text className="text-center font-sans text-slate-400 font-bold mb-4">
                 Sentence {sentencesBefore + sentIdx + 1} of {totalSentences}
               </Text>
 
@@ -460,31 +456,31 @@ export default function SmartReading() {
                 <View className="gap-3">
                   <View className="flex-row gap-3">
                     {playing ? (
-                      <Pressable onPress={stopNarration} className="flex-1 px-4 py-3.5 bg-red-400 rounded-full items-center">
-                        <Text className="text-white font-bold">⏸ Pause</Text>
+                      <Pressable onPress={stopNarration} className="flex-1 px-4 py-3.5 bg-gold border-b-4 border-gold-dark rounded-full items-center">
+                        <Text className="font-sans text-navy font-bold">⏸ Pause</Text>
                       </Pressable>
                     ) : (
                       <Pressable
                         onPress={() => startListen(pageIdx, sentIdx)}
-                        className="flex-1 px-4 py-3.5 bg-brand rounded-full items-center"
+                        className="flex-1 px-4 py-3.5 bg-navy border-b-4 border-navy-deep rounded-full items-center"
                       >
-                        <Text className="text-white font-bold">▶ Play</Text>
+                        <Text className="font-sans text-white font-bold">▶ Play</Text>
                       </Pressable>
                     )}
                     <Pressable
                       onPress={() => setMuted((m) => !m)}
-                      className={`flex-1 px-4 py-3.5 rounded-full items-center border ${muted ? 'bg-amber-100 border-amber-200' : 'bg-slate-100 border-slate-200'}`}
+                      className={`flex-1 px-4 py-3.5 rounded-full items-center border ${muted ? 'bg-gold-light border-gold' : 'bg-white border-inkline'}`}
                     >
-                      <Text className="font-bold text-slate-700">{muted ? '🔇 Sound off' : '🔊 Sound on'}</Text>
+                      <Text className="font-sans font-bold text-slate-700">{muted ? '🔇 Sound off' : '🔊 Sound on'}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setRateIdx((r) => (r + 1) % RATES.length)}
-                      className="flex-1 px-4 py-3.5 bg-slate-100 border border-slate-200 rounded-full items-center"
+                      className="flex-1 px-4 py-3.5 bg-white border border-inkline rounded-full items-center"
                     >
-                      <Text className="font-bold text-slate-700">🐢 Speed {RATES[rateIdx]}×</Text>
+                      <Text className="font-sans font-bold text-slate-700">🐢 Speed {RATES[rateIdx]}×</Text>
                     </Pressable>
                   </View>
-                  <Text className="text-center text-slate-400 text-sm">
+                  <Text className="text-center font-sans text-slate-400 text-sm">
                     The words light up as they are read. Sound off still guides you word by word.
                   </Text>
                 </View>
@@ -494,7 +490,7 @@ export default function SmartReading() {
                     <SpeechScoreView score={currentScore.score} transcript={currentScore.transcript} />
                   ) : null}
                   {speech.supported === false ? (
-                    <Text className="text-center text-slate-500">
+                    <Text className="text-center font-sans text-slate-500">
                       Speech scoring is not available on this device/browser — read the sentence aloud, then tap Next.
                     </Text>
                   ) : (
@@ -505,15 +501,15 @@ export default function SmartReading() {
                           speech.start();
                         }
                       }}
-                      className={`px-6 py-4 rounded-full items-center ${speech.listening ? 'bg-red-400' : 'bg-brand'}`}
+                      className="px-6 py-4 rounded-full items-center bg-gold border-b-4 border-gold-dark"
                     >
-                      <Text className="text-white font-bold">
+                      <Text className="font-sans text-navy font-bold">
                         {speech.listening ? '🎙️ Listening… read the sentence!' : '🎤 Tap and read this sentence'}
                       </Text>
                     </Pressable>
                   )}
-                  <Pressable onPress={nextAloud} className="px-6 py-3.5 bg-slate-100 border border-slate-200 rounded-full items-center">
-                    <Text className="font-bold text-slate-700">
+                  <Pressable onPress={nextAloud} className="px-6 py-3.5 bg-white border border-inkline rounded-full items-center">
+                    <Text className="font-sans font-bold text-slate-700">
                       {sentIdx + 1 < sentences.length || pageIdx + 1 < story.pages.length ? 'Next sentence →' : 'Finish story 🎉'}
                     </Text>
                   </Pressable>

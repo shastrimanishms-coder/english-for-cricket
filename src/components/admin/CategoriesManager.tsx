@@ -12,12 +12,12 @@ interface Category {
 }
 
 const CATEGORY_TYPES = [
-  { id: 'curriculum', label: 'Curriculum & Lessons', color: 'bg-blue-100 text-blue-800' },
-  { id: 'downloads', label: 'Downloads & Workbooks', color: 'bg-pink-100 text-pink-800' },
-  { id: 'games', label: 'Games & Arcade', color: 'bg-teal-100 text-teal-800' },
-  { id: 'videos', label: 'Video Lectures', color: 'bg-orange-100 text-orange-800' },
-  { id: 'speaking', label: 'Speaking Practice', color: 'bg-purple-100 text-purple-800' },
-  { id: 'reading', label: 'Smart Reading', color: 'bg-emerald-100 text-emerald-800' },
+  { id: 'curriculum', label: 'Curriculum & Lessons', color: 'bg-navy/10 text-navy' },
+  { id: 'downloads', label: 'Downloads & Workbooks', color: 'bg-gold-light/70 text-gold-dark' },
+  { id: 'games', label: 'Games & Arcade', color: 'bg-pitch-light text-pitch-dark' },
+  { id: 'videos', label: 'Video Lectures', color: 'bg-slate-100 text-slate-700' },
+  { id: 'speaking', label: 'Speaking Practice', color: 'bg-navy/5 text-navy-soft' },
+  { id: 'reading', label: 'Smart Reading', color: 'bg-pitch/10 text-pitch-dark' },
 ];
 
 export default function CategoriesManager() {
@@ -200,12 +200,12 @@ export default function CategoriesManager() {
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Categories Manager</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Categories Manager</Text>
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">
           {editId ? 'Edit Category' : 'Create New Category'}
         </Text>
         
@@ -217,7 +217,7 @@ export default function CategoriesManager() {
               <Pressable
                 key={type.id}
                 onPress={() => setSelectedType(type.id)}
-                className={`px-4 py-2 rounded-full border ${selectedType === type.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                className={`px-4 py-2 rounded-full border ${selectedType === type.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
               >
                 <Text className={`font-semibold text-sm ${selectedType === type.id ? 'text-white' : 'text-slate-600'}`}>
                   {type.label}
@@ -233,7 +233,7 @@ export default function CategoriesManager() {
           <View className="flex-row flex-wrap gap-3">
             <Pressable
               onPress={() => setParentId(null)}
-              className={`px-4 py-2 rounded-full border ${parentId === null ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+              className={`px-4 py-2 rounded-full border ${parentId === null ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
             >
               <Text className={`font-semibold text-sm ${parentId === null ? 'text-white' : 'text-slate-600'}`}>Top level</Text>
             </Pressable>
@@ -241,7 +241,7 @@ export default function CategoriesManager() {
               <Pressable
                 key={c.id}
                 onPress={() => setParentId(c.id)}
-                className={`px-4 py-2 rounded-full border ${parentId === c.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                className={`px-4 py-2 rounded-full border ${parentId === c.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
               >
                 <Text className={`font-semibold text-sm ${parentId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
               </Pressable>
@@ -256,7 +256,7 @@ export default function CategoriesManager() {
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Category Name</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="e.g., Eiken Pre-2, Worksheets..."
               value={name}
               onChangeText={setName}
@@ -265,7 +265,7 @@ export default function CategoriesManager() {
           <View className="flex-2">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Description (Optional)</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="What belongs in this category?"
               value={description}
               onChangeText={setDescription}
@@ -292,7 +292,7 @@ export default function CategoriesManager() {
       </View>
 
       {/* Categories List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         ) : categories.length === 0 ? (
@@ -303,7 +303,7 @@ export default function CategoriesManager() {
           displayCategories.map(({ cat, depth }, index) => (
             <View
               key={cat.id}
-              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== displayCategories.length - 1 ? 'border-b border-slate-100' : ''}`}
+              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== displayCategories.length - 1 ? 'border-b border-inkline' : ''}`}
               style={{ paddingLeft: 16 + depth * 24 }}
             >
               <View className="flex-row items-center flex-wrap gap-3">
@@ -318,10 +318,10 @@ export default function CategoriesManager() {
               </View>
               
               <View className="flex-row gap-3">
-                <Pressable onPress={() => handleEdit(cat)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                <Pressable onPress={() => handleEdit(cat)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                   <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(cat.id, cat.name)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                <Pressable onPress={() => handleDelete(cat.id, cat.name)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                   <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                 </Pressable>
               </View>

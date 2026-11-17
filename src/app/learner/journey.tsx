@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ElegantCard, ScreenHeader } from '../../components/ui/Elegant';
 import { fetchCompletedLessons } from '../../lib/completions';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { EXTRA_META, fetchAllTagged, fetchExtrasDone, type TaggedItem } from '../../lib/extras';
@@ -87,15 +89,8 @@ export default function MyJourney() {
   }, [tax]);
 
   return (
-    <View className="flex-1 bg-white">
-      <SafeAreaView edges={['top']} className="w-full bg-[#0A192F] shadow-sm">
-        <View className="max-w-7xl w-full mx-auto flex-row items-center gap-3 p-4 md:p-6">
-          <Pressable onPress={() => router.back()} className="px-3 py-2 bg-white/10 rounded-lg border border-white/20">
-            <Text className="text-white font-bold text-sm">← Back</Text>
-          </Pressable>
-          <Text className="text-xl md:text-2xl font-bold text-white tracking-wider">My Journey 🗺️</Text>
-        </View>
-      </SafeAreaView>
+    <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
+      <ScreenHeader title="My Journey" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
         <View className="max-w-4xl w-full mx-auto">
@@ -103,38 +98,46 @@ export default function MyJourney() {
             <View className="py-16 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
           ) : !tax || tax.lessons.length === 0 ? (
             <View className="items-center py-16">
-              <Text className="text-5xl mb-4">🗺️</Text>
-              <Text className="text-2xl font-bold text-[#0A192F] mb-2 text-center">Your journey is being prepared</Text>
-              <Text className="text-slate-500 text-center">Lessons will appear here soon.</Text>
+              <View className="mb-4 h-20 w-20 items-center justify-center rounded-full bg-gold-light">
+                <Ionicons name="map-outline" size={36} color="#0A192F" />
+              </View>
+              <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">Your journey is being prepared</Text>
+              <Text className="font-sans text-slate-500 text-center">Lessons will appear here soon.</Text>
             </View>
           ) : (
             <>
               <View className="flex-row gap-3 mb-8">
-                <View className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-4 items-center">
-                  <Text className="text-2xl font-bold text-[#0A192F]">📚 {stats.lessonsDone}/{stats.lessonsTotal}</Text>
-                  <Text className="text-slate-500 text-sm">lessons finished</Text>
-                </View>
-                <View className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-4 items-center">
-                  <Text className="text-2xl font-bold text-[#0A192F]">⭐ {stats.extrasDone}/{stats.extrasTotal}</Text>
-                  <Text className="text-slate-500 text-sm">extras collected</Text>
-                </View>
+                <ElegantCard className="flex-1 p-4 items-center">
+                  <Ionicons name="book-outline" size={22} color="#0A192F" />
+                  <Text className="font-display text-2xl font-semibold text-navy mt-1">{stats.lessonsDone}/{stats.lessonsTotal}</Text>
+                  <Text className="font-sans text-slate-500 text-sm">lessons finished</Text>
+                </ElegantCard>
+                <ElegantCard className="flex-1 p-4 items-center">
+                  <Ionicons name="star" size={22} color="#D4AF37" />
+                  <Text className="font-display text-2xl font-semibold text-navy mt-1">{stats.extrasDone}/{stats.extrasTotal}</Text>
+                  <Text className="font-sans text-slate-500 text-sm">extras collected</Text>
+                </ElegantCard>
               </View>
 
               {sections.map((section) => (
                 <View key={section.title} className="mb-8">
-                  <Text className="text-2xl font-bold text-[#0A192F] mb-3">{section.title}</Text>
+                  <Text className="font-display text-2xl font-semibold text-navy mb-3">{section.title}</Text>
                   {section.blocks.map(({ module, lessons }) => (
-                    <View key={module?.id} className="mb-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                      <Text className="font-bold text-[#0A192F] text-lg mb-2">{module?.title}</Text>
+                    <ElegantCard key={module?.id} className="mb-4 p-4 md:p-5">
+                      <Text className="font-display font-semibold text-navy text-lg mb-2">{module?.title}</Text>
                       {lessons.map((lesson) => {
                         const extras = taggedByLesson.get(lesson.id) || [];
                         const isDone = completed.has(lesson.id);
                         return (
-                          <View key={lesson.id} className="flex-row items-center gap-3 py-1.5">
-                            <Text className={`text-base ${isDone ? 'text-emerald-600 font-bold' : 'text-slate-300'}`}>
-                              {isDone ? '✓' : '○'}
-                            </Text>
-                            <Text className={`flex-1 ${isDone ? 'text-[#0A192F] font-semibold' : 'text-slate-600'}`}>
+                          <View key={lesson.id} className="flex-row items-center gap-3 py-2">
+                            {isDone ? (
+                              <View className="h-6 w-6 items-center justify-center rounded-full bg-pitch">
+                                <Text className="text-xs font-bold text-white">✓</Text>
+                              </View>
+                            ) : (
+                              <View className="h-6 w-6 rounded-full border border-inkline bg-white" />
+                            )}
+                            <Text className={`font-sans flex-1 ${isDone ? 'text-navy font-semibold' : 'text-slate-500'}`}>
                               {lesson.title}
                             </Text>
                             {extras.map((item) => {
@@ -152,18 +155,18 @@ export default function MyJourney() {
                           </View>
                         );
                       })}
-                    </View>
+                    </ElegantCard>
                   ))}
                 </View>
               ))}
 
-              <Text className="text-slate-400 text-center text-sm mb-6">
+              <Text className="font-sans text-slate-400 text-center text-sm mb-6">
                 Pale icons are extras still waiting for you. They are always optional — your next lesson is never locked.
               </Text>
             </>
           )}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

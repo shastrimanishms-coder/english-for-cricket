@@ -50,13 +50,13 @@ export default function BelongsToPicker({ value, onChange }: Props) {
   if (!tax) return null;
 
   const chip = (active: boolean) =>
-    `px-3 py-1.5 rounded-full border ${active ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`;
-  const chipText = (active: boolean) => `text-xs font-semibold ${active ? 'text-white' : 'text-slate-600'}`;
+    `px-3 py-1.5 rounded-full border ${active ? 'border-navy bg-navy' : 'border-inkline bg-white'}`;
+  const chipText = (active: boolean) => `font-sans text-xs font-semibold ${active ? 'text-white' : 'text-slate-600'}`;
 
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
-        <Text className="text-sm font-semibold text-text-secondary">Belongs to a lesson (optional)</Text>
+        <Text className="font-sans text-sm font-semibold text-text-secondary">Belongs to a lesson (optional)</Text>
         {value ? (
           <Pressable onPress={() => onChange(null)} className="px-2 py-1 bg-red-50 rounded border border-red-100">
             <Text className="text-red-600 text-xs font-semibold">Clear</Text>

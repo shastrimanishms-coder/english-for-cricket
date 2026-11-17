@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
+import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import {
@@ -693,18 +694,18 @@ export default function SpeakingPractice() {
     <Pressable
       key={s.id}
       onPress={() => startScenario(s)}
-      className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-4"
+      className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 mb-4"
     >
       <View className="flex-row items-start gap-4">
         <Text className="text-4xl">{s.emoji}</Text>
         <View className="flex-1">
-          <Text className="text-xl font-bold text-[#0A192F]">{s.title}</Text>
-          <Text className="text-slate-500 mt-1">{s.description}</Text>
-          <Text className="text-xs font-bold text-brand uppercase mt-2">
+          <Text className="font-display text-xl font-semibold text-navy">{s.title}</Text>
+          <Text className="font-sans text-slate-500 mt-1">{s.description}</Text>
+          <Text className="font-sans text-xs font-bold text-pitch uppercase tracking-[1.5px] mt-2">
             {learnerLineCount(s)} lines to speak • with the {s.otherName}
           </Text>
         </View>
-        <Text className="text-slate-300 text-2xl">›</Text>
+        <Text className="text-gold text-2xl">›</Text>
       </View>
     </Pressable>
   );
@@ -719,53 +720,40 @@ export default function SpeakingPractice() {
   const scenarioIsLastTurn = scenario ? turnIndex === scenario.turns.length - 1 : false;
 
   return (
-    <View className="flex-1 bg-white">
-      {/* Top Navigation Bar - Dark Navy (matches learner home / path) */}
-      <SafeAreaView edges={['top']} className="w-full bg-[#0A192F] shadow-sm">
-        <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center p-4 md:p-6">
-          <View className="flex-row items-center gap-3">
-            <Pressable
-              onPress={mode !== 'menu' ? backToMenu : goBack}
-              className="px-3 py-2 bg-white/10 rounded-lg border border-white/20"
-            >
-              <Text className="text-white font-bold text-sm">← Back</Text>
-            </Pressable>
-            <Text className="text-xl md:text-2xl font-bold text-white tracking-wider">
-              Speaking Practice
-            </Text>
-          </View>
-        </View>
+    <View className="flex-1 bg-canvas">
+      {/* Slim navy header (matches the rest of the learner side) */}
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader
+          title="Speaking Practice"
+          onBack={mode !== 'menu' ? backToMenu : goBack}
+        />
       </SafeAreaView>
 
       {mode === 'menu' ? (
         <ScrollView contentContainerStyle={{ padding: 24 }}>
           <View className="max-w-3xl w-full mx-auto">
-            <Text className="text-lg text-slate-500 mb-6">
+            <Text className="font-sans text-lg text-slate-500 mb-6">
               Choose how you want to practise speaking today.
             </Text>
 
             <Pressable
               onPress={() => setMode('lines')}
-              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-8"
+              className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 mb-8"
             >
               <Text className="text-4xl mb-2">📚</Text>
-              <Text className="text-xl font-bold text-[#0A192F] mb-1">Practise My Lesson Lines</Text>
-              <Text className="text-slate-500">
+              <Text className="font-display text-xl font-semibold text-navy mb-1">Practise My Lesson Lines</Text>
+              <Text className="font-sans text-slate-500">
                 Say the words and sentences from your lessons out loud, and get your voice checked.
               </Text>
-              <Text className="text-brand font-bold mt-3">START →</Text>
+              <Text className="font-sans text-sm font-bold uppercase tracking-[2px] text-gold-dark mt-3">Start →</Text>
             </Pressable>
 
-            <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">
-              🎙️ Interviews
-            </Text>
+            <MicroLabel className="mb-3">🎙️ Interviews</MicroLabel>
             {scenarios
               .filter(s => s.category === 'Interview')
               .map(s => renderScenarioCard(s))}
 
-            <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 mt-6">
-              💬 Small Talk
-            </Text>
+            <MicroLabel className="mb-3 mt-6">💬 Small Talk</MicroLabel>
             {scenarios
               .filter(s => s.category === 'Small Talk')
               .map(s => renderScenarioCard(s))}
@@ -775,34 +763,34 @@ export default function SpeakingPractice() {
         !scenario ? null : scenarioDone ? (
           <View className="flex-1 items-center justify-center p-6">
             <Text className="text-6xl mb-4">🎉</Text>
-            <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">
+            <Text className="font-display text-3xl font-semibold text-navy mb-2 text-center">
               Great conversation!
             </Text>
-            <Text className="text-lg text-slate-500 text-center mb-8">
+            <Text className="font-sans text-lg text-slate-500 text-center mb-8">
               You finished “{scenario.title}” with the {scenario.otherName}. Well done!
             </Text>
             {scenarioAvg !== null ? (
-              <Text className="text-xl font-bold text-brand text-center -mt-4 mb-8">
+              <Text className="font-sans text-xl font-bold text-pitch text-center -mt-4 mb-8">
                 🎙️ Average speaking score: {scenarioAvg}%
               </Text>
             ) : null}
             <Pressable
               onPress={scenarioAgain}
-              className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
+              className="w-full max-w-sm px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full mb-3 items-center"
             >
-              <Text className="text-white font-bold text-base">Practice Again</Text>
+              <Text className="font-sans text-navy font-bold text-base">Practice Again</Text>
             </Pressable>
             <Pressable
               onPress={backToMenu}
-              className="w-full max-w-sm px-6 py-4 bg-white border border-slate-200 rounded-full items-center mb-3"
+              className="w-full max-w-sm px-6 py-4 bg-white border border-inkline rounded-full items-center mb-3"
             >
-              <Text className="text-slate-600 font-bold text-base">🎙️ All Speaking Practice</Text>
+              <Text className="font-sans text-slate-600 font-bold text-base">🎙️ All Speaking Practice</Text>
             </Pressable>
             <Pressable
               onPress={() => router.replace('/learner')}
-              className="w-full max-w-sm px-6 py-4 bg-slate-100 border border-slate-200 rounded-full items-center"
+              className="w-full max-w-sm px-6 py-4 bg-white border border-inkline rounded-full items-center"
             >
-              <Text className="text-slate-600 font-bold text-base">Learner Home</Text>
+              <Text className="font-sans text-slate-600 font-bold text-base">Learner Home</Text>
             </Pressable>
             <Celebration visible />
           </View>
@@ -811,14 +799,14 @@ export default function SpeakingPractice() {
             <View className="max-w-3xl w-full mx-auto flex-1">
               {/* Progress */}
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-xs font-bold text-slate-500 uppercase">
+                <Text className="font-sans text-xs font-bold text-slate-500 uppercase tracking-[1.5px]">
                   {scenario.emoji} {scenario.title}
                 </Text>
-                <Text className="text-xs font-bold text-brand uppercase">
+                <Text className="font-sans text-xs font-bold text-gold-dark uppercase tracking-[1.5px]">
                   Turn {turnIndex + 1} of {scenario.turns.length}
                 </Text>
               </View>
-              <View className="h-3 bg-slate-200 rounded-full overflow-hidden mb-6">
+              <View className="h-2 bg-inkline rounded-full overflow-hidden mb-6">
                 <View
                   style={{
                     width: `${((turnIndex + 1) / scenario.turns.length) * 100}%`,
@@ -835,9 +823,9 @@ export default function SpeakingPractice() {
                   {scenario.turns.slice(0, turnIndex).map((t, i) => (
                     <View
                       key={i}
-                      className={`max-w-[85%] rounded-2xl px-4 py-2 ${t.speaker === 'other' ? 'self-start bg-slate-100' : 'self-end bg-brand/10'}`}
+                      className={`max-w-[85%] rounded-2xl px-4 py-2 ${t.speaker === 'other' ? 'self-start bg-white border border-inkline' : 'self-end bg-pitch-light'}`}
                     >
-                      <Text className="text-xs font-bold text-slate-400 mb-0.5">
+                      <Text className="font-sans text-xs font-bold text-slate-400 mb-0.5">
                         {t.speaker === 'other' ? scenario.otherName : learnerName || 'You'}
                         {t.speaker === 'learner' && scenarioScores[i] !== undefined
                           ? ` • ${scenarioScores[i]}%`
@@ -863,7 +851,7 @@ export default function SpeakingPractice() {
                           ))}
                         </View>
                       ) : (
-                        <Text className="text-slate-600">{t.text}</Text>
+                        <Text className="font-sans text-slate-600">{t.text}</Text>
                       )}
                     </View>
                   ))}
@@ -871,15 +859,15 @@ export default function SpeakingPractice() {
               ) : null}
 
               {/* Current turn */}
-              <View className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 items-center mb-6">
-                <Text className="text-sm text-slate-400 mb-3">
+              <View className="bg-white rounded-[20px] border border-inkline shadow-sm p-8 items-center mb-6">
+                <Text className="font-sans text-sm text-slate-400 mb-3">
                   {scenarioTurn.speaker === 'other'
                     ? `${scenario.otherName} says:`
                     : learnerName
                       ? `${learnerName}, your turn — say this:`
                       : 'Your turn — say this:'}
                 </Text>
-                <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] text-center leading-snug">
+                <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center leading-snug">
                   {scenarioTurn.text}
                 </Text>
               </View>
@@ -887,20 +875,20 @@ export default function SpeakingPractice() {
               <View className="items-center gap-3">
                 <Pressable
                   onPress={() => listenText(scenarioTurn.text)}
-                  className="px-8 py-3 bg-brand rounded-full"
+                  className="px-8 py-3 bg-navy border-b-4 border-navy-deep rounded-full"
                 >
-                  <Text className="text-white font-bold text-base">🔊 Listen</Text>
+                  <Text className="font-sans text-white font-bold text-base">🔊 Listen</Text>
                 </Pressable>
 
                 {noVoices ? (
-                  <Text className="text-amber-600 text-xs text-center max-w-md">
+                  <Text className="font-sans text-amber-600 text-xs text-center max-w-md">
                     🔇 This browser has no voice installed, so Listen may stay silent.
                     Chrome, or the phone app, can read the line aloud.
                   </Text>
                 ) : null}
 
                 {scenarioTurn.speaker === 'other' ? (
-                  <Text className="text-slate-400 text-sm text-center mt-3 max-w-md">
+                  <Text className="font-sans text-slate-400 text-sm text-center mt-3 max-w-md">
                     🎧 Listen… when {scenario.otherName} finishes, it&apos;s your turn
                     automatically — just wait for the beep.
                   </Text>
@@ -909,31 +897,31 @@ export default function SpeakingPractice() {
                     {/* Automatic speech check, where the device supports it */}
                     {speech.supported ? (
                       checkResult ? (
-                        <View className="w-full max-w-xl bg-slate-50 rounded-3xl border border-slate-200 p-6 items-center">
+                        <View className="w-full max-w-xl bg-white rounded-[20px] border border-inkline shadow-sm p-6 items-center">
                           <SpeechScoreView score={checkResult.score} transcript={checkResult.transcript} />
                         </View>
                       ) : speech.listening ? (
                         <>
-                          <Pressable onPress={speech.stop} className="px-8 py-3 bg-red-500 rounded-full">
-                            <Text className="text-white font-bold text-base">
+                          <Pressable onPress={speech.stop} className="px-8 py-3 bg-gold border-b-4 border-gold-dark rounded-full">
+                            <Text className="font-sans text-navy font-bold text-base">
                               ⏹ Listening… tap when done
                             </Text>
                           </Pressable>
                           {speech.interim ? (
-                            <Text className="text-slate-500 italic text-center">
+                            <Text className="font-sans text-slate-500 italic text-center">
                               &quot;{speech.interim}&quot;
                             </Text>
                           ) : (
-                            <Text className="text-slate-400">Say your line now 🎧</Text>
+                            <Text className="font-sans text-slate-400">Say your line now 🎧</Text>
                           )}
                         </>
                       ) : (
                         <View className="items-center">
-                          <Text className="text-slate-400 text-sm text-center">
+                          <Text className="font-sans text-slate-400 text-sm text-center">
                             🎧 After the beep, just speak — the microphone opens by itself.
                           </Text>
                           <Pressable onPress={startCheck} className="px-3 py-2">
-                            <Text className="text-slate-400 font-bold underline text-sm">
+                            <Text className="font-sans text-slate-400 font-bold underline text-sm">
                               Tap to speak now
                             </Text>
                           </Pressable>
@@ -941,7 +929,7 @@ export default function SpeakingPractice() {
                       )
                     ) : null}
                     {checkError && speech.supported ? (
-                      <Text className="text-red-500 text-sm text-center max-w-md">
+                      <Text className="font-sans text-red-500 text-sm text-center max-w-md">
                         {speechErrorMessage(checkError)}
                       </Text>
                     ) : null}
@@ -954,9 +942,9 @@ export default function SpeakingPractice() {
                               await stopRecording();
                             })();
                           }}
-                          className="px-8 py-3 bg-red-500 rounded-full"
+                          className="px-8 py-3 bg-gold border-b-4 border-gold-dark rounded-full"
                         >
-                          <Text className="text-white font-bold text-base">
+                          <Text className="font-sans text-navy font-bold text-base">
                             ⏹ Stop ({recordingSeconds}s)
                           </Text>
                         </Pressable>
@@ -967,14 +955,14 @@ export default function SpeakingPractice() {
                               await startRecording();
                             })();
                           }}
-                          className="px-8 py-3 bg-[#0A192F] rounded-full"
+                          className="px-8 py-3 bg-navy border-b-4 border-navy-deep rounded-full"
                         >
-                          <Text className="text-white font-bold text-base">🎙️ Record Your Voice</Text>
+                          <Text className="font-sans text-white font-bold text-base">🎙️ Record Your Voice</Text>
                         </Pressable>
                       )
                     ) : (
                       <View className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 max-w-md">
-                        <Text className="text-amber-700 text-sm text-center">
+                        <Text className="font-sans text-amber-700 text-sm text-center">
                           🎙️ Recording isn&apos;t available here (microphone permission or browser
                           support). You can still Listen and say the line out loud!
                         </Text>
@@ -985,12 +973,12 @@ export default function SpeakingPractice() {
                       <View className="flex-row items-center gap-4">
                         <Pressable
                           onPress={playRecording}
-                          className="px-6 py-3 bg-slate-100 border border-slate-200 rounded-full"
+                          className="px-6 py-3 bg-white border border-inkline rounded-full"
                         >
-                          <Text className="text-slate-700 font-bold text-base">▶️ Play Back</Text>
+                          <Text className="font-sans text-navy font-bold text-base">▶️ Play Back</Text>
                         </Pressable>
                         <Pressable onPress={retry} className="px-3 py-3">
-                          <Text className="text-slate-400 font-bold underline">Try again</Text>
+                          <Text className="font-sans text-slate-400 font-bold underline">Try again</Text>
                         </Pressable>
                       </View>
                     ) : null}
@@ -999,9 +987,9 @@ export default function SpeakingPractice() {
                       <>
                         <Pressable
                           onPress={retry}
-                          className="w-full max-w-md px-6 py-4 bg-[#0A192F] rounded-full items-center mt-3"
+                          className="w-full max-w-md px-6 py-4 bg-navy border-b-4 border-navy-deep rounded-full items-center mt-3"
                         >
-                          <Text className="text-white font-bold text-lg">🎙️ Try Again</Text>
+                          <Text className="font-sans text-white font-bold text-lg">🎙️ Try Again</Text>
                         </Pressable>
                         <Pressable
                           onPress={() => {
@@ -1011,7 +999,7 @@ export default function SpeakingPractice() {
                           }}
                           className="px-3 py-2"
                         >
-                          <Text className="text-slate-400 font-bold underline">Continue anyway →</Text>
+                          <Text className="font-sans text-slate-400 font-bold underline">Continue anyway →</Text>
                         </Pressable>
                       </>
                     ) : (
@@ -1021,9 +1009,9 @@ export default function SpeakingPractice() {
                             await scenarioNext();
                           })();
                         }}
-                        className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center mt-3"
+                        className="w-full max-w-md px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full items-center mt-3"
                       >
-                        <Text className="text-white font-bold text-lg">
+                        <Text className="font-sans text-navy font-bold text-lg">
                           {checkResult
                             ? scenarioIsLastTurn
                               ? '✅ Finish'
@@ -1041,40 +1029,40 @@ export default function SpeakingPractice() {
       ) : loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#0A192F" />
-          <Text className="text-slate-400 mt-3">Preparing your lines…</Text>
+          <Text className="font-sans text-slate-400 mt-3">Preparing your lines…</Text>
         </View>
       ) : finished ? (
         <View className="flex-1 items-center justify-center p-6">
           <Text className="text-6xl mb-4">🎉</Text>
-          <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">
+          <Text className="font-display text-3xl font-semibold text-navy mb-2 text-center">
             Great speaking!
           </Text>
-          <Text className="text-lg text-slate-500 text-center mb-8">
+          <Text className="font-sans text-lg text-slate-500 text-center mb-8">
             You practised {items.length} {items.length === 1 ? 'line' : 'lines'} out loud.
             Keep it up, champion!
           </Text>
           {avgScore !== null ? (
-            <Text className="text-xl font-bold text-brand text-center -mt-4 mb-8">
+            <Text className="font-sans text-xl font-bold text-pitch text-center -mt-4 mb-8">
               🎙️ Average speaking score: {avgScore}%
             </Text>
           ) : null}
           <Pressable
             onPress={practiceAgain}
-            className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
+            className="w-full max-w-sm px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full mb-3 items-center"
           >
-            <Text className="text-white font-bold text-base">Practice Again</Text>
+            <Text className="font-sans text-navy font-bold text-base">Practice Again</Text>
           </Pressable>
           <Pressable
             onPress={backToMenu}
-            className="w-full max-w-sm px-6 py-4 bg-white border border-slate-200 rounded-full items-center mb-3"
+            className="w-full max-w-sm px-6 py-4 bg-white border border-inkline rounded-full items-center mb-3"
           >
-            <Text className="text-slate-600 font-bold text-base">🎙️ All Speaking Practice</Text>
+            <Text className="font-sans text-slate-600 font-bold text-base">🎙️ All Speaking Practice</Text>
           </Pressable>
           <Pressable
             onPress={() => router.replace('/learner')}
-            className="w-full max-w-sm px-6 py-4 bg-slate-100 border border-slate-200 rounded-full items-center"
+            className="w-full max-w-sm px-6 py-4 bg-white border border-inkline rounded-full items-center"
           >
-            <Text className="text-slate-600 font-bold text-base">Learner Home</Text>
+            <Text className="font-sans text-slate-600 font-bold text-base">Learner Home</Text>
           </Pressable>
           <Celebration visible />
         </View>
@@ -1083,14 +1071,14 @@ export default function SpeakingPractice() {
           <View className="max-w-3xl w-full mx-auto flex-1">
             {/* Progress */}
             <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-xs font-bold text-slate-500 uppercase">
+              <Text className="font-sans text-xs font-bold text-slate-500 uppercase tracking-[1.5px]">
                 Line {index + 1} of {items.length}
               </Text>
-              <Text className="text-xs font-bold text-brand uppercase">
+              <Text className="font-sans text-xs font-bold text-gold-dark uppercase tracking-[1.5px]">
                 {current.lessonTitle}
               </Text>
             </View>
-            <View className="h-3 bg-slate-200 rounded-full overflow-hidden mb-6">
+            <View className="h-2 bg-inkline rounded-full overflow-hidden mb-6">
               <View
                 style={{
                   width: `${((index + 1) / items.length) * 100}%`,
@@ -1102,23 +1090,23 @@ export default function SpeakingPractice() {
             </View>
 
             {/* The line to practise */}
-            <View className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 items-center mb-6">
-              <Text className="text-sm text-slate-400 mb-3">
+            <View className="bg-white rounded-[20px] border border-inkline shadow-sm p-8 items-center mb-6">
+              <Text className="font-sans text-sm text-slate-400 mb-3">
                 Listen, then say it out loud:
               </Text>
-              <Text className="text-3xl md:text-4xl font-bold text-[#0A192F] text-center leading-snug">
+              <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center leading-snug">
                 {current.text}
               </Text>
             </View>
 
             {/* Actions */}
             <View className="items-center gap-3">
-              <Pressable onPress={listen} className="px-8 py-3 bg-brand rounded-full">
-                <Text className="text-white font-bold text-base">🔊 Listen</Text>
+              <Pressable onPress={listen} className="px-8 py-3 bg-navy border-b-4 border-navy-deep rounded-full">
+                <Text className="font-sans text-white font-bold text-base">🔊 Listen</Text>
               </Pressable>
 
               {noVoices ? (
-                <Text className="text-amber-600 text-xs text-center max-w-md">
+                <Text className="font-sans text-amber-600 text-xs text-center max-w-md">
                   🔇 This browser has no voice installed, so Listen may stay silent.
                   Chrome, or the phone app, can read the line aloud.
                 </Text>
@@ -1127,31 +1115,31 @@ export default function SpeakingPractice() {
               {/* Automatic speech check, where the device supports it */}
               {speech.supported ? (
                 checkResult ? (
-                  <View className="w-full max-w-xl bg-slate-50 rounded-3xl border border-slate-200 p-6 items-center">
+                  <View className="w-full max-w-xl bg-white rounded-[20px] border border-inkline shadow-sm p-6 items-center">
                     <SpeechScoreView score={checkResult.score} transcript={checkResult.transcript} />
                   </View>
                 ) : speech.listening ? (
                   <>
-                    <Pressable onPress={speech.stop} className="px-8 py-3 bg-red-500 rounded-full">
-                      <Text className="text-white font-bold text-base">
+                    <Pressable onPress={speech.stop} className="px-8 py-3 bg-gold border-b-4 border-gold-dark rounded-full">
+                      <Text className="font-sans text-navy font-bold text-base">
                         ⏹ Listening… tap when done
                       </Text>
                     </Pressable>
                     {speech.interim ? (
-                      <Text className="text-slate-500 italic text-center">
+                      <Text className="font-sans text-slate-500 italic text-center">
                         &quot;{speech.interim}&quot;
                       </Text>
                     ) : (
-                      <Text className="text-slate-400">Say the line now 🎧</Text>
+                      <Text className="font-sans text-slate-400">Say the line now 🎧</Text>
                     )}
                   </>
                 ) : (
                   <View className="items-center">
-                    <Text className="text-slate-400 text-sm text-center">
+                    <Text className="font-sans text-slate-400 text-sm text-center">
                       🎧 After the beep, just speak — the microphone opens by itself.
                     </Text>
                     <Pressable onPress={startCheck} className="px-3 py-2">
-                      <Text className="text-slate-400 font-bold underline text-sm">
+                      <Text className="font-sans text-slate-400 font-bold underline text-sm">
                         Tap to speak now
                       </Text>
                     </Pressable>
@@ -1159,7 +1147,7 @@ export default function SpeakingPractice() {
                 )
               ) : null}
               {checkError && speech.supported ? (
-                <Text className="text-red-500 text-sm text-center max-w-md">
+                <Text className="font-sans text-red-500 text-sm text-center max-w-md">
                   {speechErrorMessage(checkError)}
                 </Text>
               ) : null}
@@ -1172,9 +1160,9 @@ export default function SpeakingPractice() {
                         await stopRecording();
                       })();
                     }}
-                    className="px-8 py-3 bg-red-500 rounded-full"
+                    className="px-8 py-3 bg-gold border-b-4 border-gold-dark rounded-full"
                   >
-                    <Text className="text-white font-bold text-base">
+                    <Text className="font-sans text-navy font-bold text-base">
                       ⏹ Stop ({recordingSeconds}s)
                     </Text>
                   </Pressable>
@@ -1185,14 +1173,14 @@ export default function SpeakingPractice() {
                         await startRecording();
                       })();
                     }}
-                    className="px-8 py-3 bg-[#0A192F] rounded-full"
+                    className="px-8 py-3 bg-navy border-b-4 border-navy-deep rounded-full"
                   >
-                    <Text className="text-white font-bold text-base">🎙️ Record Your Voice</Text>
+                    <Text className="font-sans text-white font-bold text-base">🎙️ Record Your Voice</Text>
                   </Pressable>
                 )
               ) : (
                 <View className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 max-w-md">
-                  <Text className="text-amber-700 text-sm text-center">
+                  <Text className="font-sans text-amber-700 text-sm text-center">
                     🎙️ Recording isn&apos;t available here (microphone permission or browser
                     support). You can still Listen and say the line out loud!
                   </Text>
@@ -1203,12 +1191,12 @@ export default function SpeakingPractice() {
                 <View className="flex-row items-center gap-4">
                   <Pressable
                     onPress={playRecording}
-                    className="px-6 py-3 bg-slate-100 border border-slate-200 rounded-full"
+                    className="px-6 py-3 bg-white border border-inkline rounded-full"
                   >
-                    <Text className="text-slate-700 font-bold text-base">▶️ Play Back</Text>
+                    <Text className="font-sans text-navy font-bold text-base">▶️ Play Back</Text>
                   </Pressable>
                   <Pressable onPress={retry} className="px-3 py-3">
-                    <Text className="text-slate-400 font-bold underline">Try again</Text>
+                    <Text className="font-sans text-slate-400 font-bold underline">Try again</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -1217,9 +1205,9 @@ export default function SpeakingPractice() {
                 <>
                   <Pressable
                     onPress={retry}
-                    className="w-full max-w-md px-6 py-4 bg-[#0A192F] rounded-full items-center mt-3"
+                    className="w-full max-w-md px-6 py-4 bg-navy border-b-4 border-navy-deep rounded-full items-center mt-3"
                   >
-                    <Text className="text-white font-bold text-lg">🎙️ Try Again</Text>
+                    <Text className="font-sans text-white font-bold text-lg">🎙️ Try Again</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => {
@@ -1229,7 +1217,7 @@ export default function SpeakingPractice() {
                     }}
                     className="px-3 py-2"
                   >
-                    <Text className="text-slate-400 font-bold underline">Next line anyway →</Text>
+                    <Text className="font-sans text-slate-400 font-bold underline">Next line anyway →</Text>
                   </Pressable>
                 </>
               ) : (
@@ -1239,9 +1227,9 @@ export default function SpeakingPractice() {
                       await advance();
                     })();
                   }}
-                  className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center mt-3"
+                  className="w-full max-w-md px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full items-center mt-3"
                 >
-                  <Text className="text-white font-bold text-lg">
+                  <Text className="font-sans text-navy font-bold text-lg">
                     {checkResult ? '✅ Great! Next Line' : '✅ I said it!'}
                   </Text>
                 </Pressable>

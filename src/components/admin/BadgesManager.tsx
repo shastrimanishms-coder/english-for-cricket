@@ -166,7 +166,7 @@ export default function BadgesManager() {
       return (
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Number of Consecutive Days</Text>
-          <TextInput className="bg-slate-50 p-4 rounded-xl border border-slate-200" placeholder="e.g., 3, 7, 30" keyboardType="numeric" value={conditionTarget} onChangeText={setConditionTarget} />
+          <TextInput className="bg-canvas p-4 rounded-xl border border-inkline" placeholder="e.g., 3, 7, 30" keyboardType="numeric" value={conditionTarget} onChangeText={setConditionTarget} />
         </View>
       );
     }
@@ -185,7 +185,7 @@ export default function BadgesManager() {
             <Pressable 
               key={item.id} 
               onPress={() => setConditionTarget(item.id)}
-              className={`px-4 py-3 rounded-lg border ${conditionTarget === item.id ? 'border-brand bg-brand' : 'border-slate-200 bg-slate-50'}`}
+              className={`px-4 py-3 rounded-lg border ${conditionTarget === item.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
             >
               <Text className={`text-sm font-semibold ${conditionTarget === item.id ? 'text-white' : 'text-slate-600'}`}>{item.title}</Text>
             </Pressable>
@@ -198,24 +198,24 @@ export default function BadgesManager() {
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">Gamification: Badges</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">Gamification: Badges</Text>
       </View>
 
       {/* Editor Form */}
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">{editId ? 'Edit Badge' : 'Create New Badge'}</Text>
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">{editId ? 'Edit Badge' : 'Create New Badge'}</Text>
         
         <View className="flex-col md:flex-row gap-4">
           <View className="flex-2">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Badge Title</Text>
-            <TextInput className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200" placeholder="e.g., Early Bird, Level 1 Master" value={title} onChangeText={setTitle} />
+            <TextInput className="w-full bg-canvas p-4 rounded-xl border border-inkline" placeholder="e.g., Early Bird, Level 1 Master" value={title} onChangeText={setTitle} />
           </View>
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Badge Artwork</Text>
             <View className="flex-row items-center gap-4">
-              <Pressable onPress={pickImage} className="px-4 py-3 bg-[#0A192F] rounded-lg"><Text className="text-white font-bold text-sm">Upload Image</Text></Pressable>
-              {selectedImage ? <Text className="text-brand font-semibold text-xs" numberOfLines={1}>{selectedImage.name}</Text>
-              : imageUrl ? <Image source={{ uri: imageUrl }} className="w-12 h-12 rounded-full border border-slate-200" />
+              <Pressable onPress={pickImage} className="px-4 py-3 bg-navy rounded-full"><Text className="text-white font-bold text-sm">Upload Image</Text></Pressable>
+              {selectedImage ? <Text className="text-pitch font-semibold text-xs" numberOfLines={1}>{selectedImage.name}</Text>
+              : imageUrl ? <Image source={{ uri: imageUrl }} className="w-12 h-12 rounded-full border border-inkline" />
               : null}
             </View>
           </View>
@@ -223,10 +223,10 @@ export default function BadgesManager() {
 
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Unlock Description (Shown to students)</Text>
-          <TextInput className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200" placeholder="e.g., Earned for logging in 3 days in a row!" value={description} onChangeText={setDescription} />
+          <TextInput className="w-full bg-canvas p-4 rounded-xl border border-inkline" placeholder="e.g., Earned for logging in 3 days in a row!" value={description} onChangeText={setDescription} />
         </View>
 
-        <View className="border-t border-slate-100 pt-6">
+        <View className="border-t border-inkline pt-6">
           <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Unlock Conditions</Text>
           <View className="mb-4">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Requirement Type</Text>
@@ -235,7 +235,7 @@ export default function BadgesManager() {
                 <Pressable 
                   key={type.id} 
                   onPress={() => { setConditionType(type.id); setConditionTarget(''); }}
-                  className={`px-4 py-2 rounded-full border ${conditionType === type.id ? 'border-[#0A192F] bg-[#0A192F]' : 'border-slate-200 bg-slate-50'}`}
+                  className={`px-4 py-2 rounded-full border ${conditionType === type.id ? 'border-navy bg-navy' : 'border-inkline bg-canvas'}`}
                 >
                   <Text className={`font-semibold text-sm ${conditionType === type.id ? 'text-white' : 'text-slate-600'}`}>{type.label}</Text>
                 </Pressable>
@@ -245,35 +245,35 @@ export default function BadgesManager() {
           {renderTargetSelector()}
         </View>
 
-        <View className="flex-row justify-end gap-4 mt-2 border-t border-slate-100 pt-4">
+        <View className="flex-row justify-end gap-4 mt-2 border-t border-inkline pt-4">
           {editId && <View className="w-24"><AnimatedButton title="Cancel" onPress={cancelEdit} variant="outline" size="sm" /></View>}
           <View className="w-40"><AnimatedButton title={saving ? "Saving..." : "Save Badge"} onPress={handleSave} disabled={saving} variant="primary" size="sm" /></View>
         </View>
       </View>
 
       {/* List */}
-      <View className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
         : badges.length === 0 ? <View className="p-8 items-center"><Text className="text-slate-500">No badges created yet.</Text></View>
         : badges.map((badge, index) => {
             const cType = CONDITION_TYPES.find(c => c.id === badge.condition_type)?.label || badge.condition_type;
             return (
-              <View key={badge.id} className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 ${index !== badges.length - 1 ? 'border-b border-slate-100' : ''}`}>
+              <View key={badge.id} className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 ${index !== badges.length - 1 ? 'border-b border-inkline' : ''}`}>
                 <View className="flex-row items-center gap-4 flex-1">
-                  {badge.image_url ? <Image source={{ uri: badge.image_url }} className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200" />
+                  {badge.image_url ? <Image source={{ uri: badge.image_url }} className="w-14 h-14 rounded-full bg-slate-100 border border-inkline" />
                   : <View className="w-14 h-14 rounded-full bg-slate-100" />}
                   <View className="flex-1">
                     <Text className="font-bold text-text-primary text-base">{badge.title}</Text>
-                    <Text className="text-xs font-bold text-brand uppercase mt-0.5">Unlocks by: {cType}</Text>
+                    <Text className="text-xs font-bold text-pitch uppercase mt-0.5">Unlocks by: {cType}</Text>
                     {badge.description ? <Text className="text-sm text-slate-500 mt-1">{badge.description}</Text> : null}
                   </View>
                 </View>
                 
                 <View className="flex-row gap-3">
-                  <Pressable onPress={() => handleEdit(badge)} className="px-3 py-1.5 bg-slate-100 rounded border border-slate-200">
+                  <Pressable onPress={() => handleEdit(badge)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                     <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                   </Pressable>
-                  <Pressable onPress={() => handleDelete(badge.id, badge.image_url)} className="px-3 py-1.5 bg-red-50 rounded border border-red-100">
+                  <Pressable onPress={() => handleDelete(badge.id, badge.image_url)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
                     <Text className="text-red-600 text-sm font-semibold">Delete</Text>
                   </Pressable>
                 </View>

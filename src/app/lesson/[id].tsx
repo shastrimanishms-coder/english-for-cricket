@@ -528,30 +528,30 @@ function GridSpeakSlide({
         {panels.map((panel, idx) => {
           const result = results[idx];
           const isActive = phase !== 'done' && idx === activeIdx;
-          let borderClass = 'border-slate-200';
-          let bgClass = 'bg-slate-50';
+          let borderClass = 'border-inkline';
+          let bgClass = 'bg-white';
           if (result) {
-            borderClass = result.passed ? 'border-emerald-500' : 'border-amber-400';
-            bgClass = result.passed ? 'bg-emerald-50' : 'bg-amber-50';
+            borderClass = result.passed ? 'border-pitch' : 'border-gold';
+            bgClass = result.passed ? 'bg-pitch-light/50' : 'bg-gold-light/40';
           } else if (isActive) {
-            borderClass = 'border-brand';
-            bgClass = 'bg-amber-50';
+            borderClass = 'border-gold';
+            bgClass = 'bg-gold-light/40';
           }
           return (
             <Pressable
               key={panel.id}
               onPress={() => playOrSpeak(panel.audio_url, panel.text)}
-              className={`w-[48%] rounded-2xl border-2 ${borderClass} ${bgClass} p-2 items-center`}
+              className={`w-[48%] rounded-[20px] border ${borderClass} ${bgClass} p-2 items-center shadow-sm`}
             >
               {panel.media_url ? (
                 <FallbackImage
                   key={panel.media_url}
                   uri={panel.media_url}
-                  className="w-full rounded-xl mb-2"
+                  className="w-full rounded-2xl mb-2"
                   height={panelImgH}
                   fallback={
                     <View
-                      className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+                      className="w-full rounded-2xl mb-2 bg-canvas items-center justify-center"
                       style={{ height: panelImgH }}
                     >
                       <Text className="text-3xl">🔊</Text>
@@ -560,14 +560,14 @@ function GridSpeakSlide({
                 />
               ) : (
                 <View
-                  className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+                  className="w-full rounded-2xl mb-2 bg-canvas items-center justify-center"
                   style={{ height: panelImgH }}
                 >
                   <Text className="text-3xl">🔊</Text>
                 </View>
               )}
               <Text
-                className={`${tight ? 'text-sm' : 'text-base'} font-bold text-slate-800 text-center`}
+                className={`${tight ? 'text-sm' : 'text-base'} font-sans font-bold text-navy text-center`}
               >
                 {panel.text}
               </Text>
@@ -629,12 +629,12 @@ function GridSpeakSlide({
                   <Text className="text-slate-400 text-sm mt-2">⭐ Great! Next one coming…</Text>
                 ) : (
                   <View className="flex-row gap-3 mt-3">
-                    <Pressable onPress={startSpeaking} className="px-5 py-3 bg-[#0A192F] rounded-full">
+                    <Pressable onPress={startSpeaking} className="px-5 py-3 bg-navy border-b-4 border-navy-deep rounded-full">
                       <Text className="text-white font-bold text-sm">🎙️ Try Again</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => advancePanel(activeIdx, { score: lastScore, passed: false })}
-                      className="px-5 py-3 bg-slate-200 rounded-full"
+                      className="px-5 py-3 bg-white border border-inkline rounded-full"
                     >
                       <Text className="text-slate-600 font-bold text-sm">Next ➡️</Text>
                     </Pressable>
@@ -649,12 +649,12 @@ function GridSpeakSlide({
                   </Text>
                 ) : null}
                 <View className="flex-row gap-3">
-                  <Pressable onPress={startSpeaking} className="px-5 py-3 bg-[#0A192F] rounded-full">
+                  <Pressable onPress={startSpeaking} className="px-5 py-3 bg-navy border-b-4 border-navy-deep rounded-full">
                     <Text className="text-white font-bold text-sm">🎙️ Try Again</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => advancePanel(activeIdx, { score: null, passed: true })}
-                    className="px-5 py-3 bg-slate-200 rounded-full"
+                    className="px-5 py-3 bg-white border border-inkline rounded-full"
                   >
                     <Text className="text-slate-600 font-bold text-sm">✅ I said it — Next</Text>
                   </Pressable>
@@ -676,8 +676,8 @@ function GridSpeakSlide({
             )}
           </View>
         ) : (
-          <Pressable onPress={startSpeaking} className="px-6 py-3 bg-[#0A192F] rounded-full">
-            <Text className="text-white font-bold text-base">🎙️ Tap to Speak</Text>
+          <Pressable onPress={startSpeaking} className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full">
+            <Text className="text-navy font-bold text-base">🎙️ Tap to Speak</Text>
           </Pressable>
         )}
       </View>
@@ -825,14 +825,14 @@ function SpeakRepeatSlide({
         />
       ) : null}
       {instruction ? (
-        <Text className="text-lg text-slate-500 text-center mb-2">{instruction}</Text>
+        <Text className="font-sans text-lg text-slate-500 text-center mb-2">{instruction}</Text>
       ) : null}
       <Text className="text-sm text-slate-400 mb-1">Listen, then say it out loud:</Text>
-      <Text className="text-3xl font-bold text-[#0A192F] text-center mb-6">{target}</Text>
+      <Text className="font-display text-3xl font-semibold text-navy text-center mb-6">{target}</Text>
 
       <Pressable
         onPress={() => playOrSpeak(slide.audio_url, target)}
-        className="px-6 py-3 bg-brand rounded-full mb-6"
+        className="px-6 py-3 bg-navy border-b-4 border-navy-deep rounded-full mb-6"
       >
         <Text className="text-white font-bold text-base">🔊 Listen</Text>
       </Pressable>
@@ -854,7 +854,7 @@ function SpeakRepeatSlide({
               <Text className="text-slate-400 text-sm mt-4 text-center">
                 🔁 This one will come back at the end of the lesson.
               </Text>
-              <Pressable onPress={() => onRetry(slide)} className="px-6 py-3 mt-3 bg-[#0A192F] rounded-full">
+              <Pressable onPress={() => onRetry(slide)} className="px-6 py-3 mt-3 bg-navy border-b-4 border-navy-deep rounded-full">
                 <Text className="text-white font-bold text-base">🎙️ Try Again Now</Text>
               </Pressable>
             </>
@@ -874,7 +874,7 @@ function SpeakRepeatSlide({
           </View>
           <Pressable
             onPress={() => onAnswered(slide, true, null)}
-            className="px-8 py-4 bg-emerald-600 rounded-full"
+            className="px-8 py-4 bg-pitch rounded-full"
           >
             <Text className="text-white font-bold text-base">✅ I said it out loud</Text>
           </Pressable>
@@ -893,8 +893,8 @@ function SpeakRepeatSlide({
               )}
             </>
           ) : (
-            <Pressable onPress={startSpeaking} className="px-8 py-4 bg-[#0A192F] rounded-full">
-              <Text className="text-white font-bold text-lg">🎙️ Tap to Speak</Text>
+            <Pressable onPress={startSpeaking} className="px-8 py-4 bg-gold border-b-4 border-gold-dark rounded-full">
+              <Text className="text-navy font-bold text-lg">🎙️ Tap to Speak</Text>
             </Pressable>
           )}
           {error ? (
@@ -1486,34 +1486,34 @@ export default function LessonPlayer() {
     const selected = attempt.selectedPanelId === panel.id;
     const explored = attempt.exploredPanelIds.includes(panel.id);
 
-    let borderClass = 'border-slate-200';
-    let bgClass = 'bg-slate-50';
+    let borderClass = 'border-inkline';
+    let bgClass = 'bg-white';
     if (isQuiz && attempt.answered && panel.is_correct) {
-      borderClass = 'border-emerald-500';
-      bgClass = 'bg-emerald-50';
+      borderClass = 'border-pitch';
+      bgClass = 'bg-pitch-light/50';
     } else if (isQuiz && attempt.answered && selected && !panel.is_correct) {
       borderClass = 'border-red-400';
       bgClass = 'bg-red-50';
     } else if (selected || explored) {
-      borderClass = 'border-brand';
-      bgClass = 'bg-amber-50';
+      borderClass = 'border-gold';
+      bgClass = 'bg-gold-light/40';
     }
 
     return (
       <Pressable
         key={panel.id}
         onPress={() => handlePanelTap(slide, panel)}
-        className={`w-[48%] rounded-2xl border-2 ${borderClass} ${bgClass} p-3 items-center`}
+        className={`w-[48%] rounded-[20px] border ${borderClass} ${bgClass} p-3 items-center shadow-sm`}
       >
         {panel.media_url ? (
           <FallbackImage
             key={panel.media_url}
             uri={panel.media_url}
-            className="w-full rounded-xl mb-2"
+            className="w-full rounded-2xl mb-2"
             height={panelImgH}
             fallback={
               <View
-                className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+                className="w-full rounded-2xl mb-2 bg-canvas items-center justify-center"
                 style={{ height: panelImgH }}
               >
                 <Text className="text-3xl">🔊</Text>
@@ -1522,13 +1522,13 @@ export default function LessonPlayer() {
           />
         ) : (
           <View
-            className="w-full rounded-xl mb-2 bg-slate-200 items-center justify-center"
+            className="w-full rounded-2xl mb-2 bg-canvas items-center justify-center"
             style={{ height: panelImgH }}
           >
             <Text className="text-3xl">🔊</Text>
           </View>
         )}
-        <Text className="text-base font-bold text-slate-800 text-center">{panel.text}</Text>
+        <Text className="font-sans text-base font-bold text-navy text-center">{panel.text}</Text>
         <Text className="text-xs text-slate-400 mt-1">Tap to listen</Text>
       </Pressable>
     );
@@ -1550,10 +1550,10 @@ export default function LessonPlayer() {
             />
           ) : null}
           {slide.prompt_text ? (
-            <Text className="text-lg text-slate-500 text-center mb-2">{slide.prompt_text}</Text>
+            <Text className="font-sans text-lg text-slate-500 text-center mb-2">{slide.prompt_text}</Text>
           ) : null}
           {slide.correct_answer ? (
-            <Text className="text-3xl font-bold text-[#0A192F] text-center mb-4">
+            <Text className="font-display text-3xl font-semibold text-navy text-center mb-4">
               {slide.correct_answer}
             </Text>
           ) : null}
@@ -1562,7 +1562,7 @@ export default function LessonPlayer() {
               onPress={() =>
                 playOrSpeak(slide.audio_url, slide.correct_answer || slide.prompt_text)
               }
-              className="px-6 py-3 bg-brand rounded-full"
+              className="px-6 py-3 bg-navy border-b-4 border-navy-deep rounded-full"
             >
               <Text className="text-white font-bold text-base">🔊 Listen</Text>
             </Pressable>
@@ -1588,7 +1588,7 @@ export default function LessonPlayer() {
       return (
         <View>
           {slide.prompt_text ? (
-            <Text className="text-2xl font-bold text-[#0A192F] text-center mb-3">
+            <Text className="font-display text-2xl font-semibold text-navy text-center mb-3">
               {slide.prompt_text}
             </Text>
           ) : null}
@@ -1662,7 +1662,7 @@ export default function LessonPlayer() {
               {gapInstruction ? (
                 <Text className="text-lg text-slate-500 text-center mb-2">{gapInstruction}</Text>
               ) : null}
-              <Text className="text-2xl font-bold text-[#0A192F] text-center mb-4">
+              <Text className="font-display text-2xl font-semibold text-navy text-center mb-4">
                 {gapSentence || prompt}
               </Text>
             </>
@@ -1672,7 +1672,7 @@ export default function LessonPlayer() {
                 <Text className="text-lg text-slate-500 text-center mb-2">{prompt}</Text>
               ) : null}
               {isInstruction && slide.correct_answer ? (
-                <Text className="text-2xl font-bold text-[#0A192F] text-center mb-4">
+                <Text className="font-display text-2xl font-semibold text-navy text-center mb-4">
                   {slide.correct_answer}
                 </Text>
               ) : null}
@@ -1681,13 +1681,13 @@ export default function LessonPlayer() {
           {slide.audio_url || listenText ? (
             <Pressable
               onPress={() => playOrSpeak(slide.audio_url, listenText)}
-              className="px-6 py-3 bg-brand rounded-full mb-4"
+              className="px-6 py-3 bg-navy border-b-4 border-navy-deep rounded-full mb-4"
             >
               <Text className="text-white font-bold text-base">🔊 Listen</Text>
             </Pressable>
           ) : null}
           <TextInput
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-lg text-slate-800 mb-4"
+            className="w-full bg-white border border-inkline rounded-2xl p-4 font-sans text-lg text-slate-800 mb-4"
             placeholder={isGap ? 'Type the missing word here' : 'Type the sentence here'}
             value={attempt.typingValue}
             onChangeText={(text) => updateAttempt(slide.id, { typingValue: text })}
@@ -1698,9 +1698,9 @@ export default function LessonPlayer() {
           {!attempt.answered ? (
             <Pressable
               onPress={() => handleTypingCheck(slide)}
-              className="px-6 py-3 bg-brand rounded-full"
+              className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full"
             >
-              <Text className="text-white font-bold text-base">Check Answer</Text>
+              <Text className="text-navy font-bold text-base">Check Answer</Text>
             </Pressable>
           ) : (
             <View className="items-center">
@@ -1735,7 +1735,7 @@ export default function LessonPlayer() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-surface-background items-center justify-center">
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center">
         <ActivityIndicator size="large" color="#0A192F" />
       </SafeAreaView>
     );
@@ -1743,8 +1743,8 @@ export default function LessonPlayer() {
 
   if (loadError) {
     return (
-      <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
-        <Text className="text-2xl font-bold text-[#0A192F] mb-2 text-center">
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center p-6">
+        <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">
           Couldn&apos;t load this lesson
         </Text>
         <Text className="text-slate-500 text-center mb-8">{loadError}</Text>
@@ -1754,7 +1754,7 @@ export default function LessonPlayer() {
               await fetchLessonData();
             })();
           }}
-          className="px-6 py-3 bg-brand rounded-full mb-3"
+          className="px-6 py-3 bg-navy border-b-4 border-navy-deep rounded-full mb-3"
         >
           <Text className="text-white font-bold">Try Again</Text>
         </Pressable>
@@ -1773,7 +1773,7 @@ export default function LessonPlayer() {
 
     if (showTricky) {
       return (
-        <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
+        <SafeAreaView className="flex-1 bg-canvas items-center justify-center p-6">
           <TrickyWordsPractice
             words={trickyWords}
             lessonId={lesson?.id || ''}
@@ -1787,21 +1787,21 @@ export default function LessonPlayer() {
     }
 
     return (
-      <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center p-6">
         <View className="mb-2">
           <MascotPair height={130} />
         </View>
-        <Text className="text-3xl font-bold text-[#0A192F] mb-2 text-center">Lesson Complete!</Text>
-        <Text className="text-lg text-slate-500 text-center mb-2">
+        <Text className="font-display text-3xl font-semibold text-navy mb-2 text-center">Lesson Complete!</Text>
+        <Text className="font-sans text-lg text-slate-500 text-center mb-2">
           {lesson?.title}
         </Text>
         <PopIn>
           {percentage !== null ? (
-            <Text className="text-xl font-bold text-brand mb-2">
+            <Text className="text-xl font-bold text-pitch mb-2">
               You got {correct} out of {total} correct ({percentage}%)
             </Text>
           ) : (
-            <Text className="text-xl font-bold text-brand mb-2">Great listening practice!</Text>
+            <Text className="text-xl font-bold text-pitch mb-2">Great listening practice!</Text>
           )}
         </PopIn>
         {percentage !== null ? <StarsRow count={starCount} /> : null}
@@ -1821,9 +1821,9 @@ export default function LessonPlayer() {
         {trickyWords.length > 0 && trickyFixed === null ? (
           <Pressable
             onPress={() => setShowTricky(true)}
-            className="w-full max-w-sm px-6 py-4 bg-[#D4AF37] rounded-full mb-3 items-center"
+            className="w-full max-w-sm px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full mb-3 items-center"
           >
-            <Text className="text-white font-bold text-base">
+            <Text className="text-navy font-bold text-base">
               🗣️ Fix {trickyWords.length} tricky word{trickyWords.length > 1 ? 's' : ''} · +2 ⭐ each
             </Text>
           </Pressable>
@@ -1836,13 +1836,13 @@ export default function LessonPlayer() {
         {lesson ? <Recommendations lessonId={lesson.id} /> : null}
         <Pressable
           onPress={() => router.replace('/learner/path')}
-          className="w-full max-w-sm px-6 py-4 bg-brand rounded-full mb-3 items-center"
+          className="w-full max-w-sm px-6 py-4 bg-navy border-b-4 border-navy-deep rounded-full mb-3 items-center"
         >
           <Text className="text-white font-bold text-base">Back to Learning Path</Text>
         </Pressable>
         <Pressable
           onPress={() => router.replace('/learner')}
-          className="w-full max-w-sm px-6 py-4 bg-slate-100 border border-slate-200 rounded-full items-center"
+          className="w-full max-w-sm px-6 py-4 bg-white border border-inkline rounded-full items-center"
         >
           <Text className="text-slate-600 font-bold text-base">Learner Home</Text>
         </Pressable>
@@ -1853,14 +1853,14 @@ export default function LessonPlayer() {
 
   if (!currentSlide) {
     return (
-      <SafeAreaView className="flex-1 bg-surface-background items-center justify-center p-6">
-        <Text className="text-2xl font-bold text-[#0A192F] mb-2 text-center">
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center p-6">
+        <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">
           No slides yet
         </Text>
         <Text className="text-slate-500 text-center mb-8">
           This lesson doesn&apos;t have any slides yet. Please check back soon.
         </Text>
-        <Pressable onPress={() => router.back()} className="px-6 py-3 bg-brand rounded-full">
+        <Pressable onPress={() => router.back()} className="px-6 py-3 bg-navy rounded-full">
           <Text className="text-white font-bold">Go Back</Text>
         </Pressable>
       </SafeAreaView>
@@ -1876,15 +1876,18 @@ export default function LessonPlayer() {
   const isLastInQueue = queuePos >= queue.length - 1;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-background">
+    <SafeAreaView className="flex-1 bg-canvas">
       <View className="flex-1 w-full max-w-3xl mx-auto px-4 py-2 md:px-8">
         {/* Top Navigation & Progress Bar */}
         <View className="flex-row items-center justify-between mb-2 pt-2">
-          <Pressable onPress={handleExit} className="p-2 -ml-2 rounded-full hover:bg-slate-100">
-            <Text className="text-2xl text-slate-400 font-bold">✕</Text>
+          <Pressable
+            onPress={handleExit}
+            className="h-10 w-10 -ml-1 items-center justify-center rounded-full border border-inkline bg-white"
+          >
+            <Text className="text-base text-navy font-bold">✕</Text>
           </Pressable>
 
-          <View className="flex-1 h-4 bg-slate-200 rounded-full mx-4 overflow-hidden">
+          <View className="flex-1 h-[10px] bg-gold-light rounded-full mx-4 overflow-hidden">
             <Animated.View
               style={[
                 progressStyle,
@@ -1893,21 +1896,21 @@ export default function LessonPlayer() {
             />
           </View>
 
-          <View className="px-3 py-1 bg-slate-100 rounded-lg border border-slate-200">
-            <Text className="text-xs font-bold text-slate-500 uppercase">
+          <View className="px-3 py-1.5 bg-white rounded-full border border-inkline">
+            <Text className="text-xs font-bold text-navy uppercase tracking-wider">
               {completedIds.length} / {slides.length} done
             </Text>
           </View>
         </View>
 
         {lesson?.title ? (
-          <Text className="text-center text-sm font-bold text-slate-400 mb-2">{lesson.title}</Text>
+          <Text className="text-center font-display text-base font-semibold text-navy/60 mb-2">{lesson.title}</Text>
         ) : null}
 
         {isRepeat ? (
           <View className="items-center mb-3">
-            <View className="px-3 py-1 bg-amber-100 border border-amber-200 rounded-full">
-              <Text className="text-xs font-bold text-amber-700">
+            <View className="px-3 py-1 bg-gold-light/60 border border-gold/50 rounded-full">
+              <Text className="text-xs font-bold text-gold-dark">
                 🔁 Practice again — until it&apos;s right!
               </Text>
             </View>
@@ -1918,7 +1921,7 @@ export default function LessonPlayer() {
             answer can pulse the card and a wrong one can shake it. */}
         <Animated.View style={[{ flex: 1 }, cardStyle]}>
           <ScrollView
-            className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm"
+            className="flex-1 bg-white rounded-[24px] border border-inkline shadow-sm"
             contentContainerStyle={{
               padding: compact ? 14 : 20,
               flexGrow: 1,
@@ -1958,9 +1961,9 @@ export default function LessonPlayer() {
               onPress={() => {
                 void advance();
               }}
-              className="w-full max-w-md px-6 py-4 bg-brand rounded-full items-center"
+              className="w-full max-w-md px-6 py-4 bg-gold border-b-4 border-gold-dark rounded-full items-center"
             >
-              <Text className="text-white font-bold text-lg">
+              <Text className="text-navy font-bold text-lg">
                 {isLastInQueue ? 'Finish Lesson' : 'Continue'}
               </Text>
             </Pressable>

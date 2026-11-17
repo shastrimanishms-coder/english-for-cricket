@@ -1,9 +1,35 @@
+import {
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
+} from '@expo-google-fonts/fraunces';
+import {
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../global.css';
 
 export default function RootLayout() {
+  // Elegant redesign type pairing: Fraunces (display) + Manrope
+  // (UI/body). Non-blocking: the tree renders immediately and the
+  // fonts swap in when ready, so a slow font fetch never blanks
+  // the app.
+  useFonts({
+    Fraunces: Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    Manrope: Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+  });
+
   return (
     <SafeAreaProvider>
     <View className="flex-1 bg-surface-background">

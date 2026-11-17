@@ -8,16 +8,16 @@ import { scoreMessage, type SpeechScore } from '../../lib/speechScoring';
 // and the Speaking Practice screen so both speak the same language.
 
 const CHIP_CLASSES: Record<string, string> = {
-  correct: 'bg-emerald-100 border-emerald-300',
-  close: 'bg-amber-100 border-amber-300',
-  wrong: 'bg-red-100 border-red-300',
-  missing: 'bg-red-50 border-red-200',
+  correct: 'bg-pitch-light/60 border-pitch/40',
+  close: 'bg-gold-light/50 border-gold/50',
+  wrong: 'bg-red-50 border-red-200',
+  missing: 'bg-red-50/60 border-red-100',
 };
 
 const CHIP_TEXT_CLASSES: Record<string, string> = {
-  correct: 'text-emerald-800',
-  close: 'text-amber-800',
-  wrong: 'text-red-700',
+  correct: 'text-pitch-dark',
+  close: 'text-gold-dark',
+  wrong: 'text-red-600',
   missing: 'text-red-400',
 };
 
@@ -39,8 +39,8 @@ export default function SpeechScoreView({
 
   return (
     <View className="w-full items-center">
-      <Text className={`text-5xl font-bold ${accuracyColor}`}>{score.accuracy}%</Text>
-      <Text className="text-base font-bold text-slate-700 mt-1 mb-4 text-center">
+      <Text className={`font-display text-5xl font-bold ${accuracyColor}`}>{score.accuracy}%</Text>
+      <Text className="mt-1 mb-4 text-center font-sans text-base font-bold text-slate-700">
         {scoreMessage(score.accuracy)}
       </Text>
 
@@ -48,9 +48,9 @@ export default function SpeechScoreView({
         {score.words.map((w, idx) => (
           <View
             key={`${w.word}-${idx}`}
-            className={`px-3 py-2 rounded-xl border ${CHIP_CLASSES[w.status]} items-center`}
+            className={`items-center rounded-full border px-4 py-2 ${CHIP_CLASSES[w.status]}`}
           >
-            <Text className={`text-lg font-bold ${CHIP_TEXT_CLASSES[w.status]}`}>{w.word}</Text>
+            <Text className={`font-sans text-lg font-bold ${CHIP_TEXT_CLASSES[w.status]}`}>{w.word}</Text>
             {w.heard && w.status !== 'correct' ? (
               <Text className="text-xs text-slate-500">you: {w.heard}</Text>
             ) : null}
@@ -70,10 +70,10 @@ export default function SpeechScoreView({
         </Text>
       ) : null}
 
-      <View className="flex-row gap-4 mt-3">
-        <Text className="text-xs text-emerald-700 font-bold">🟩 Perfect</Text>
-        <Text className="text-xs text-amber-700 font-bold">🟧 Close</Text>
-        <Text className="text-xs text-red-500 font-bold">🟥 Try again</Text>
+      <View className="mt-3 flex-row gap-4">
+        <Text className="text-xs font-bold text-pitch">● Perfect</Text>
+        <Text className="text-xs font-bold text-gold-dark">● Close</Text>
+        <Text className="text-xs font-bold text-red-500">● Try again</Text>
       </View>
     </View>
   );

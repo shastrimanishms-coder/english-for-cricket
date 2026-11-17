@@ -140,17 +140,17 @@ export default function SystemSettings() {
   return (
     <View className="space-y-8 gap-8 pb-12">
       <View className="flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-text-primary">System Settings</Text>
+        <Text className="font-display text-3xl font-semibold text-navy">System Settings</Text>
       </View>
 
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
-        <Text className="text-lg font-bold text-[#0A192F]">Global Configuration</Text>
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <Text className="font-display text-xl font-semibold text-navy">Global Configuration</Text>
 
         <View className="flex-col md:flex-row gap-6">
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">Support Contact Email</Text>
             <TextInput
-              className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200"
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
               placeholder="support@englishforcricket.com"
               value={supportEmail}
               onChangeText={setSupportEmail}
@@ -161,16 +161,16 @@ export default function SystemSettings() {
           
         </View>
 
-        <View className="flex-row justify-end mt-2 pt-4 border-t border-slate-100">
+        <View className="flex-row justify-end mt-2 pt-4 border-t border-inkline">
           <View className="w-48">
             <AnimatedButton title={saving ? "Saving Config..." : "Save Configuration"} onPress={handleSaveSettings} disabled={saving} variant="primary" size="sm" />
           </View>
         </View>
       </View>
 
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 gap-6">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
         <View>
-          <Text className="text-lg font-bold text-[#0A192F]">App / Web Logo</Text>
+          <Text className="font-display text-xl font-semibold text-navy">App / Web Logo</Text>
           <Text className="text-xs text-slate-400 mt-2">
             PNG with transparency works best. The logo appears in the website and app header.
             Festive or seasonal versions can be swapped in anytime and take effect immediately
@@ -181,13 +181,13 @@ export default function SystemSettings() {
         <View className="flex-col md:flex-row gap-4">
           <View className="flex-1">
             <Text className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">On light</Text>
-            <View className="bg-slate-100 border border-slate-200 rounded-xl h-24 items-center justify-center p-3">
+            <View className="bg-slate-100 border border-inkline rounded-xl h-24 items-center justify-center p-3">
               <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             </View>
           </View>
           <View className="flex-1">
             <Text className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">On dark</Text>
-            <View className="bg-[#0A192F] border border-slate-200 rounded-xl h-24 items-center justify-center p-3">
+            <View className="bg-navy border border-inkline rounded-xl h-24 items-center justify-center p-3">
               <Image source={previewLogoSource} onError={() => setLogoPreviewFailed(true)} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             </View>
           </View>
@@ -204,31 +204,31 @@ export default function SystemSettings() {
             <AnimatedButton title={logoBusy ? "Working..." : "Upload New Logo"} onPress={handleUploadLogo} disabled={logoBusy} variant="primary" size="sm" />
           </View>
           {appLogoUrl ? (
-            <Pressable onPress={handleResetLogo} disabled={logoBusy} className="px-3 py-1.5 rounded border bg-slate-100 border-slate-200">
+            <Pressable onPress={handleResetLogo} disabled={logoBusy} className="px-3 py-1.5 rounded-full border bg-slate-100 border-inkline">
               <Text className="text-xs font-semibold text-slate-500">Use Default Logo</Text>
             </Pressable>
           ) : null}
         </View>
       </View>
 
-      <View className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm">
         <View className="mb-6">
-          <Text className="text-lg font-bold text-[#0A192F]">Admin Role Management</Text>
+          <Text className="font-display text-xl font-semibold text-navy">Admin Role Management</Text>
         </View>
-        <View className="border border-slate-200 rounded-xl overflow-hidden">
+        <View className="border border-inkline rounded-xl overflow-hidden">
           {loading ? <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
           : users.map((user, index) => {
             const isSuperAdmin = user.role === 'super_admin';
             return (
-              <View key={user.id} className={`p-4 flex-row items-center justify-between ${index !== users.length - 1 ? 'border-b border-slate-100' : ''}`}>
+              <View key={user.id} className={`p-4 flex-row items-center justify-between ${index !== users.length - 1 ? 'border-b border-inkline' : ''}`}>
                 <View className="w-1/2">
                   <Text className="font-mono text-sm text-slate-600">{user.id}</Text>
                 </View>
-                <View className={`px-2.5 py-1 rounded-md ${isSuperAdmin ? 'bg-[#D4AF37]/20' : 'bg-slate-100'}`}>
-                  <Text className={`text-xs font-bold uppercase ${isSuperAdmin ? 'text-[#D4AF37]' : 'text-slate-500'}`}>{user.role.replace('_', ' ')}</Text>
+                <View className={`px-2.5 py-1 rounded-md ${isSuperAdmin ? 'bg-gold/20' : 'bg-slate-100'}`}>
+                  <Text className={`text-xs font-bold uppercase ${isSuperAdmin ? 'text-gold-dark' : 'text-slate-500'}`}>{user.role.replace('_', ' ')}</Text>
                 </View>
-                <Pressable onPress={() => handleToggleRole(user.id, user.role)} className={`px-3 py-1.5 rounded border ${isSuperAdmin ? 'bg-slate-100 border-slate-200' : 'bg-brand/10 border-brand/30'}`}>
-                  <Text className={`text-xs font-semibold ${isSuperAdmin ? 'text-slate-500' : 'text-brand'}`}>{isSuperAdmin ? 'Demote to Manager' : 'Make Super Admin'}</Text>
+                <Pressable onPress={() => handleToggleRole(user.id, user.role)} className={`px-3 py-1.5 rounded border ${isSuperAdmin ? 'bg-slate-100 border-inkline' : 'bg-pitch/10 border-pitch/30'}`}>
+                  <Text className={`text-xs font-semibold ${isSuperAdmin ? 'text-slate-500' : 'text-pitch'}`}>{isSuperAdmin ? 'Demote to Manager' : 'Make Super Admin'}</Text>
                 </Pressable>
               </View>
             );

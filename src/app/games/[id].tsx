@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
@@ -71,8 +72,9 @@ function BadgeToast({ badge, onDone }: { badge: AwardedBadge; onDone: () => void
         style,
       ]}
     >
-      <View className="bg-[#0A192F]/95 border border-[#D4AF37] rounded-full px-5 py-2.5 shadow-lg">
-        <Text className="text-white font-bold text-sm">🏆 Badge earned: {badge.title}</Text>
+      <View className="bg-navy/95 border border-gold rounded-full px-5 py-2.5 shadow-lg flex-row items-center gap-2">
+        <Ionicons name="trophy" size={16} color="#D4AF37" />
+        <Text className="text-white font-sans font-bold text-sm">Badge earned: {badge.title}</Text>
       </View>
     </Animated.View>
   );
@@ -199,7 +201,7 @@ export default function GamePlayer() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center">
+      <SafeAreaView className="flex-1 bg-navy-deep items-center justify-center">
         <ActivityIndicator size="large" color="#ffffff" />
       </SafeAreaView>
     );
@@ -207,11 +209,11 @@ export default function GamePlayer() {
 
   if (fetchError) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
-        <Text className="text-white text-xl font-bold mb-2 text-center">
+      <SafeAreaView className="flex-1 bg-navy-deep items-center justify-center p-6">
+        <Text className="text-white font-display text-xl font-semibold mb-2 text-center">
           Couldn&apos;t load this game
         </Text>
-        <Text className="text-slate-400 text-center mb-6">
+        <Text className="text-slate-400 font-sans text-center mb-6">
           Something went wrong while loading. Check your connection and try again.
         </Text>
         <Pressable
@@ -220,12 +222,12 @@ export default function GamePlayer() {
               await fetchGameDetails();
             })();
           }}
-          className="px-6 py-3 bg-white rounded-lg mb-3"
+          className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full mb-3"
         >
-          <Text className="font-bold text-slate-900">Try Again</Text>
+          <Text className="font-sans font-bold text-navy">Try Again</Text>
         </Pressable>
         <Pressable onPress={goBack} className="px-6 py-3">
-          <Text className="font-bold text-slate-300">Go Back</Text>
+          <Text className="font-sans font-bold text-slate-300">Go Back</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -233,25 +235,25 @@ export default function GamePlayer() {
 
   if (!game) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center p-6">
-        <Text className="text-white text-xl font-bold mb-4">Game not found.</Text>
-        <Pressable onPress={goBack} className="px-6 py-3 bg-white rounded-lg">
-          <Text className="font-bold text-slate-900">Go Back</Text>
+      <SafeAreaView className="flex-1 bg-navy-deep items-center justify-center p-6">
+        <Text className="text-white font-display text-xl font-semibold mb-4">Game not found.</Text>
+        <Pressable onPress={goBack} className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full">
+          <Text className="font-sans font-bold text-navy">Go Back</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-900">
-      <View className="flex-row items-center justify-between p-4 bg-black/50 z-10 absolute top-0 left-0 right-0">
-        <Pressable onPress={goBack} className="px-4 py-2 bg-white/10 rounded-full border border-white/20">
-          <Text className="text-white font-bold text-sm">← Back to Arcade</Text>
+    <SafeAreaView className="flex-1 bg-navy-deep">
+      <View className="flex-row items-center justify-between p-4 bg-navy-deep/70 z-10 absolute top-0 left-0 right-0">
+        <Pressable onPress={goBack} className="h-10 w-10 items-center justify-center bg-white/10 rounded-full border border-white/20">
+          <Ionicons name="chevron-back" size={20} color="#ffffff" />
         </Pressable>
-        <Text className="text-white font-bold text-lg flex-1 text-center mx-2" numberOfLines={1}>{game.title}</Text>
+        <Text className="text-white font-display font-semibold text-lg flex-1 text-center mx-2" numberOfLines={1}>{game.title}</Text>
         {/* Spacer for centering (comment on its own line: a same-line
             comment after an element leaves a stray " " text node) */}
-        <View className="w-24" />
+        <View className="w-10" />
       </View>
 
       {badgeToasts[0] ? (
@@ -265,17 +267,17 @@ export default function GamePlayer() {
       <View className="flex-1 pt-16">
         {embedStatus === 'error' ? (
           <View className="flex-1 items-center justify-center p-6">
-            <Text className="text-white text-xl font-bold mb-2 text-center">
+            <Text className="text-white font-display text-xl font-semibold mb-2 text-center">
               This game couldn&apos;t be loaded
             </Text>
-            <Text className="text-slate-400 text-center mb-6">
+            <Text className="text-slate-400 font-sans text-center mb-6">
               The game itself failed to load. You can try again, or pick a different game.
             </Text>
-            <Pressable onPress={retryEmbed} className="px-6 py-3 bg-white rounded-lg mb-3">
-              <Text className="font-bold text-slate-900">Retry</Text>
+            <Pressable onPress={retryEmbed} className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full mb-3">
+              <Text className="font-sans font-bold text-navy">Retry</Text>
             </Pressable>
             <Pressable onPress={goBack} className="px-6 py-3">
-              <Text className="font-bold text-slate-300">Go Back</Text>
+              <Text className="font-sans font-bold text-slate-300">Go Back</Text>
             </Pressable>
           </View>
         ) : (
@@ -322,9 +324,9 @@ export default function GamePlayer() {
               />
             )}
             {embedStatus === 'loading' ? (
-              <View className="absolute inset-0 items-center justify-center bg-slate-900">
+              <View className="absolute inset-0 items-center justify-center bg-navy-deep">
                 <ActivityIndicator size="large" color="#ffffff" />
-                <Text className="text-slate-400 mt-3">Loading game…</Text>
+                <Text className="text-slate-400 font-sans mt-3">Loading game…</Text>
               </View>
             ) : null}
           </>

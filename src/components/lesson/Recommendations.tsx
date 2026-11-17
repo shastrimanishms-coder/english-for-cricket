@@ -60,17 +60,17 @@ export default function Recommendations({ lessonId }: { lessonId: string }) {
     if (!nextLesson) return null;
     return (
       <View className="w-full max-w-sm mb-3">
-        <Text className="text-center font-bold text-[#0A192F] mb-2">Keep going ⭐</Text>
+        <Text className="text-center font-display text-lg font-semibold text-navy mb-2">Keep going ⭐</Text>
         <Pressable
           onPress={() => router.push(`/lesson/${nextLesson.id}` as any)}
-          className="flex-row items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-3 mb-2"
+          className="flex-row items-center gap-3 bg-white border border-inkline rounded-[20px] px-4 py-3 mb-2 shadow-sm"
         >
           <Text className="text-2xl">📚</Text>
           <View className="flex-1">
-            <Text className="font-bold text-[#0A192F]" numberOfLines={1}>{nextLesson.title}</Text>
+            <Text className="font-sans font-bold text-navy" numberOfLines={1}>{nextLesson.title}</Text>
             <Text className="text-slate-400 text-xs">Next lesson in this module</Text>
           </View>
-          <Text className="text-[#D4AF37] font-bold">Start ›</Text>
+          <Text className="text-gold-dark font-bold">Start ›</Text>
         </Pressable>
       </View>
     );
@@ -78,22 +78,22 @@ export default function Recommendations({ lessonId }: { lessonId: string }) {
 
   return (
     <View className="w-full max-w-sm mb-3">
-      <Text className="text-center font-bold text-[#0A192F] mb-2">Keep going — try these next ⭐</Text>
+      <Text className="text-center font-display text-lg font-semibold text-navy mb-2">Keep going — try these next ⭐</Text>
       {recs.map((rec) => (
         <Pressable
           key={`${rec.kind}:${rec.id}`}
           onPress={() => router.push(ROUTES[rec.kind](rec.id) as any)}
-          className="flex-row items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-3 mb-2"
+          className="flex-row items-center gap-3 bg-white border border-inkline rounded-[20px] px-4 py-3 mb-2 shadow-sm"
         >
           <Text className="text-2xl">{EXTRA_META[rec.kind].emoji}</Text>
           <View className="flex-1">
-            <Text className="font-bold text-[#0A192F]" numberOfLines={1}>{rec.title}</Text>
+            <Text className="font-sans font-bold text-navy" numberOfLines={1}>{rec.title}</Text>
             <Text className="text-slate-400 text-xs">{EXTRA_META[rec.kind].label} · extra practice</Text>
           </View>
           {rec.done ? (
-            <Text className="text-emerald-600 font-bold">✓ Done</Text>
+            <Text className="text-pitch font-bold">✓ Done</Text>
           ) : (
-            <Text className="text-[#D4AF37] font-bold">+{POINTS.EXTRA_STARS} ⭐</Text>
+            <Text className="text-gold-dark font-bold">+{POINTS.EXTRA_STARS} ⭐</Text>
           )}
         </Pressable>
       ))}

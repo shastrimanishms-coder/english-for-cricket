@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -46,15 +48,13 @@ export default function VideosGallery() {
   }, []);
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-surface-background">
+    <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
+      <ScreenHeader title="Video Library" onBack={goBack} />
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="w-full max-w-7xl mx-auto">
-        <Pressable onPress={goBack} className="self-start px-4 py-2 bg-slate-200 rounded-lg mb-4">
-          <Text className="font-bold text-slate-700">← Back</Text>
-        </Pressable>
         <View className="mb-8">
-          <Text className="text-4xl font-bold text-text-primary mb-2">Video Library</Text>
-          <Text className="text-lg text-text-secondary">Watch and learn at your own pace.</Text>
+          <MicroLabel className="mb-2">Videos</MicroLabel>
+          <Text className="font-sans text-lg text-slate-500">Watch and learn at your own pace.</Text>
         </View>
 
         {loading ? (
@@ -62,33 +62,37 @@ export default function VideosGallery() {
             <ActivityIndicator size="large" color="#0A192F" />
           </View>
         ) : videos.length === 0 ? (
-          <View className="py-20 items-center justify-center bg-white rounded-2xl border border-slate-200">
-            <Text className="text-6xl mb-4">📺</Text>
-            <Text className="text-xl font-bold text-text-primary mb-2">No Videos Yet</Text>
-            <Text className="text-text-secondary">Check back soon for new lessons!</Text>
-          </View>
+          <ElegantCard className="py-20 items-center justify-center px-6">
+            <View className="w-20 h-20 rounded-full bg-navy items-center justify-center mb-4">
+              <Ionicons name="play-circle-outline" size={38} color="#D4AF37" />
+            </View>
+            <Text className="font-display text-xl font-semibold text-navy mb-2">No Videos Yet</Text>
+            <Text className="font-sans text-slate-500">Check back soon for new lessons!</Text>
+          </ElegantCard>
         ) : (
           <View className="flex-row flex-wrap gap-6">
             {videos.map((video) => (
               <Link key={video.id} href={`/videos/${video.id}`} asChild>
-                <Pressable className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                <Pressable className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] bg-white rounded-[20px] border border-inkline shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                   {video.thumbnail_url ? (
-                    <Image source={{ uri: video.thumbnail_url }} className="w-full h-48 bg-slate-100 object-cover" />
+                    <Image source={{ uri: video.thumbnail_url }} className="w-full h-48 bg-pitch-light object-cover" />
                   ) : (
-                    <View className="w-full h-48 bg-slate-100 items-center justify-center">
-                      <Text className="text-4xl">▶️</Text>
+                    <View className="w-full h-48 bg-pitch-light items-center justify-center">
+                      <View className="w-16 h-16 rounded-full bg-navy items-center justify-center">
+                        <Ionicons name="play" size={28} color="#D4AF37" />
+                      </View>
                     </View>
                   )}
                   <View className="p-5">
                     {video.category && (
-                      <Text className="text-xs font-bold text-brand uppercase tracking-wider mb-1">
+                      <Text className="font-sans text-[11px] font-bold text-gold-dark uppercase tracking-[2px] mb-1">
                         {video.category}
                       </Text>
                     )}
-                    <Text className="text-xl font-bold text-text-primary mb-2" numberOfLines={1}>
+                    <Text className="font-display text-xl font-semibold text-navy mb-2" numberOfLines={1}>
                       {video.title}
                     </Text>
-                    <Text className="text-text-secondary text-sm" numberOfLines={2}>
+                    <Text className="font-sans text-slate-500 text-sm" numberOfLines={2}>
                       {video.description}
                     </Text>
                   </View>
