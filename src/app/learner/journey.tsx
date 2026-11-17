@@ -2,10 +2,10 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { fetchCompletedLessons } from '../../lib/completions';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { EXTRA_META, fetchAllTagged, fetchExtrasDone, type TaggedItem } from '../../lib/extras';
 import { getStudentIdentity } from '../../lib/studentIdentity';
-import { supabase } from '../../lib/supabase';
 
 /**
  * My Journey: the whole path as one map — stages, modules, lessons —
@@ -30,14 +30,10 @@ export default function MyJourney() {
 
       const identity = await getStudentIdentity();
       if (identity) {
-        const { data } = await supabase
-          .from('lesson_completions')
-          .select('lesson_id')
-          .eq('student_id', identity.studentId)
-          .eq('student_kind', identity.studentKind);
-        if (Array.isArray(data)) {
-          setCompleted(new Set(data.map((r: any) => r.lesson_id)));
-        }
+        // Via the migration-22 RPC: the completions table itself has
+        // no anon read policy, so a direct select returns nothing
+        // for PIN students (the old 0/8-forever bug).
+        setCompleted(await fetchCompletedLessons(identity));
         setExtrasDone(await fetchExtrasDone(identity));
       }
     } finally {

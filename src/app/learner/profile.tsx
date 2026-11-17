@@ -306,6 +306,36 @@ export default function StudentProfile() {
         {/* XP & Stars */}
         <RewardsCard />
 
+        {/* My Progress: Journey map + placement test live here now
+            (moved off the home grid at Shastri's request) */}
+        <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <Text className="text-xl font-bold text-[#0A192F] mb-4">My Progress</Text>
+          <Pressable
+            onPress={() => router.push('/learner/journey')}
+            className="flex-row items-center justify-between py-3 border-b border-slate-100"
+          >
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-bold text-slate-800">🗺️ My Journey</Text>
+              <Text className="text-sm text-slate-500">
+                Your whole path on one map — lessons finished, extras collected, and what is still waiting.
+              </Text>
+            </View>
+            <Text className="text-[#D4AF37] font-bold text-lg">›</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/learner/placement')}
+            className="flex-row items-center justify-between py-3"
+          >
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-bold text-slate-800">🎯 Find Your Start</Text>
+              <Text className="text-sm text-slate-500">
+                Take or retake the short placement test any time. It suggests the best stage to start from — nothing is ever locked.
+              </Text>
+            </View>
+            <Text className="text-[#D4AF37] font-bold text-lg">›</Text>
+          </Pressable>
+        </View>
+
         {/* Study Days (migration 16) */}
         <View className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <Text className="text-xl font-bold text-[#0A192F] mb-2">My Study Days 📅</Text>

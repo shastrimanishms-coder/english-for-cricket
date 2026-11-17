@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { fetchCompletedLessons } from '../../lib/completions';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 
@@ -118,18 +119,12 @@ export default function LearningPath() {
       }
       setExpandedModules(new Set(modules.map((m) => m.id)));
 
-      // Completion ticks: lesson_completions exists only after migration
-      // 20261115000006 runs, so any failure here just hides the ticks.
+      // Completion ticks via the migration-22 RPC: the completions
+      // table has no anon read policy, so a direct select silently
+      // returned nothing for PIN students and the ticks never showed.
       const identity = await getStudentIdentity();
       if (identity) {
-        const { data: completions, error: completionsError } = await supabase
-          .from('lesson_completions')
-          .select('lesson_id')
-          .eq('student_id', identity.studentId)
-          .eq('student_kind', identity.studentKind);
-        if (!completionsError && completions) {
-          setCompletedLessonIds(new Set(completions.map((c: any) => c.lesson_id)));
-        }
+        setCompletedLessonIds(await fetchCompletedLessons(identity));
       }
     } catch (error: any) {
       setLoadError(error.message || 'Something went wrong while loading your learning path.');
@@ -245,7 +240,11 @@ export default function LearningPath() {
                           ) : null}
                           <Text className="text-xs text-slate-400 mt-1">
                             {moduleLessons.length} lesson{moduleLessons.length === 1 ? '' : 's'}
-                            {doneCount > 0 ? ` · ${doneCount} completed` : ''}
+                            {doneCount > 0
+                              ? doneCount === moduleLessons.length
+                                ? ' · 🎉 Module complete!'
+                                : ` · ${doneCount} of ${moduleLessons.length} finished`
+                              : ''}
                           </Text>
                         </View>
                         <Text className="text-slate-400 text-xl">{expanded ? '▾' : '▸'}</Text>
@@ -259,6 +258,12 @@ export default function LearningPath() {
                         ) : (
                           moduleLessons.map((lesson) => {
                             const completed = completedLessonIds.has(lesson.id);
+                            // The first unfinished lesson in the module is
+                            // "next" - a signpost only; every lesson stays
+                            // tappable, learners can start anywhere.
+                            const isNext =
+                              !completed &&
+                              moduleLessons.find((l) => !completedLessonIds.has(l.id))?.id === lesson.id;
                             return (
                               <Pressable
                                 key={lesson.id}
@@ -276,6 +281,10 @@ export default function LearningPath() {
                                 {completed ? (
                                   <View className="w-7 h-7 rounded-full bg-emerald-500 items-center justify-center">
                                     <Text className="text-white font-bold text-sm">✓</Text>
+                                  </View>
+                                ) : isNext ? (
+                                  <View className="px-3 py-1.5 rounded-full bg-[#D4AF37]">
+                                    <Text className="text-[#0A192F] font-bold text-sm">▶ Next</Text>
                                   </View>
                                 ) : (
                                   <Text className="text-[#D4AF37] font-bold">Start ›</Text>

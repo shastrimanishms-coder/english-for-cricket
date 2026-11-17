@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -89,22 +89,6 @@ const LEARNING_MODULES = [
     icon: '🎙️',
   },
   {
-    id: 'placement',
-    title: 'Find Your Start',
-    description: 'A short placement test that suggests the best stage to start from. Nothing is ever locked.',
-    cta: 'take the test >',
-    imageColor: '#FCE7F3',
-    icon: '🎯',
-  },
-  {
-    id: 'journey',
-    title: 'My Journey',
-    description: 'See your whole path on one map — lessons finished, extras collected, and what is still waiting.',
-    cta: 'see my journey >',
-    imageColor: '#FEF9C3',
-    icon: '🗺️',
-  },
-  {
     id: 'reading',
     title: 'Smart Reading',
     description: 'Read short stories while the words light up, or read aloud and get a score for every sentence.',
@@ -125,6 +109,8 @@ const LEARNING_MODULES = [
 export default function LearnerDashboard() {
   const router = useRouter();
   const [studentName, setStudentName] = useState('Champion');
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [showPlacementPrompt, setShowPlacementPrompt] = useState(false);
 
   // Greet the actual student: PIN students carry their display name in the
   // local session blob, email learners in user_profiles. Falls back to the
@@ -136,9 +122,26 @@ export default function LearnerDashboard() {
       // Streak badges accrue from ANY recorded activity (games, videos,
       // lessons), not just lesson completions - re-evaluate whenever the
       // learner lands on their home screen. Fails soft.
-      if (identity) await evaluateStreakBadges(identity);
+      if (identity) {
+        await evaluateStreakBadges(identity);
+        setStudentId(identity.studentId);
+        // First-login placement prompt: show until the test is done on
+        // this device or the learner skips it. The test itself lives
+        // in the Profile ("Find Your Start") and can be retaken there
+        // any time - the prompt says so.
+        const done = await AsyncStorage.getItem(`placement_done_${identity.studentId}`);
+        const dismissed = await AsyncStorage.getItem(`placement_prompt_dismissed_${identity.studentId}`);
+        if (!done && !dismissed) setShowPlacementPrompt(true);
+      }
     })();
   }, []);
+
+  const dismissPlacementPrompt = useCallback(async () => {
+    setShowPlacementPrompt(false);
+    if (studentId) {
+      await AsyncStorage.setItem(`placement_prompt_dismissed_${studentId}`, '1').catch(() => {});
+    }
+  }, [studentId]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -169,12 +172,6 @@ export default function LearnerDashboard() {
         break;
       case 'reading':
         router.push('/learner/reading');
-        break;
-      case 'journey':
-        router.push('/learner/journey');
-        break;
-      case 'placement':
-        router.push('/learner/placement');
         break;
       case 'profile':
         router.push('/learner/profile');
@@ -225,6 +222,34 @@ export default function LearnerDashboard() {
           </Animated.View>
 
           <RewardsCard />
+
+          {/* First-login placement prompt (until done or skipped) */}
+          {showPlacementPrompt && (
+            <View className="mb-8 p-5 rounded-2xl bg-[#FFF7E0] border-2 border-[#D4AF37]">
+              <Text className="text-xl font-bold text-[#0A192F] mb-1">
+                🎯 New here? Find your starting stage!
+              </Text>
+              <Text className="text-slate-600 mb-4">
+                Take the short Find Your Start test (about 5 minutes) and we will suggest the
+                best stage for you. You can skip it now and take or retake it any time from
+                your Profile — nothing is ever locked.
+              </Text>
+              <View className="flex-row gap-3">
+                <Pressable
+                  onPress={() => router.push('/learner/placement')}
+                  className="px-5 py-3 rounded-xl bg-[#0A192F]"
+                >
+                  <Text className="text-white font-bold">Take the test</Text>
+                </Pressable>
+                <Pressable
+                  onPress={dismissPlacementPrompt}
+                  className="px-5 py-3 rounded-xl bg-white border border-slate-300"
+                >
+                  <Text className="text-slate-600 font-bold">Skip for now</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
 
           {/* Feature Grid - cards fade and rise in, staggered ~60ms apart */}
           <View className="flex-row flex-wrap justify-between gap-y-8">

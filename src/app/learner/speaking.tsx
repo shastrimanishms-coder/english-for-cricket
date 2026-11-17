@@ -22,6 +22,7 @@ import {
   probeVoicesAvailable,
   speakWithCallback,
   toSpeechText,
+  waitUntilSafeToListen,
 } from '../../lib/speechCue';
 import {
   SPEAKING_SCENARIOS,
@@ -397,13 +398,22 @@ export default function SpeakingPractice() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     speakWithCallback(text, () => {
       if (cancelled) return;
-      playDing();
       const tryStart = (attemptsLeft: number) => {
         if (cancelled) return;
         if (supportedRef.current) {
-          timer = setTimeout(() => {
-            if (!cancelled) startCheckRef.current();
-          }, 450);
+          // Same rule as the lesson player: wait until the model
+          // voice is genuinely finished (floor + idle), THEN ding a
+          // fixed beat before the mic opens. Dinging at callback
+          // time made the beep land early or late at random, and
+          // opening the mic on the callback alone let the recogniser
+          // hear the app's own voice.
+          void waitUntilSafeToListen().then(() => {
+            if (cancelled) return;
+            playDing();
+            timer = setTimeout(() => {
+              if (!cancelled) startCheckRef.current();
+            }, 250);
+          });
         } else if (supportedRef.current === null && attemptsLeft > 0) {
           // The recogniser is still reporting whether it exists.
           timer = setTimeout(() => tryStart(attemptsLeft - 1), 500);

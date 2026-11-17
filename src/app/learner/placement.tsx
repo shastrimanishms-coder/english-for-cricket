@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -45,7 +46,12 @@ export default function PlacementTest() {
       const resolved = await resolvePlacement(stage);
       setResult(resolved);
       const identity = await getStudentIdentity();
-      if (identity) await savePlacement(identity, resolved);
+      if (identity) {
+        await savePlacement(identity, resolved);
+        // Remember on this device that the test is done, so the
+        // first-login prompt on the home screen stops appearing.
+        await AsyncStorage.setItem(`placement_done_${identity.studentId}`, '1').catch(() => {});
+      }
       setSaving(false);
       setPhase('result');
     },

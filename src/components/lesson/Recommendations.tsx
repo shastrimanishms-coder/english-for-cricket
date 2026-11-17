@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { EXTRA_META, fetchRecommendations, type ExtraKind, type Recommendation } from '../../lib/extras';
 import { POINTS } from '../../lib/points';
 import { getStudentIdentity } from '../../lib/studentIdentity';
+import { supabase } from '../../lib/supabase';
 
 const ROUTES: Record<ExtraKind, (id: string) => string> = {
   game: (id) => `/games/${id}`,
@@ -22,15 +23,58 @@ const ROUTES: Record<ExtraKind, (id: string) => string> = {
 export default function Recommendations({ lessonId }: { lessonId: string }) {
   const router = useRouter();
   const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [nextLesson, setNextLesson] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     (async () => {
       const identity = await getStudentIdentity();
-      setRecs(await fetchRecommendations(lessonId, identity));
+      const found = await fetchRecommendations(lessonId, identity);
+      setRecs(found);
+      if (found.length === 0) {
+        // No extras tagged to this lesson yet: still point the learner
+        // somewhere useful - the next lesson in the same module.
+        try {
+          const { data: current } = await supabase
+            .from('curriculum_lessons')
+            .select('module_id, order_index')
+            .eq('id', lessonId)
+            .maybeSingle();
+          if (current?.module_id) {
+            const { data: next } = await supabase
+              .from('curriculum_lessons')
+              .select('id, title')
+              .eq('module_id', current.module_id)
+              .gt('order_index', current.order_index ?? 0)
+              .order('order_index', { ascending: true })
+              .limit(1);
+            if (next && next.length > 0) setNextLesson(next[0] as any);
+          }
+        } catch {
+          // Fail soft: the completion screen simply shows no card.
+        }
+      }
     })();
   }, [lessonId]);
 
-  if (recs.length === 0) return null;
+  if (recs.length === 0) {
+    if (!nextLesson) return null;
+    return (
+      <View className="w-full max-w-sm mb-3">
+        <Text className="text-center font-bold text-[#0A192F] mb-2">Keep going ⭐</Text>
+        <Pressable
+          onPress={() => router.push(`/lesson/${nextLesson.id}` as any)}
+          className="flex-row items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-3 mb-2"
+        >
+          <Text className="text-2xl">📚</Text>
+          <View className="flex-1">
+            <Text className="font-bold text-[#0A192F]" numberOfLines={1}>{nextLesson.title}</Text>
+            <Text className="text-slate-400 text-xs">Next lesson in this module</Text>
+          </View>
+          <Text className="text-[#D4AF37] font-bold">Start ›</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View className="w-full max-w-sm mb-3">

@@ -294,6 +294,14 @@ function FallbackImage({
  * Hearing the whole finished sentence is the point of the exercise;
  * hearing the lone answer word teaches almost nothing. Returns null
  * when the prompt has no blank to fill.
+ *
+ * The prompt usually carries an instruction sentence first ("Which
+ * word completes the sentence? ___! I am Ken."), so leading
+ * instruction sentences are dropped - but EVERYTHING from the gap
+ * onward is kept and spoken whole. The old version spoke only the
+ * single sentence containing the blank, which for a prompt like
+ * "___! I am Ken." produced just "Hello!" - the inconsistency
+ * learners heard as "sometimes the full sentence, sometimes not".
  */
 function completedSentence(
   prompt: string | null | undefined,
@@ -302,9 +310,19 @@ function completedSentence(
   if (!prompt || !/_/.test(prompt)) return null;
   const answer = toSpeechText(answerText);
   if (!answer) return null;
-  const sentences = prompt.match(/[^.?!]+[.?!]*/g) || [prompt];
-  const gapSentence = sentences.find((s) => /_/.test(s)) || prompt;
-  return gapSentence.replace(/_+/g, answer).trim();
+  const sentences = (prompt.match(/[^.?!]+[.?!]*/g) || [prompt])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  let start = 0;
+  while (
+    start < sentences.length - 1 &&
+    (sentences[start].endsWith('?') || /^(which|choose|tap|select)\b/i.test(sentences[start]))
+  ) {
+    start += 1;
+  }
+  const body = sentences.slice(start).join(' ');
+  if (!/_/.test(body)) return null;
+  return body.replace(/_+/g, answer).trim();
 }
 
 function GridSpeakSlide({
@@ -385,7 +403,6 @@ function GridSpeakSlide({
       const token = mountTokenRef.current;
       playModelThen(panel.audio_url, panel.text, () => {
         if (token.cancelled || runRef.current !== run) return;
-        playDing();
         const tryStart = (attemptsLeft: number) => {
           if (token.cancelled || runRef.current !== run) return;
           const current = speechRef.current;
@@ -404,6 +421,12 @@ function GridSpeakSlide({
             // drop early on some voices.
             void waitUntilSafeToListen().then(() => {
               if (token.cancelled || runRef.current !== run) return;
+              // The ding sounds HERE - a fixed beat before the mic
+              // opens - never at "model finished" time. That signal
+              // arrives early on some voices and very late on others
+              // (the estimate fallback), which made the beep feel
+              // random: too soon, too late, or as the slide loaded.
+              playDing();
               timerRef.current = setTimeout(() => {
                 if (token.cancelled || runRef.current !== run) return;
                 setError(null);
@@ -731,7 +754,6 @@ function SpeakRepeatSlide({
     let timer: ReturnType<typeof setTimeout> | null = null;
     playModelThen(slide.audio_url, target, () => {
       if (cancelled) return;
-      playDing();
       const tryStart = (attemptsLeft: number) => {
         if (cancelled) return;
         const current = speechRef.current;
@@ -748,6 +770,11 @@ function SpeakRepeatSlide({
           // duration floor applies as well.
           void waitUntilSafeToListen().then(() => {
             if (cancelled) return;
+            // Ding HERE, a fixed beat before the mic opens - see
+            // GridSpeakSlide: dinging at "model finished" time made
+            // the beep feel random because that signal's timing
+            // varies wildly between voices.
+            playDing();
             timer = setTimeout(() => {
               if (cancelled) return;
               setError(null);
@@ -1578,7 +1605,9 @@ export default function LessonPlayer() {
             </Text>
           ) : (
             <Text className="text-center text-sm text-slate-400 mt-4">
-              Tap the picture that matches.
+              {slide.slide_type === 'quiz_4up'
+                ? 'Tap the correct answer.'
+                : 'Tap the picture that matches.'}
             </Text>
           )}
         </View>
