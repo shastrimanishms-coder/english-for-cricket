@@ -15,6 +15,7 @@ import SlideBuilder from '../../components/admin/SlideBuilder';
 import SystemSettings from '../../components/admin/SystemSettings';
 import UsersManager from '../../components/admin/UsersManager';
 import VideosManager from '../../components/admin/VideosManager';
+import VoiceStudioManager from '../../components/admin/VoiceStudioManager';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
@@ -54,6 +55,14 @@ const ADMIN_MENU = [
   },
   { id: 'speaking', label: 'Speaking Practice', icon: '🎙️' },
   { id: 'reading', label: 'Smart Reading', icon: '📖' },
+  {
+    id: 'contributors',
+    label: 'Contributors',
+    icon: '🎤',
+    subItems: [
+      { id: 'voice-studio', label: 'Voice Studio' },
+    ]
+  },
   { id: 'badges', label: 'Gamification & Badges', icon: '🏆' },
   { id: 'organizations', label: 'Users & Organizations', icon: '🏛️' },
   { id: 'pages', label: 'Static Pages & Legal', icon: '📄' },
@@ -101,6 +110,7 @@ const TAB_PARENT_MENU: Record<string, string> = {
   downloads: 'assets',
   games: 'assets',
   videos: 'assets',
+  'voice-studio': 'contributors',
 };
 
 interface PopularActivity {
@@ -485,6 +495,9 @@ export default function SuperAdminDashboard() {
 
       case 'reading':
         return <ReadingManager />;
+
+      case 'voice-studio':
+        return <VoiceStudioManager />;
 
       case 'curriculum':
         return <CurriculumManager />;

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -8,12 +9,57 @@ import { ElegantCard, ScreenHeader } from '../../components/ui/Elegant';
 import RewardsCard from '../../components/ui/RewardsCard';
 import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
 import { showAlert } from '../../lib/showAlert';
+import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
+import {
+  CATEGORY_LABELS,
+  VOICE_CATEGORIES,
+  getRecordingPublicUrl,
+  setVoicePref,
+  type VoiceCategory,
+  type VoiceOption,
+} from '../../lib/voiceStudio';
 
 interface EarnedBadge {
   title: string;
   description: string | null;
   image_url: string | null;
+}
+
+/**
+ * Sample player for one voice's approved introduction recording.
+ * Only mounted once the voice list has loaded on the client, so the
+ * web player is never constructed during prerendering.
+ */
+function VoiceSampleButton({ url }: { url: string }) {
+  const player = useAudioPlayer(url);
+  const status = useAudioPlayerStatus(player);
+
+  const toggle = () => {
+    try {
+      if (status.playing) {
+        player.pause();
+        return;
+      }
+      if (status.duration > 0 && status.currentTime >= status.duration - 0.1) {
+        void player.seekTo(0);
+      }
+      player.play();
+    } catch {
+      // Samples are a preview nicety only.
+    }
+  };
+
+  return (
+    <Pressable
+      onPress={toggle}
+      className="rounded-full bg-navy px-4 py-2 active:opacity-90"
+    >
+      <Text className="font-sans text-sm font-bold text-white">
+        {status.playing ? '⏸ Pause' : '▶ Hear sample'}
+      </Text>
+    </Pressable>
+  );
 }
 
 export default function StudentProfile() {
@@ -37,6 +83,68 @@ export default function StudentProfile() {
   // student plans to study. Only these days count toward their streak.
   const [studyDays, setStudyDays] = useState<number[]>([]);
   const [savingStudyDays, setSavingStudyDays] = useState(false);
+
+  // My Voices (migration 23): named human voices per category,
+  // recorded by voice actors in the Voice Studio. Fails soft - until
+  // voices exist (or the migration is run) the card shows its
+  // "coming soon" line.
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
+  const [voicePrefOverrides, setVoicePrefOverrides] = useState<Record<string, string>>({});
+  const [savingVoiceCat, setSavingVoiceCat] = useState<VoiceCategory | null>(null);
+
+  // The student's current choices ride along on the profile row this
+  // screen already loads (voice_prefs jsonb on both student tables);
+  // choices made on this screen override them immediately.
+  const loadedVoicePrefs: Record<string, string> = (() => {
+    const prefs = profile?.voice_prefs;
+    return prefs && typeof prefs === 'object' && !Array.isArray(prefs)
+      ? (prefs as Record<string, string>)
+      : {};
+  })();
+  const voicePrefs: Record<string, string> = {
+    ...loadedVoicePrefs,
+    ...voicePrefOverrides,
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('voices')
+          .select('id, display_name, category, intro_path, intro_status, sort_order')
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true });
+        if (!error && data) setVoiceOptions(data as VoiceOption[]);
+      } catch {
+        // The picker simply stays in its coming-soon state.
+      }
+    })();
+  }, []);
+
+  const handlePickVoice = async (category: VoiceCategory, voiceId: string) => {
+    if (savingVoiceCat || voicePrefs[category] === voiceId) return;
+    setSavingVoiceCat(category);
+    try {
+      const identity = await getStudentIdentity();
+      if (!identity) {
+        throw new Error('We could not find your sign-in. Please log in again.');
+      }
+      const ok = await setVoicePref(
+        identity.studentId,
+        identity.studentKind,
+        category,
+        voiceId
+      );
+      if (!ok) {
+        throw new Error('Your voice choice could not be saved yet. Please try again later.');
+      }
+      setVoicePrefOverrides((prev) => ({ ...prev, [category]: voiceId }));
+    } catch (error: any) {
+      showAlert('Could not save', error.message || 'Please try again.');
+    } finally {
+      setSavingVoiceCat(null);
+    }
+  };
 
   // Earned badges for either identity kind. Fails soft: if the read is
   // blocked (PIN students hold no session for the table's rules to check),
@@ -331,6 +439,77 @@ export default function StudentProfile() {
             </View>
             <Text className="text-gold font-bold text-lg">›</Text>
           </Pressable>
+        </ElegantCard>
+
+        {/* My Voices (migration 23): pick the named human voice for
+            each kind of speaker. Samples play the actor's approved
+            introduction recording. */}
+        <ElegantCard className="p-6">
+          <Text className="font-display text-xl font-semibold text-navy mb-2">My Voices 🎙️</Text>
+          <Text className="font-sans text-slate-500 mb-4">
+            Real people are recording the voices for your lessons. For each kind of speaker, pick the voice you like best — tap “Hear sample” to listen to them say hello.
+          </Text>
+          {voiceOptions.length === 0 ? (
+            <Text className="font-sans text-slate-500">
+              Your teachers are preparing real voices — coming soon 🎧
+            </Text>
+          ) : (
+            VOICE_CATEGORIES.map((category) => {
+              const choices = voiceOptions.filter((v) => v.category === category);
+              if (choices.length === 0) return null;
+              return (
+                <View key={category} className="mb-4">
+                  <Text className="font-sans text-sm font-bold text-slate-700 mb-2">
+                    {CATEGORY_LABELS[category]}
+                  </Text>
+                  <View className="gap-2">
+                    {choices.map((voice) => {
+                      const selected = voicePrefs[category] === voice.id;
+                      const canPlay =
+                        voice.intro_status === 'approved' && !!voice.intro_path;
+                      return (
+                        <View
+                          key={voice.id}
+                          className={`flex-row items-center justify-between rounded-xl border p-3 ${
+                            selected
+                              ? 'border-gold bg-gold-light/50'
+                              : 'border-inkline bg-white'
+                          }`}
+                        >
+                          <Pressable
+                            className="flex-1 pr-3"
+                            onPress={() => handlePickVoice(category, voice.id)}
+                            disabled={savingVoiceCat === category}
+                          >
+                            <Text className="font-sans text-base font-bold text-navy">
+                              {voice.display_name}
+                              {selected ? '  ✓' : ''}
+                            </Text>
+                            <Text className="font-sans text-xs text-slate-500">
+                              {selected
+                                ? 'Your voice for these lines'
+                                : savingVoiceCat === category
+                                  ? 'Saving…'
+                                  : 'Tap to choose this voice'}
+                            </Text>
+                          </Pressable>
+                          {canPlay ? (
+                            <VoiceSampleButton
+                              url={getRecordingPublicUrl(voice.intro_path as string)}
+                            />
+                          ) : (
+                            <Text className="font-sans text-xs text-slate-400">
+                              Sample coming soon
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })
+          )}
         </ElegantCard>
 
         {/* Study Days (migration 16) */}
