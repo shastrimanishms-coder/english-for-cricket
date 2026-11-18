@@ -37,6 +37,8 @@ export interface ActorSession {
   voiceId: string | null;
   voiceName: string | null;
   voiceSlug: string | null;
+  /** False until the actor has chosen their voice's name (one-time). */
+  nameChosen: boolean;
   category: VoiceCategory | null;
   introText: string | null;
   introStatus: IntroStatus;
@@ -104,6 +106,8 @@ export async function authenticateActor(
         voiceId: (row.voice_id as string | null) ?? null,
         voiceName: (row.voice_name as string | null) ?? null,
         voiceSlug: (row.voice_slug as string | null) ?? null,
+        // An older RPC without the field counts as chosen (no gate).
+        nameChosen: row.name_chosen !== false,
         category: (row.category as VoiceCategory | null) ?? null,
         introText: (row.intro_text as string | null) ?? null,
         introStatus: (row.intro_status as IntroStatus | null) ?? 'pending',
@@ -219,6 +223,43 @@ export async function submitIntro(actorId: string, storagePath: string): Promise
     return !row.error;
   } catch {
     return false;
+  }
+}
+
+export type SetVoiceNameResult =
+  | { status: 'ok'; voiceName: string; voiceSlug: string }
+  | { status: 'already_chosen' }
+  | { status: 'invalid_name' }
+  | { status: 'no_voice' }
+  | { status: 'unavailable' };
+
+/**
+ * First-login voice naming (set_voice_name RPC): the actor chooses the
+ * name of their voice once; afterwards only the admin can rename it.
+ */
+export async function setVoiceName(
+  actorId: string,
+  name: string
+): Promise<SetVoiceNameResult> {
+  try {
+    const { data, error } = await supabase.rpc('set_voice_name', {
+      p_actor_id: actorId,
+      p_name: name.trim(),
+    });
+    if (error) return { status: 'unavailable' };
+    if (!data) return { status: 'unavailable' };
+    const row = data as Record<string, unknown>;
+    if (row.error === 'already_chosen') return { status: 'already_chosen' };
+    if (row.error === 'invalid_name') return { status: 'invalid_name' };
+    if (row.error === 'no_voice') return { status: 'no_voice' };
+    if (row.error) return { status: 'unavailable' };
+    return {
+      status: 'ok',
+      voiceName: String(row.voice_name ?? name.trim()),
+      voiceSlug: String(row.voice_slug ?? ''),
+    };
+  } catch {
+    return { status: 'unavailable' };
   }
 }
 
@@ -372,4 +413,66 @@ export interface VoiceOption {
   intro_path: string | null;
   intro_status: IntroStatus;
   sort_order: number;
+}
+
+// ------------------------------------------------------------ full deletion
+// Deleting a voice in the admin panel must clear EVERYTHING the voice
+// owns: its audio files in the bucket AND its database rows. The rows
+// are the easy half - voice_recordings references voices with
+// ON DELETE CASCADE, so removing the voice row removes its recording
+// rows with it. Storage files are NOT covered by any cascade, so they
+// are listed and removed explicitly first. Deleting an actor then only
+// needs the same treatment per linked voice, plus the actor row itself
+// (recordings/voices reference actors with ON DELETE SET NULL, so an
+// actor delete alone would leave the voice and its recordings behind).
+
+/** How many recording rows a voice currently has (any status). */
+export async function countVoiceRecordings(voiceId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('voice_recordings')
+    .select('id', { count: 'exact', head: true })
+    .eq('voice_id', voiceId);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+/**
+ * Remove every file stored under a voice's folder ('<slug>/...'),
+ * including the introduction. Files sit flat in the folder, so this
+ * pages through the listing, removing as it goes. Returns the number
+ * of files removed.
+ */
+export async function removeAllVoiceFiles(slug: string): Promise<number> {
+  let removed = 0;
+  // Safety cap: 500 pages x 100 files is far beyond any real voice.
+  for (let page = 0; page < 500; page += 1) {
+    const { data, error } = await supabase.storage
+      .from(VOICE_BUCKET)
+      .list(slug, { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
+    if (error) throw error;
+    const files = (data ?? []).filter((entry) => entry.id);
+    if (files.length === 0) break;
+    const paths = files.map((entry) => `${slug}/${entry.name}`);
+    const { error: removeError } = await supabase.storage
+      .from(VOICE_BUCKET)
+      .remove(paths);
+    if (removeError) throw removeError;
+    removed += paths.length;
+  }
+  return removed;
+}
+
+/**
+ * Delete a voice completely: all of its audio files, then the voice
+ * row itself (which cascades to its voice_recordings rows). Returns
+ * how many files were removed.
+ */
+export async function deleteVoiceCompletely(
+  voiceId: string,
+  slug: string
+): Promise<{ filesRemoved: number }> {
+  const filesRemoved = await removeAllVoiceFiles(slug);
+  const { error } = await supabase.from('voices').delete().eq('id', voiceId);
+  if (error) throw error;
+  return { filesRemoved };
 }

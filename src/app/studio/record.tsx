@@ -15,6 +15,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,6 +34,8 @@ import {
   getActorNext,
   getActorSession,
   recordingFileExtension,
+  saveActorSession,
+  setVoiceName,
   submitIntro,
   submitRecording,
   uploadRecording,
@@ -405,6 +408,135 @@ function RecorderPanel({ text, hint, submitLabel, onSubmitTake }: RecorderPanelP
   );
 }
 
+// ------------------------------------------------------- first-login naming
+
+/**
+ * Shown once, on the actor's first login: they choose the name of
+ * their voice (the name students will see and hear introduced). The
+ * choice is one-time - the set_voice_name RPC refuses a second
+ * change, and only the admin can rename the voice afterwards.
+ */
+function VoiceNaming({
+  session,
+  onNamed,
+  onSignOut,
+}: {
+  session: ActorSession;
+  onNamed: (updated: ActorSession) => void;
+  onSignOut: () => void;
+}) {
+  const [name, setName] = useState(session.voiceName ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      showAlert('Choose a name', 'Please type the name for your voice first.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await setVoiceName(session.actorId, trimmed);
+      if (result.status === 'ok') {
+        const oldName = session.voiceName;
+        const updated: ActorSession = {
+          ...session,
+          voiceName: result.voiceName,
+          voiceSlug: result.voiceSlug || session.voiceSlug,
+          nameChosen: true,
+          // Mirror the server: a pending introduction script follows
+          // the name it introduces.
+          introText:
+            session.introText && oldName && session.introText.includes(oldName)
+              ? session.introText.split(oldName).join(result.voiceName)
+              : session.introText,
+        };
+        await saveActorSession(updated);
+        onNamed(updated);
+      } else if (result.status === 'already_chosen') {
+        // The admin set the name meanwhile - it is locked now.
+        const updated = { ...session, nameChosen: true };
+        await saveActorSession(updated);
+        onNamed(updated);
+      } else if (result.status === 'invalid_name') {
+        showAlert(
+          'That name cannot be used',
+          'Please choose a shorter name using letters and numbers.'
+        );
+      } else if (result.status === 'no_voice') {
+        showAlert(
+          'No voice yet',
+          'Your account has no voice assigned yet. Please ask the admin to finish setting up your account.'
+        );
+      } else {
+        showAlert(
+          'Something went wrong',
+          'The name could not be saved. Please check your connection and try again.'
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View className="flex-1 bg-canvas">
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader
+          title="Voice Studio"
+          right={
+            <Pressable
+              onPress={onSignOut}
+              className="rounded-full border border-white/20 bg-white/10 px-4 py-2 active:bg-white/20"
+            >
+              <Text className="font-sans text-sm font-bold text-white">Sign out</Text>
+            </Pressable>
+          }
+        />
+      </SafeAreaView>
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+        <View className="mx-auto w-full max-w-2xl">
+          <ElegantCard className="p-6">
+            <MicroLabel>Welcome to the Voice Studio</MicroLabel>
+            <Text className="mt-2 font-display text-3xl font-semibold text-navy">
+              Choose the name of your voice
+            </Text>
+            <Text className="mt-3 font-sans text-base leading-6 text-slate-600">
+              Students will see this name when they choose which voice to hear in
+              their lessons - a first name is perfect, like{' '}
+              <Text className="font-bold text-navy">Amy</Text> or{' '}
+              <Text className="font-bold text-navy">John</Text>. Choose any name
+              you like.
+            </Text>
+            <View className="mt-4 rounded-2xl bg-gold-light p-4">
+              <Text className="font-sans text-sm font-bold text-gold-dark">
+                Please choose carefully: you can choose only once, and you
+                cannot change it yourself afterwards. If a change is ever
+                needed, the admin can rename your voice from the dashboard.
+              </Text>
+            </View>
+            <TextInput
+              className="mt-5 rounded-2xl border border-inkline bg-white px-4 py-3.5 font-sans text-lg text-navy"
+              placeholder="e.g. Amy"
+              value={name}
+              onChangeText={setName}
+              maxLength={40}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+            <GoldButton
+              label={saving ? 'Saving…' : 'Save my voice name'}
+              onPress={submit}
+              disabled={saving}
+              className="mt-4"
+            />
+          </ElegantCard>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 // ------------------------------------------------------------------ screen
 
 type QueueState = 'loading' | 'ok' | 'no_voice' | 'unavailable';
@@ -511,6 +643,20 @@ export default function StudioRecord() {
       <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
+    );
+  }
+
+  // First login: the actor names their voice before anything else.
+  if (session.voiceId && !session.nameChosen) {
+    return (
+      <VoiceNaming
+        session={session}
+        onNamed={(updated) => {
+          setSession(updated);
+          void loadQueue(updated.actorId);
+        }}
+        onSignOut={handleSignOut}
+      />
     );
   }
 

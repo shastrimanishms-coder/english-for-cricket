@@ -52,6 +52,7 @@ create table if not exists public.voices (
   id                uuid primary key default gen_random_uuid(),
   slug              text not null unique,  -- storage folder name, e.g. 'amy'
   display_name      text not null,         -- what students see, e.g. 'Amy'
+  name_chosen       boolean not null default false, -- actor picked the name on first login (one-time; admin can still rename)
   category          text not null check (category in ('M1', 'F1', 'B1', 'G1')),
   actor_id          uuid references public.voice_actors (id) on delete set null,
   intro_text        text not null default 'Hello! I am one of your English voices. Listen to me in your lessons, and let us learn English together!',
@@ -240,6 +241,7 @@ begin
     'voice_id', v.id,
     'voice_name', v.display_name,
     'voice_slug', v.slug,
+    'name_chosen', coalesce(v.name_chosen, true),
     'category', v.category,
     'intro_text', v.intro_text,
     'intro_status', v.intro_status,
@@ -254,6 +256,82 @@ comment on function public.authenticate_actor(text, text) is
   'Voice-actor sign-in (username + password). Returns the actor and their active voice, or null. Mirrors authenticate_student.';
 
 grant execute on function public.authenticate_actor(text, text) to anon, authenticated;
+
+-- ------------------------------------------------- first-login voice naming
+-- On their first login the actor chooses the name of their voice
+-- (e.g. 'Amy'). It can be chosen ONCE: once name_chosen is set, this
+-- RPC refuses, and only the admin can rename the voice afterwards
+-- (from the dashboard). The storage slug is derived from the name,
+-- with a numeric suffix if another voice already uses it. Naming
+-- happens before any recording, so deriving the slug here is safe.
+create or replace function public.set_voice_name(
+  p_actor_id uuid,
+  p_name text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v public.voices%rowtype;
+  clean_name text;
+  base_slug text;
+  final_slug text;
+  suffix integer := 2;
+begin
+  clean_name := trim(p_name);
+  if clean_name = '' or length(clean_name) > 40 then
+    return jsonb_build_object('error', 'invalid_name');
+  end if;
+
+  select * into v from public.voices
+  where actor_id = p_actor_id and is_active = true
+  order by sort_order asc, created_at asc
+  limit 1;
+  if not found then
+    return jsonb_build_object('error', 'no_voice');
+  end if;
+  if v.name_chosen then
+    return jsonb_build_object('error', 'already_chosen');
+  end if;
+
+  base_slug := regexp_replace(lower(clean_name), '[^a-z0-9]+', '-', 'g');
+  base_slug := trim(both '-' from base_slug);
+  if base_slug = '' then
+    base_slug := 'voice';
+  end if;
+  final_slug := base_slug;
+  while exists (select 1 from public.voices where slug = final_slug and id <> v.id) loop
+    final_slug := base_slug || '-' || suffix;
+    suffix := suffix + 1;
+  end loop;
+
+  update public.voices
+  set display_name = clean_name,
+      slug = final_slug,
+      name_chosen = true,
+      -- Keep a not-yet-recorded introduction in step with the name:
+      -- the default script embeds the old (placeholder) name.
+      intro_text = case
+        when v.intro_status = 'pending' and position(v.display_name in v.intro_text) > 0
+        then replace(v.intro_text, v.display_name, clean_name)
+        else v.intro_text
+      end
+  where id = v.id;
+
+  return jsonb_build_object(
+    'ok', true,
+    'voice_name', clean_name,
+    'voice_slug', final_slug
+  );
+end;
+$$;
+
+comment on function public.set_voice_name(uuid, text) is
+  'First-login voice naming: the actor chooses their voice''s name once; only the admin can rename it afterwards.';
+
+grant execute on function public.set_voice_name(uuid, text) to anon, authenticated;
 
 -- ------------------------------------------------- actor queue
 -- Returns the actor's progress counts and their next line: lines sent back

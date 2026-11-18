@@ -13,6 +13,7 @@ import {
   CATEGORY_LABELS,
   VOICE_CATEGORIES,
   defaultIntroText,
+  deleteVoiceCompletely,
   getRecordingPublicUrl,
   getVoiceProgress,
   slugifyVoiceName,
@@ -43,6 +44,7 @@ interface VoiceRow {
   id: string;
   slug: string;
   display_name: string;
+  name_chosen: boolean;
   category: VoiceCategory;
   actor_id: string | null;
   intro_text: string;
@@ -150,6 +152,9 @@ export default function VoiceStudioManager() {
   const [actors, setActors] = useState<ActorRow[]>([]);
   const [voices, setVoices] = useState<VoiceRow[]>([]);
   const [actingId, setActingId] = useState<string | null>(null);
+  // Two-step delete confirmation (Alert.alert buttons do not render on
+  // web in this stack): the key is 'actor:<id>' or 'voice:<id>'.
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Send-back state for line recordings
   const [redoTargetId, setRedoTargetId] = useState<string | null>(null);
@@ -426,9 +431,11 @@ export default function VoiceStudioManager() {
         intro_text: introText.trim() || defaultIntroText(voiceName),
       };
       if (editVoiceId) {
+        // An admin (re)name is authoritative: it locks the name, so the
+        // actor is not asked to choose one on their next login.
         const { error } = await supabase
           .from('voices')
-          .update(payload)
+          .update({ ...payload, name_chosen: true })
           .eq('id', editVoiceId);
         if (error) throw error;
       } else {
@@ -457,6 +464,47 @@ export default function VoiceStudioManager() {
       await loadAll();
     } catch (error: any) {
       showAlert('Update failed', error.message);
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  // ------------------------------------------------------------- deletion
+  // Full delete (Shastri's requirement): removing a voice clears its
+  // recording rows (database cascade) AND its audio files in storage;
+  // removing an actor removes every linked voice the same way, then
+  // the account itself. Deactivation above remains the soft option.
+
+  const handleDeleteVoice = async (voice: VoiceRow) => {
+    setActingId(voice.id);
+    setConfirmDelete(null);
+    try {
+      await deleteVoiceCompletely(voice.id, voice.slug);
+      if (editVoiceId === voice.id) resetVoiceForm();
+      await loadAll();
+    } catch (error: any) {
+      showAlert('Delete failed', error.message);
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const handleDeleteActor = async (actor: ActorRow) => {
+    setActingId(actor.id);
+    setConfirmDelete(null);
+    try {
+      const linked = voices.filter((v) => v.actor_id === actor.id);
+      for (const voice of linked) {
+        await deleteVoiceCompletely(voice.id, voice.slug);
+      }
+      const { error } = await supabase
+        .from('voice_actors')
+        .delete()
+        .eq('id', actor.id);
+      if (error) throw error;
+      await loadAll();
+    } catch (error: any) {
+      showAlert('Delete failed', error.message);
     } finally {
       setActingId(null);
     }
@@ -851,21 +899,59 @@ export default function VoiceStudioManager() {
                         : 'none linked yet'}
                     </Text>
                   </View>
-                  <Pressable
-                    onPress={() => void toggleActorActive(actor)}
-                    disabled={actingId === actor.id}
-                    className={`rounded-full px-4 py-1.5 ${
-                      actor.is_active ? 'bg-pitch-light' : 'bg-slate-200'
-                    }`}
-                  >
-                    <Text
-                      className={`font-sans text-xs font-bold ${
-                        actor.is_active ? 'text-pitch-dark' : 'text-slate-500'
+                  <View className="flex-row gap-2">
+                    <Pressable
+                      onPress={() => void toggleActorActive(actor)}
+                      disabled={actingId === actor.id}
+                      className={`rounded-full px-4 py-1.5 ${
+                        actor.is_active ? 'bg-pitch-light' : 'bg-slate-200'
                       }`}
                     >
-                      {actor.is_active ? 'Active' : 'Disabled'}
+                      <Text
+                        className={`font-sans text-xs font-bold ${
+                          actor.is_active ? 'text-pitch-dark' : 'text-slate-500'
+                        }`}
+                      >
+                        {actor.is_active ? 'Active' : 'Disabled'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        if (confirmDelete === `actor:${actor.id}`) {
+                          void handleDeleteActor(actor);
+                        } else {
+                          setConfirmDelete(`actor:${actor.id}`);
+                        }
+                      }}
+                      disabled={actingId === actor.id}
+                      className={`rounded-full px-4 py-1.5 ${
+                        confirmDelete === `actor:${actor.id}`
+                          ? 'bg-red-600'
+                          : 'border border-red-200 bg-white'
+                      }`}
+                    >
+                      <Text
+                        className={`font-sans text-xs font-bold ${
+                          confirmDelete === `actor:${actor.id}`
+                            ? 'text-white'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {confirmDelete === `actor:${actor.id}`
+                          ? 'Tap again to delete'
+                          : 'Delete'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {confirmDelete === `actor:${actor.id}` ? (
+                    <Text className="w-full font-sans text-xs font-semibold text-red-600">
+                      This permanently deletes the account
+                      {linked.length > 0
+                        ? `, its voice (${linked.map((v) => v.display_name).join(', ')}), all its recordings and the audio files`
+                        : ''}
+                      . This cannot be undone.
                     </Text>
-                  </Pressable>
+                  ) : null}
                 </View>
               );
             })}
@@ -1062,7 +1148,10 @@ export default function VoiceStudioManager() {
                   <Text className="mt-0.5 font-sans text-xs text-slate-500">
                     Folder: {voice.slug} · Stages {voice.from_stage}-
                     {voice.to_stage} · Actor:{' '}
-                    {actorNameById(voice.actor_id) ?? 'none'}
+                    {actorNameById(voice.actor_id) ?? 'none'} ·{' '}
+                    {voice.name_chosen
+                      ? 'Name locked'
+                      : 'Actor chooses the name on first login'}
                   </Text>
                 </View>
                 <View className="flex-row gap-2">
@@ -1089,7 +1178,40 @@ export default function VoiceStudioManager() {
                       {voice.is_active ? 'Active' : 'Inactive'}
                     </Text>
                   </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      if (confirmDelete === `voice:${voice.id}`) {
+                        void handleDeleteVoice(voice);
+                      } else {
+                        setConfirmDelete(`voice:${voice.id}`);
+                      }
+                    }}
+                    disabled={actingId === voice.id}
+                    className={`rounded-full px-4 py-1.5 ${
+                      confirmDelete === `voice:${voice.id}`
+                        ? 'bg-red-600'
+                        : 'border border-red-200 bg-white'
+                    }`}
+                  >
+                    <Text
+                      className={`font-sans text-xs font-bold ${
+                        confirmDelete === `voice:${voice.id}`
+                          ? 'text-white'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {confirmDelete === `voice:${voice.id}`
+                        ? 'Tap again to delete'
+                        : 'Delete'}
+                    </Text>
+                  </Pressable>
                 </View>
+                {confirmDelete === `voice:${voice.id}` ? (
+                  <Text className="w-full font-sans text-xs font-semibold text-red-600">
+                    This permanently deletes this voice, all its recordings and
+                    the audio files. This cannot be undone.
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
