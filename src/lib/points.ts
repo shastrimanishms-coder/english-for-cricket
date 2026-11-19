@@ -96,9 +96,18 @@ export async function awardPoints(
  */
 export async function isTodayAStudyDay(identity: StudentIdentity): Promise<boolean> {
   try {
-    const table = identity.studentKind === 'sub_account' ? 'sub_accounts' : 'user_profiles';
+    if (identity.studentKind === 'sub_account') {
+      // PIN students cannot read sub_accounts directly (row security),
+      // so their study days come through the migration-24 RPC. Until it
+      // runs, or when no plan is saved, every day counts.
+      const { data, error } = await supabase.rpc('get_student_study_days', {
+        p_student_id: identity.studentId,
+      });
+      if (error || !Array.isArray(data) || data.length === 0) return true;
+      return data.includes(new Date().getUTCDay());
+    }
     const { data, error } = await supabase
-      .from(table)
+      .from('user_profiles')
       .select('study_days')
       .eq('id', identity.studentId)
       .maybeSingle();

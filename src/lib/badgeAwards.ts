@@ -290,9 +290,20 @@ export function computeCurrentStreak(
  */
 async function fetchStudyDays(identity: StudentIdentity): Promise<number[] | null> {
   try {
-    const table = identity.studentKind === 'sub_account' ? 'sub_accounts' : 'user_profiles';
+    if (identity.studentKind === 'sub_account') {
+      // PIN students cannot read sub_accounts directly (row security),
+      // so their study days come through the migration-24 RPC.
+      const { data, error } = await supabase.rpc('get_student_study_days', {
+        p_student_id: identity.studentId,
+      });
+      if (error || !Array.isArray(data)) return null;
+      const days = data.filter(
+        (d): d is number => typeof d === 'number' && d >= 0 && d <= 6
+      );
+      return days.length >= 3 ? days : null;
+    }
     const { data, error } = await supabase
-      .from(table)
+      .from('user_profiles')
       .select('study_days')
       .eq('id', identity.studentId)
       .maybeSingle();

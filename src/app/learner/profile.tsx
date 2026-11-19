@@ -195,7 +195,24 @@ export default function StudentProfile() {
             created_at: sessionData.created_at || new Date().toISOString(),
           });
         }
-        
+
+        // PIN students cannot read sub_accounts directly (row security
+        // returns no row to the anon key), so the direct read above
+        // normally lands in the failsafe and the saved study days never
+        // show. Read them back through the migration-24 RPC instead.
+        // Until that migration runs this quietly keeps whatever the
+        // direct read produced.
+        try {
+          const { data: rpcDays, error: rpcError } = await supabase.rpc('get_student_study_days', {
+            p_student_id: targetId,
+          });
+          if (!rpcError && Array.isArray(rpcDays)) {
+            setStudyDays(rpcDays.filter((d): d is number => typeof d === 'number'));
+          }
+        } catch {
+          // Study days are one card on this screen; never break it.
+        }
+
         setIsEmailUser(false);
         await loadBadges(targetId);
         setLoading(false);
