@@ -55,7 +55,7 @@ create table if not exists public.voices (
   name_chosen       boolean not null default false, -- actor picked the name on first login (one-time; admin can still rename)
   category          text not null check (category in ('M1', 'F1', 'B1', 'G1')),
   actor_id          uuid references public.voice_actors (id) on delete set null,
-  intro_text        text not null default 'Hello! I am one of your English voices. Listen to me in your lessons, and let us learn English together!',
+  intro_text        text not null default 'Hello! I will be one of your English voices. Listen to me in your lessons, and let us learn English together!',
   intro_path        text,                  -- storage path of the intro recording
   intro_status      text not null default 'pending'
                       check (intro_status in ('pending', 'submitted', 'approved', 'redo')),
