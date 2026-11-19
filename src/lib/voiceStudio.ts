@@ -324,13 +324,42 @@ export async function setVoicePref(
 }
 
 // ---------------------------------------------------------------- storage
+// Voice audio lives on the Lolipop server as plain files, NOT in
+// Supabase storage: one complete voice is roughly 700 MB of audio,
+// far beyond the Supabase free plan's 1 GB file storage, while the
+// Lolipop plan has 700 GB. Playback is a direct static-file URL on
+// the same server that hosts the app itself, so listening never goes
+// through this script, PHP or Supabase - it is exactly as fast as the
+// server can hand over a small file. Only uploads and deletions pass
+// through the small key-protected voice-storage.php script, which
+// sits in the site's web root (source kept with the Lolipop media
+// pack). The database stores only the path ('<slug>/<file>'), as it
+// always did.
 
-export const VOICE_BUCKET = 'voice-recordings';
+const VOICE_MEDIA_BASE = 'https://englishforcricket.com/media/voice';
+const VOICE_STORAGE_ENDPOINT = 'https://englishforcricket.com/voice-storage.php';
+const VOICE_STORAGE_KEY = 'e398d41f5fa5be1da402a66041abc3b29eaab39cacb41967';
 
-/** Public playback URL for a storage path inside the voice bucket. */
+/** Public playback URL for a recording path ('<slug>/<file>'). */
 export function getRecordingPublicUrl(storagePath: string): string {
-  const { data } = supabase.storage.from(VOICE_BUCKET).getPublicUrl(storagePath);
-  return data.publicUrl;
+  if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
+    return storagePath;
+  }
+  return `${VOICE_MEDIA_BASE}/${storagePath}`;
+}
+
+/** POST to the Lolipop voice-storage script; throws a readable error. */
+async function postVoiceStorage(form: FormData): Promise<any> {
+  const res = await fetch(VOICE_STORAGE_ENDPOINT, { method: 'POST', body: form });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json?.ok) {
+    throw new Error(
+      json?.error
+        ? `Recording storage: ${json.error}`
+        : `Recording storage answered ${res.status}. Is voice-storage.php uploaded to the site yet?`
+    );
+  }
+  return json;
 }
 
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -359,9 +388,10 @@ export function recordingFileExtension(localUri: string): string {
 }
 
 /**
- * Upload one take into the voice bucket at '<slug>/<fileName>',
- * replacing any earlier take at the same path. Mirrors the
- * BadgesManager upload pattern. Returns the storage path.
+ * Upload one take to the Lolipop file server as '<slug>/<fileName>',
+ * replacing any earlier take at the same path. The database keeps
+ * only the returned path; the audio itself never touches Supabase.
+ * Returns the storage path.
  */
 export async function uploadRecording(
   slug: string,
@@ -369,22 +399,24 @@ export async function uploadRecording(
   localUri: string
 ): Promise<string> {
   const storagePath = `${slug}/${fileName}`;
-  let fileBody;
+  const form = new FormData();
+  form.append('key', VOICE_STORAGE_KEY);
+  form.append('action', 'upload');
+  form.append('slug', slug);
+  form.append('name', fileName);
   if (Platform.OS === 'web') {
     const res = await fetch(localUri);
-    fileBody = await res.blob();
+    const blob = await res.blob();
+    form.append('file', blob, fileName);
   } else {
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-    fileBody = {
+    form.append('file', {
       uri: localUri,
       type: MIME_BY_EXTENSION[ext] ?? 'audio/m4a',
       name: fileName,
-    } as any;
+    } as any);
   }
-  const { error } = await supabase.storage
-    .from(VOICE_BUCKET)
-    .upload(storagePath, fileBody, { upsert: true });
-  if (error) throw error;
+  await postVoiceStorage(form);
   return storagePath;
 }
 
@@ -417,7 +449,7 @@ export interface VoiceOption {
 
 // ------------------------------------------------------------ full deletion
 // Deleting a voice in the admin panel must clear EVERYTHING the voice
-// owns: its audio files in the bucket AND its database rows. The rows
+// owns: its audio files on the file server AND its database rows. The rows
 // are the easy half - voice_recordings references voices with
 // ON DELETE CASCADE, so removing the voice row removes its recording
 // rows with it. Storage files are NOT covered by any cascade, so they
@@ -437,29 +469,18 @@ export async function countVoiceRecordings(voiceId: string): Promise<number> {
 }
 
 /**
- * Remove every file stored under a voice's folder ('<slug>/...'),
- * including the introduction. Files sit flat in the folder, so this
- * pages through the listing, removing as it goes. Returns the number
- * of files removed.
+ * Remove every file stored under a voice's folder ('<slug>/...') on
+ * the Lolipop file server, including the introduction. The storage
+ * script deletes the whole folder in one call. Returns the number of
+ * files removed.
  */
 export async function removeAllVoiceFiles(slug: string): Promise<number> {
-  let removed = 0;
-  // Safety cap: 500 pages x 100 files is far beyond any real voice.
-  for (let page = 0; page < 500; page += 1) {
-    const { data, error } = await supabase.storage
-      .from(VOICE_BUCKET)
-      .list(slug, { limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } });
-    if (error) throw error;
-    const files = (data ?? []).filter((entry) => entry.id);
-    if (files.length === 0) break;
-    const paths = files.map((entry) => `${slug}/${entry.name}`);
-    const { error: removeError } = await supabase.storage
-      .from(VOICE_BUCKET)
-      .remove(paths);
-    if (removeError) throw removeError;
-    removed += paths.length;
-  }
-  return removed;
+  const form = new FormData();
+  form.append('key', VOICE_STORAGE_KEY);
+  form.append('action', 'delete-voice');
+  form.append('slug', slug);
+  const json = await postVoiceStorage(form);
+  return typeof json?.removed === 'number' ? json.removed : 0;
 }
 
 /**

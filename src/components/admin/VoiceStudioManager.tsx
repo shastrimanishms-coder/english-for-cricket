@@ -91,7 +91,7 @@ function joined(value: any): any {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Play/pause for one submitted recording (public bucket URL). */
+/** Play/pause for one submitted recording (public file URL). */
 function ReviewPlayer({ url }: { url: string }) {
   const player = useAudioPlayer(url);
   const status = useAudioPlayerStatus(player);
