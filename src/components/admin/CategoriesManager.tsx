@@ -257,7 +257,7 @@ export default function CategoriesManager() {
             <Text className="text-sm font-semibold text-text-secondary mb-2">Category Name</Text>
             <TextInput
               className="w-full bg-canvas p-4 rounded-xl border border-inkline"
-              placeholder="e.g., Eiken Pre-2, Worksheets..."
+              placeholder="e.g., Worksheets, Match Reports..."
               value={name}
               onChangeText={setName}
             />

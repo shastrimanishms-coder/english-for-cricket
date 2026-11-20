@@ -1,9 +1,10 @@
 import { Image, View } from 'react-native';
 
 // The KYCO mascots (Shastri's artwork, supplied 2026-11-16): a male
-// and a female fox in cricket kit. Shown as a pair - landing page,
-// learner home greeting and the lesson-complete celebration - so the
-// same friendly faces follow the student through the app.
+// and a female fox in cricket kit. Shown as a pair on the learner
+// home greeting and the lesson-complete celebration, so the same
+// friendly faces follow the student through the app. (The landing
+// page uses the same artwork large, as blended background figures.)
 // Assets are transparent PNGs, 540x960 (aspect 0.5625).
 
 const MALE = require('../../../assets/images/mascot-male.png');

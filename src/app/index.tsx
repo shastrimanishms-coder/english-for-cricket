@@ -5,9 +5,15 @@ import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { GoldButton, MicroLabel } from '../components/ui/Elegant';
-import MascotPair from '../components/ui/Mascots';
 import { supabase } from '../lib/supabase';
 import { useAppLogo } from '../lib/useAppLogo';
+
+// The KYCO mascots appear on this page as large background artwork,
+// blended into the navy sections at low opacity rather than as a
+// small foreground pair (which stretched the old hero). Transparent
+// PNGs, 540x960 (aspect 0.5625).
+const MASCOT_MALE = require('../../assets/images/mascot-male.png');
+const MASCOT_FEMALE = require('../../assets/images/mascot-female.png');
 
 export default function LandingPage() {
   const router = useRouter();
@@ -73,7 +79,7 @@ export default function LandingPage() {
               onPress={() => router.push('/login')}
               className="items-center rounded-full border border-inkline bg-white px-5 py-2.5 active:opacity-90"
             >
-              <Text className="font-sans text-sm font-bold text-navy">Login</Text>
+              <Text className="font-sans text-sm font-bold text-navy">Log In</Text>
             </Pressable>
             <Pressable
               onPress={() => router.push('/register')}
@@ -85,9 +91,37 @@ export default function LandingPage() {
         </View>
       </SafeAreaView>
 
-      {/* HERO SECTION */}
-      <View className="w-full bg-navy">
-        <View className="max-w-7xl w-full mx-auto flex-col md:flex-row items-center px-6 py-16 md:py-24">
+      {/* HERO SECTION — the mascots stand large in the background,
+          blended into the navy at low opacity. */}
+      <View className="w-full bg-navy relative overflow-hidden">
+        <Image
+          source={MASCOT_FEMALE}
+          resizeMode="contain"
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            right: -30,
+            bottom: -40,
+            height: 640,
+            width: 360,
+            opacity: 0.16,
+          }}
+        />
+        <Image
+          source={MASCOT_MALE}
+          resizeMode="contain"
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: -70,
+            bottom: -60,
+            height: 560,
+            width: 315,
+            opacity: 0.1,
+            transform: [{ scaleX: -1 }],
+          }}
+        />
+        <View className="max-w-7xl w-full mx-auto flex-col md:flex-row items-center px-6 py-16 md:py-24 relative">
 
           {/* Left Side: Text and Call to Action */}
           <View className="flex-1 md:pr-12 w-full mb-12 md:mb-0">
@@ -98,10 +132,12 @@ export default function LandingPage() {
               Learn English Through Cricket
             </Text>
             <Text className="font-sans text-lg text-slate-300 mb-10 leading-relaxed">
-              English for Cricket helps children and young people learn real English through
-              the game they love — interactive lessons, cricket games and videos that make
-              new words stick. It&apos;s an initiative of KYCO, the Kansai Youth Cricket
-              Organization, and it&apos;s completely free — and always will be.
+              English for Cricket is a complete English-learning programme built around the
+              game of cricket. Across 320 structured lessons, learners progress from their
+              first words to confident, independent communication — through listening,
+              speaking, reading and play. The programme is provided by KYCO, the Kansai
+              Youth Cricket Organization, and is free to every learner. It will always
+              remain so.
             </Text>
             <View className="w-full max-w-xs mb-4">
               <GoldButton
@@ -112,18 +148,32 @@ export default function LandingPage() {
             </View>
             <Pressable onPress={() => router.push('/login')} className="mb-6 self-start">
               <Text className="font-sans text-gold-light font-semibold underline">
-                Already learning? Log in →
+                Already have an account? Log in
               </Text>
             </Pressable>
             <Text className="font-sans text-sm text-slate-400 leading-relaxed">
-              At a school or club? Your teacher can give you a username and PIN — no email
-              needed.
+              Learners at participating schools and clubs receive a username and PIN from
+              their teacher or coach. No email address is required.
             </Text>
-            <View className="mt-8 self-start items-center">
-              <MascotPair height={180} />
-              <Text className="font-sans text-sm text-slate-300 mt-2 text-center">
-                Meet the KYCO mascots — they&apos;ll cheer you on as you learn! 🦊
-              </Text>
+
+            {/* Programme figures */}
+            <View className="flex-row flex-wrap gap-x-8 gap-y-4 mt-10">
+              {[
+                { value: '320', label: 'Lessons' },
+                { value: '5', label: 'Stages' },
+                { value: '40', label: 'Modules' },
+                { value: '2,200+', label: 'Words' },
+                { value: '100%', label: 'Free, always' },
+              ].map((stat) => (
+                <View key={stat.label}>
+                  <Text className="font-display text-2xl font-semibold text-gold">
+                    {stat.value}
+                  </Text>
+                  <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider">
+                    {stat.label}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
 
@@ -162,43 +212,59 @@ export default function LandingPage() {
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20">
           <MicroLabel className="text-center mb-3">The Programme</MicroLabel>
           <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-4">
-            Everything You Need to Learn
+            Everything a Learner Needs
           </Text>
           <Text className="font-sans text-lg text-slate-500 text-center mb-12 max-w-2xl mx-auto leading-relaxed">
-            Lessons, games and videos built entirely around cricket — so every new English
-            word comes with a bat, a ball and a reason to remember it.
+            A complete course in one place: structured lessons, spoken practice, guided
+            reading and considered review — every element built around cricket, so that
+            each new word arrives with a context that makes it memorable.
           </Text>
           <View className="flex-row flex-wrap justify-center gap-6">
             {[
               {
+                icon: 'library-outline',
+                title: 'The Learning Path',
+                text: 'A structured course of 320 lessons in five stages and forty modules. Each lesson builds carefully on those before it, introducing new language and returning to earlier language in new forms until it is secure.',
+              },
+              {
+                icon: 'mic-outline',
+                title: 'Speaking Practice',
+                text: 'Guided conversations — interviews and everyday small talk — in which learners speak their part aloud and receive a score for every line, against a pass mark of seventy per cent.',
+              },
+              {
                 icon: 'book-outline',
-                title: 'Interactive Lessons',
-                text: 'Short, playful lessons built around cricket words and sentences — listen, tap, match and type your way through each one.',
+                title: 'Smart Reading',
+                text: 'Short stories in two forms: Listen and Read, in which each word is highlighted as it is spoken, and Read Aloud, in which the learner\u2019s own reading is scored sentence by sentence.',
               },
               {
-                icon: 'game-controller-outline',
-                title: 'Cricket Games',
-                text: 'Practise English while you play. Cricket games turn new words into points, catches and runs.',
+                icon: 'volume-high-outline',
+                title: 'Real Human Voices',
+                text: 'Every line of the course is being recorded by real voice artists, in several distinct voices. Learners choose the voice they wish to hear, and listen to natural, human English throughout.',
               },
               {
-                icon: 'play-circle-outline',
-                title: 'Video Lessons',
-                text: "Watch real cricket explained in simple English, starting with the ICC's official guide to the game.",
+                icon: 'refresh-outline',
+                title: 'Tricky Words Review',
+                text: 'Words and phrases a learner finds difficult are gathered automatically and presented again for review, so that weaker points receive further practice until they are mastered.',
               },
               {
-                icon: 'map-outline',
-                title: 'Your Learning Path',
-                text: 'Lessons are organised into a step-by-step path, from your very first cricket words to confident match-day English.',
+                icon: 'star-outline',
+                title: 'XP, Stars and Badges',
+                text: 'Learners earn experience points and stars for completed work, and badges for significant achievements. A class may follow its own weekly star board; there are no public rankings.',
               },
               {
-                icon: 'trophy-outline',
-                title: 'Badges & Streaks',
-                text: 'Finish lessons, complete modules and learn every day to earn badges and keep your streak alive.',
+                icon: 'calendar-outline',
+                title: 'Study Days and Streaks',
+                text: 'Each learner chooses the days of the week on which they will study. Only those days count towards the learning streak, so a rest day can never break it.',
+              },
+              {
+                icon: 'compass-outline',
+                title: 'Find Your Start',
+                text: 'A short placement assessment recommends the stage at which a new learner should begin. Nothing is locked; the recommendation simply provides a sensible starting point.',
               },
               {
                 icon: 'school-outline',
-                title: 'For Schools & Clubs',
-                text: "Teachers and coaches can add a whole class with simple PIN logins, print login slips, and follow everyone's progress.",
+                title: 'For Schools and Clubs',
+                text: 'Teachers and coaches may enrol a whole class with simple username-and-PIN logins, print a login slip for every learner, and follow the progress of the entire group.',
               },
             ].map((feature) => (
               <View
@@ -213,6 +279,11 @@ export default function LandingPage() {
               </View>
             ))}
           </View>
+          <Text className="font-sans text-slate-500 text-center leading-relaxed mt-12 max-w-2xl mx-auto">
+            Beyond the lessons, a library of cricket games, video lessons and downloadable
+            workbooks accompanies the course — including the ICC&apos;s official
+            introduction to the game.
+          </Text>
         </View>
       </View>
 
@@ -227,18 +298,18 @@ export default function LandingPage() {
             {[
               {
                 step: '1',
-                title: 'Sign up — or get a PIN',
-                text: 'Register free with an email address, or ask your teacher for a username and PIN. Learning on your own or with your whole class both work.',
+                title: 'Register, or receive a PIN',
+                text: 'Create a free account with an email address, or receive a username and PIN from a teacher or coach. Both routes provide full access to the programme.',
               },
               {
                 step: '2',
-                title: 'Follow your Learning Path',
-                text: 'Work through lessons, games and videos in order, at your own pace — at home, at school or at the club.',
+                title: 'Follow the Learning Path',
+                text: 'Work through the stages in order, at your own pace — at home, at school or at the club. A short placement assessment can identify the appropriate starting point.',
               },
               {
                 step: '3',
-                title: 'Earn badges & streaks',
-                text: 'Every finished lesson counts. Collect badges, complete modules and keep your daily learning streak going.',
+                title: 'Practise, review and progress',
+                text: 'Speaking practice, guided reading and targeted review reinforce every lesson, while points, stars and badges provide a clear record of progress.',
               },
             ].map((item) => (
               <View key={item.step} className="flex-1 items-center px-4">
@@ -255,21 +326,23 @@ export default function LandingPage() {
             ))}
           </View>
 
-          {/* Pathway strip: the journey through the curriculum */}
+          {/* Pathway strip: the five stages of the course */}
           <View className="mt-16 bg-navy rounded-[20px] px-6 py-8">
             <Text className="font-display text-white font-semibold text-center text-lg mb-6">
-              Your journey: from first words to match day
+              The five stages of the course
             </Text>
-            <View className="flex-col md:flex-row items-center justify-center gap-3">
+            <View className="flex-col md:flex-row md:flex-wrap items-center justify-center gap-3">
               {[
-                'Meet the cricket words',
-                'Build your sentences',
-                'Talk on match day',
-                'Cheer like a fan',
+                { name: 'The Foundation', note: 'First words and sentences' },
+                { name: 'The Rookie', note: 'Everyday English, securely established' },
+                { name: 'The Player', note: 'Independent reading and conversation' },
+                { name: 'The Strategist', note: 'Analysis and the language of the game' },
+                { name: 'The Captain', note: 'Advanced communication and leadership' },
               ].map((stage, index, arr) => (
-                <View key={stage} className="flex-row items-center gap-3">
-                  <View className="bg-white/10 border border-white/20 rounded-full px-4 py-2">
-                    <Text className="text-slate-100 font-semibold text-sm">{stage}</Text>
+                <View key={stage.name} className="flex-row items-center gap-3">
+                  <View className="bg-white/10 border border-white/20 rounded-[14px] px-4 py-2 items-center">
+                    <Text className="text-slate-100 font-semibold text-sm">{stage.name}</Text>
+                    <Text className="text-slate-400 text-xs text-center mt-0.5">{stage.note}</Text>
                   </View>
                   {index < arr.length - 1 && (
                     <Text className="text-gold font-bold hidden md:flex">→</Text>
@@ -281,7 +354,65 @@ export default function LandingPage() {
         </View>
       </View>
 
-{/* FOOTER */}
+      {/* COMMITMENT SECTION — the male mascot stands large in the
+          background, blended into the navy. */}
+      <View className="w-full bg-navy relative overflow-hidden">
+        <Image
+          source={MASCOT_MALE}
+          resizeMode="contain"
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: -50,
+            bottom: -70,
+            height: 600,
+            width: 338,
+            opacity: 0.13,
+          }}
+        />
+        <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20 relative">
+          <MicroLabel className="text-center mb-3">Our Commitment</MicroLabel>
+          <Text className="font-display text-3xl md:text-4xl font-semibold text-white text-center mb-12">
+            Free. Safe. For Every Learner.
+          </Text>
+          <View className="flex-col md:flex-row gap-10">
+            {[
+              {
+                title: 'Free of charge, permanently',
+                text: 'English for Cricket carries no fees and no advertising, and it never will. Every part of the programme is offered to every learner on equal terms.',
+              },
+              {
+                title: 'Designed for children\u2019s safety',
+                text: 'There are no public profiles, no open messaging and no external advertising. Learners see the progress of their own class only, and nothing further.',
+              },
+              {
+                title: 'Prepared with care',
+                text: 'The programme is designed and maintained by the volunteers of KYCO in Kansai, Japan, for young cricketers — and for every child who would like to learn English through the game.',
+              },
+            ].map((item) => (
+              <View key={item.title} className="flex-1 px-2">
+                <Text className="font-sans text-lg font-bold text-gold mb-2 text-center md:text-left">
+                  {item.title}
+                </Text>
+                <Text className="font-sans text-slate-300 text-center md:text-left leading-relaxed">
+                  {item.text}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <View className="items-center mt-12">
+            <View className="w-full max-w-xs">
+              <GoldButton
+                label="Register — Free of Charge"
+                onPress={() => router.push('/register')}
+                className="w-full"
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* FOOTER */}
       <View className="w-full bg-canvas border-t border-inkline">
         <View className="max-w-7xl w-full mx-auto flex-col items-center p-8 md:p-12">
           <View className="flex-row flex-wrap justify-center gap-4 md:gap-8 mb-6">
@@ -301,6 +432,10 @@ export default function LandingPage() {
               </Link>
             )}
           </View>
+          <Text className="text-slate-400 text-sm text-center mb-2">
+            English for Cricket is an educational initiative of KYCO, the Kansai Youth
+            Cricket Organization.
+          </Text>
           <Text className="text-slate-400 text-sm text-center">
             © 2026 Kansai Youth Cricket Organization. All rights reserved.
           </Text>

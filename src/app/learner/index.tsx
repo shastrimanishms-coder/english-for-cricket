@@ -27,7 +27,7 @@ const LEARNING_MODULES: {
   {
     id: 'path',
     title: 'Learning Path',
-    description: 'Step-by-step Eiken-aligned lessons from beginner to expert. Immersion style learning.',
+    description: 'A structured course of lessons that carries learners from their first words to confident English, stage by stage.',
     cta: 'start learning',
     icon: 'library-outline',
   },
