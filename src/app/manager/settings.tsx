@@ -219,7 +219,7 @@ export default function OrganizationSettings() {
               <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Email Address</Text>
               <View className="flex-row items-center gap-4">
                 <TextInput
-                  className="flex-1 bg-[#F1ECE1] p-4 rounded-xl border border-inkline font-sans text-slate-500 text-base"
+                  className="flex-1 min-w-0 bg-[#F1ECE1] p-4 rounded-xl border border-inkline font-sans text-slate-500 text-base"
                   value={email}
                   editable={false}
                 />

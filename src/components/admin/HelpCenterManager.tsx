@@ -537,7 +537,7 @@ export default function HelpCenterManager() {
         {inboxReady && !messagesLoading && messages.length > 0 && (
           <View className="flex-row items-center gap-3 px-4 py-3 border-b border-inkline bg-canvas">
             <TextInput
-              className="flex-1 bg-white px-4 py-2.5 rounded-xl border border-inkline"
+              className="flex-1 min-w-0 bg-white px-4 py-2.5 rounded-xl border border-inkline"
               placeholder="Search by name, email, subject or message text..."
               value={messageSearch}
               onChangeText={setMessageSearch}

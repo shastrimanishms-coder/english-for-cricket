@@ -205,7 +205,7 @@ export default function RegisterScreen() {
             />
             <View className="flex-row gap-4">
               <TextInput
-                className="flex-1 bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
+                className="flex-1 min-w-0 bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                 placeholder="Country (optional)"
                 placeholderTextColor="#94A3B8"
                 value={country}
@@ -213,7 +213,7 @@ export default function RegisterScreen() {
                 autoCapitalize="words"
               />
               <TextInput
-                className="flex-1 bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
+                className="flex-1 min-w-0 bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
                 placeholder="Region (optional)"
                 placeholderTextColor="#94A3B8"
                 value={region}
