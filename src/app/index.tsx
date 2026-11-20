@@ -5,6 +5,7 @@ import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { GoldButton, MicroLabel } from '../components/ui/Elegant';
+import { routeSignedInUser } from '../lib/routeSignedInUser';
 import { supabase } from '../lib/supabase';
 import { useAppLogo } from '../lib/useAppLogo';
 
@@ -29,6 +30,30 @@ export default function LandingPage() {
   // created yet. If the check itself fails, keep showing the links
   // (the previous behaviour).
   const [existingLegalSlugs, setExistingLegalSlugs] = useState<string[] | null>(null);
+
+  // A signed-in user who lands here — most importantly the Google
+  // sign-in return, which Supabase sends back to the site root with the
+  // session in the URL — goes straight to their own home instead of
+  // sitting on the public page looking logged out.
+  useEffect(() => {
+    let cancelled = false;
+    routeSignedInUser((path) => {
+      if (!cancelled) router.replace(path);
+    });
+    // The OAuth return is processed asynchronously by supabase-js, so
+    // also route if the sign-in event lands just after this check.
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user && !cancelled) {
+        routeSignedInUser((path) => {
+          if (!cancelled) router.replace(path);
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+      authSub.subscription.unsubscribe();
+    };
+  }, [router]);
 
   useEffect(() => {
     (async () => {

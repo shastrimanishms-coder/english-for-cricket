@@ -1,5 +1,5 @@
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,9 +12,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, GoldButton } from '../components/ui/Elegant';
+import { routeSignedInUser } from '../lib/routeSignedInUser';
 import { supabase } from '../lib/supabase';
 
 export default function RegisterScreen() {
+  const router = useRouter();
+
+  // Already signed in (for example, just returned from Google sign-in)?
+  // Go straight to the user's home rather than showing the form again.
+  useEffect(() => {
+    routeSignedInUser((path) => router.replace(path));
+  }, [router]);
+
   // Form State
   const [role, setRole] = useState<'individual_learner' | 'manager'>('individual_learner');
   const [email, setEmail] = useState('');

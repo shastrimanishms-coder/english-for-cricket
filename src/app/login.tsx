@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,11 +13,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, GoldButton } from '../components/ui/Elegant';
+import { routeSignedInUser } from '../lib/routeSignedInUser';
 import { supabase } from '../lib/supabase';
 
 export default function LoginScreen() {
   const router = useRouter();
-  
+
+  // Already signed in (for example, just returned from Google sign-in)?
+  // Go straight to the user's home rather than showing the form again.
+  useEffect(() => {
+    routeSignedInUser((path) => router.replace(path));
+  }, [router]);
+
   // Toggle State
   const [loginMode, setLoginMode] = useState<'email' | 'pin'>('email');
   const [loading, setLoading] = useState(false);
