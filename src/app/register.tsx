@@ -135,6 +135,11 @@ export default function RegisterScreen() {
       <SafeAreaView edges={['top']} className="flex-1">
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <View className="w-full max-w-lg mx-auto">
+        <Link href="/" asChild>
+          <Pressable className="self-start mb-4 py-2 pr-3">
+            <Text className="font-sans text-navy font-semibold text-base">← Back to Home</Text>
+          </Pressable>
+        </Link>
         <ElegantCard className="p-6 md:p-8">
 
           <View className="mb-10">
