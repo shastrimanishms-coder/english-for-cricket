@@ -43,7 +43,86 @@ export function normalizeWords(text: string): string[] {
     .replace(/[^a-z0-9' ]/g, ' ')
     .replace(/'/g, '')
     .split(/\s+/)
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((word) => CONTRACTIONS[word] || [word]);
+}
+
+// A speech check scores what the words SOUND like, not how they are
+// spelled. Contractions are expanded so "don't" and "do not" - the
+// same sounds - score the same either way round.
+const CONTRACTIONS: Record<string, string[]> = {
+  dont: ['do', 'not'],
+  cant: ['can', 'not'],
+  wont: ['will', 'not'],
+  isnt: ['is', 'not'],
+  arent: ['are', 'not'],
+  didnt: ['did', 'not'],
+  doesnt: ['does', 'not'],
+  havent: ['have', 'not'],
+  hasnt: ['has', 'not'],
+  wasnt: ['was', 'not'],
+  werent: ['were', 'not'],
+  couldnt: ['could', 'not'],
+  shouldnt: ['should', 'not'],
+  wouldnt: ['would', 'not'],
+  im: ['i', 'am'],
+  youre: ['you', 'are'],
+  hes: ['he', 'is'],
+  shes: ['she', 'is'],
+  its: ['it', 'is'],
+  thats: ['that', 'is'],
+  whats: ['what', 'is'],
+  lets: ['let', 'us'],
+  ive: ['i', 'have'],
+  weve: ['we', 'have'],
+  ill: ['i', 'will'],
+  youll: ['you', 'will'],
+  well: ['we', 'will'],
+};
+
+// Words a recogniser cannot tell apart by ear, plus number words and
+// the digits recognisers often write instead. If the sounds are the
+// same, the spoken word was right, whichever spelling came back.
+const SOUND_EQUALS: Record<string, string> = {
+  one: '1',
+  two: '2',
+  three: '3',
+  four: '4',
+  five: '5',
+  six: '6',
+  seven: '7',
+  eight: '8',
+  nine: '9',
+  ten: '10',
+  to: 'to',
+  too: 'to',
+  their: 'there',
+  theyre: 'there',
+  your: 'your',
+  for: '4',
+  see: 'see',
+  sea: 'see',
+  right: 'right',
+  write: 'right',
+  won: '1',
+  by: 'by',
+  buy: 'by',
+  bye: 'by',
+  here: 'here',
+  hear: 'here',
+  where: 'where',
+  wear: 'where',
+  are: 'are',
+  r: 'are',
+};
+
+/** Canonical form for comparison: sound-equal words share one form. */
+function soundForm(word: string): string {
+  return SOUND_EQUALS[word] || word;
+}
+
+function sameWord(a: string, b: string): boolean {
+  return soundForm(a) === soundForm(b);
 }
 
 /** Character-level Levenshtein distance (small strings only). */
@@ -109,7 +188,7 @@ export function scoreSpeech(target: string, transcript: string): SpeechScore {
       dp[i][j] = Math.min(
         dp[i - 1][j] + 1, // target word missing
         dp[i][j - 1] + 1, // extra heard word
-        dp[i - 1][j - 1] + (targetWords[i - 1] === heardWords[j - 1] ? 0 : 1)
+        dp[i - 1][j - 1] + (sameWord(targetWords[i - 1], heardWords[j - 1]) ? 0 : 1)
       );
     }
   }
@@ -119,7 +198,7 @@ export function scoreSpeech(target: string, transcript: string): SpeechScore {
   let i = m;
   let j = n;
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && targetWords[i - 1] === heardWords[j - 1] && dp[i][j] === dp[i - 1][j - 1]) {
+    if (i > 0 && j > 0 && sameWord(targetWords[i - 1], heardWords[j - 1]) && dp[i][j] === dp[i - 1][j - 1]) {
       words[i - 1] = { word: targetWords[i - 1], status: 'correct' };
       i--;
       j--;

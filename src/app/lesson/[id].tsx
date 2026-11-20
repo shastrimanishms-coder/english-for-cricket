@@ -272,7 +272,7 @@ function FallbackImage({
       source={{ uri }}
       className={className}
       style={height ? { height } : undefined}
-      resizeMode="cover"
+      resizeMode="contain"
       onError={() => setFailed(true)}
     />
   );

@@ -39,9 +39,17 @@ interface Lesson {
 }
 
 interface CategoryGroup {
+  key: string;
   category: Category | null; // null = modules with no matching category
   title?: string;
+  description?: string | null;
   modules: Module[];
+}
+
+interface NextLesson {
+  lesson: Lesson;
+  moduleTitle: string;
+  stageTitle: string;
 }
 
 export default function LearningPath() {
@@ -52,7 +60,14 @@ export default function LearningPath() {
   const [groups, setGroups] = useState<CategoryGroup[]>([]);
   const [lessonsByModule, setLessonsByModule] = useState<Record<string, Lesson[]>>({});
   const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set());
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  // Accordion state: one stage open at a time, and inside it one
+  // module open at a time. The page opens on the stage and module of
+  // the student's next unfinished lesson, so it lands where they
+  // left off instead of unrolling the whole path.
+  const [expandedStageKey, setExpandedStageKey] = useState<string | null>(null);
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
+  const [nextLesson, setNextLesson] = useState<NextLesson | null>(null);
+  const [totals, setTotals] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
 
   const fetchPathData = useCallback(async () => {
     try {
@@ -89,22 +104,27 @@ export default function LearningPath() {
       const stages = (!stagesRes.error ? (stagesRes.data || []) : []) as Stage[];
       const useStages = stages.length > 0 && modules.some((m) => m.stage_id);
 
+      let grouped: CategoryGroup[];
       if (useStages) {
-        const grouped: CategoryGroup[] = stages.map((stage) => ({
+        grouped = stages.map((stage) => ({
+          key: stage.id,
           category: null,
           title: stage.title,
+          description: stage.description,
           modules: modules.filter((m) => m.stage_id === stage.id),
         }));
         const assignedIds = new Set(grouped.flatMap((g) => g.modules.map((m) => m.id)));
         const rest = modules.filter((m) => !assignedIds.has(m.id));
-        if (rest.length > 0) grouped.push({ category: null, title: 'More Modules', modules: rest });
-        setGroups(grouped.filter((g) => g.modules.length > 0));
+        if (rest.length > 0) {
+          grouped.push({ key: 'more-modules', category: null, title: 'More Modules', modules: rest });
+        }
       } else {
         // Modules carry no category link in the current schema (CurriculumManager
         // never writes one). Group by category_id when a module has one; modules
         // without one fall under the single curriculum category when there is
         // exactly one, otherwise under a trailing ungrouped section.
-        const grouped: CategoryGroup[] = categories.map((category) => ({
+        grouped = categories.map((category) => ({
+          key: category.id,
           category,
           modules: modules.filter((m) => m.category_id === category.id),
         }));
@@ -114,19 +134,54 @@ export default function LearningPath() {
           if (grouped.length === 1) {
             grouped[0].modules = [...grouped[0].modules, ...unassigned];
           } else {
-            grouped.push({ category: null, modules: unassigned });
+            grouped.push({ key: 'ungrouped', category: null, modules: unassigned });
           }
         }
-        setGroups(grouped.filter((g) => g.modules.length > 0));
       }
-      setExpandedModules(new Set(modules.map((m) => m.id)));
+      grouped = grouped.filter((g) => g.modules.length > 0);
+      setGroups(grouped);
 
       // Completion ticks via the migration-22 RPC: the completions
       // table has no anon read policy, so a direct select silently
       // returned nothing for PIN students and the ticks never showed.
+      let completed = new Set<string>();
       const identity = await getStudentIdentity();
       if (identity) {
-        setCompletedLessonIds(await fetchCompletedLessons(identity));
+        completed = await fetchCompletedLessons(identity);
+      }
+      setCompletedLessonIds(completed);
+
+      // Progress + where to continue: walk the path in order (stage,
+      // then module, then lesson) and find the first unfinished
+      // lesson. The accordion opens on that stage and module, and the
+      // Continue card at the top jumps straight to it.
+      let done = 0;
+      let total = 0;
+      let next: NextLesson | null = null;
+      for (const group of grouped) {
+        for (const module of group.modules) {
+          for (const lesson of byModule[module.id] || []) {
+            total++;
+            if (completed.has(lesson.id)) {
+              done++;
+            } else if (!next) {
+              next = {
+                lesson,
+                moduleTitle: module.title,
+                stageTitle: group.title || group.category?.name || '',
+              };
+              setExpandedStageKey(group.key);
+              setExpandedModuleId(module.id);
+            }
+          }
+        }
+      }
+      setTotals({ done, total });
+      setNextLesson(next);
+      if (!next && grouped.length > 0) {
+        // Everything finished (or nothing started with no lessons):
+        // open the first stage so the page is not a wall of headers.
+        setExpandedStageKey(grouped[0].key);
       }
     } catch (error: any) {
       setLoadError(error.message || 'Something went wrong while loading your learning path.');
@@ -141,13 +196,12 @@ export default function LearningPath() {
     })();
   }, [fetchPathData]);
 
+  const toggleStage = useCallback((key: string) => {
+    setExpandedStageKey((prev) => (prev === key ? null : key));
+  }, []);
+
   const toggleModule = useCallback((moduleId: string) => {
-    setExpandedModules((prev) => {
-      const next = new Set(prev);
-      if (next.has(moduleId)) next.delete(moduleId);
-      else next.add(moduleId);
-      return next;
-    });
+    setExpandedModuleId((prev) => (prev === moduleId ? null : moduleId));
   }, []);
 
   if (loading) {
@@ -180,6 +234,7 @@ export default function LearningPath() {
   }
 
   const hasModules = groups.some((g) => g.modules.length > 0);
+  const allDone = totals.total > 0 && totals.done === totals.total;
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
@@ -200,97 +255,186 @@ export default function LearningPath() {
               </Text>
             </View>
           ) : (
-            groups.map((group) => (
-              <View key={group.category?.id || group.title || 'ungrouped'} className="mb-10">
-                <Text className="font-display text-2xl md:text-3xl font-semibold text-navy mb-1">
-                  {group.title || (group.category ? group.category.name : 'More Modules')}
-                </Text>
-                {group.category?.description ? (
-                  <Text className="font-sans text-slate-500 mb-4">{group.category.description}</Text>
+            <>
+              {/* Continue card: overall progress + a jump straight to
+                  the next unfinished lesson, so returning students do
+                  not have to hunt for where they left off. */}
+              <View className="mb-8 rounded-[20px] bg-navy p-5 shadow-sm">
+                {allDone ? (
+                  <>
+                    <Text className="font-display text-xl font-semibold text-white mb-1">
+                      🎉 You finished the whole path!
+                    </Text>
+                    <Text className="font-sans text-sm text-slate-300 mb-4">
+                      All {totals.total} lessons complete. You can revisit any lesson below to
+                      practise again.
+                    </Text>
+                  </>
+                ) : nextLesson ? (
+                  <>
+                    <Text className="font-sans text-xs font-bold uppercase tracking-widest text-gold mb-1">
+                      {totals.done > 0 ? 'Continue where you left off' : 'Start your journey'}
+                    </Text>
+                    <Text className="font-display text-xl font-semibold text-white mb-1">
+                      {nextLesson.lesson.title}
+                    </Text>
+                    <Text className="font-sans text-sm text-slate-300 mb-3">
+                      {nextLesson.stageTitle} · {nextLesson.moduleTitle}
+                    </Text>
+                    <Text className="font-sans text-sm text-slate-300 mb-4">
+                      {totals.done} of {totals.total} lessons finished
+                    </Text>
+                    <GoldButton
+                      label="▶ Continue"
+                      onPress={() => router.push(`/lesson/${nextLesson.lesson.id}`)}
+                    />
+                  </>
                 ) : null}
-
-                {group.modules.map((module) => {
-                  const moduleLessons = lessonsByModule[module.id] || [];
-                  const expanded = expandedModules.has(module.id);
-                  const doneCount = moduleLessons.filter((l) => completedLessonIds.has(l.id)).length;
-                  return (
+                {totals.total > 0 && (
+                  <View className="mt-4 h-2 rounded-full bg-white/20 overflow-hidden">
                     <View
-                      key={module.id}
-                      className="mb-4 rounded-[20px] border border-inkline bg-white shadow-sm overflow-hidden"
-                    >
-                      <Pressable
-                        onPress={() => toggleModule(module.id)}
-                        className="flex-row justify-between items-center p-4"
-                      >
-                        <View className="flex-1 pr-3">
-                          <Text className="font-display text-lg font-semibold text-navy">{module.title}</Text>
-                          {module.description ? (
-                            <Text className="font-sans text-sm text-slate-500">{module.description}</Text>
-                          ) : null}
-                          <Text className="font-sans text-xs text-slate-400 mt-1">
-                            {moduleLessons.length} lesson{moduleLessons.length === 1 ? '' : 's'}
-                            {doneCount > 0
-                              ? doneCount === moduleLessons.length
-                                ? ' · 🎉 Module complete!'
-                                : ` · ${doneCount} of ${moduleLessons.length} finished`
-                              : ''}
-                          </Text>
-                        </View>
-                        <Ionicons
-                          name={expanded ? 'chevron-down' : 'chevron-forward'}
-                          size={20}
-                          color="#B8912A"
-                        />
-                      </Pressable>
-
-                      {expanded &&
-                        (moduleLessons.length === 0 ? (
-                          <Text className="px-4 pb-4 font-sans text-sm text-slate-400">
-                            No lessons in this module yet.
-                          </Text>
-                        ) : (
-                          moduleLessons.map((lesson) => {
-                            const completed = completedLessonIds.has(lesson.id);
-                            // The first unfinished lesson in the module is
-                            // "next" - a signpost only; every lesson stays
-                            // tappable, learners can start anywhere.
-                            const isNext =
-                              !completed &&
-                              moduleLessons.find((l) => !completedLessonIds.has(l.id))?.id === lesson.id;
-                            return (
-                              <Pressable
-                                key={lesson.id}
-                                onPress={() => router.push(`/lesson/${lesson.id}`)}
-                                className="flex-row justify-between items-center px-4 py-3 bg-white border-t border-inkline"
-                              >
-                                <View className="flex-1 pr-3">
-                                  <Text className="font-sans text-base font-semibold text-slate-800">
-                                    {lesson.title}
-                                  </Text>
-                                  {lesson.description ? (
-                                    <Text className="font-sans text-sm text-slate-400">{lesson.description}</Text>
-                                  ) : null}
-                                </View>
-                                {completed ? (
-                                  <View className="w-7 h-7 rounded-full bg-pitch items-center justify-center">
-                                    <Text className="text-white font-bold text-sm">✓</Text>
-                                  </View>
-                                ) : isNext ? (
-                                  <View className="px-3 py-1.5 rounded-full bg-gold border-b-4 border-gold-dark">
-                                    <Text className="font-sans text-navy font-bold text-sm">▶ Next</Text>
-                                  </View>
-                                ) : (
-                                  <Text className="font-sans text-gold-dark font-bold">Start ›</Text>
-                                )}
-                              </Pressable>
-                            );
-                          })
-                        ))}
-                    </View>
-                  );
-                })}
+                      className="h-full rounded-full bg-gold"
+                      style={{ width: `${Math.round((totals.done / totals.total) * 100)}%` }}
+                    />
+                  </View>
+                )}
               </View>
-            ))
+
+              {groups.map((group) => {
+                const groupLessons = group.modules.flatMap((m) => lessonsByModule[m.id] || []);
+                const groupDone = groupLessons.filter((l) => completedLessonIds.has(l.id)).length;
+                const stageExpanded = expandedStageKey === group.key;
+                return (
+                  <View key={group.key} className="mb-6">
+                    <Pressable
+                      onPress={() => toggleStage(group.key)}
+                      className="flex-row justify-between items-center rounded-[20px] border border-inkline bg-white p-4 shadow-sm"
+                    >
+                      <View className="flex-1 pr-3">
+                        <Text className="font-display text-2xl font-semibold text-navy">
+                          {group.title || (group.category ? group.category.name : 'More Modules')}
+                        </Text>
+                        {group.description || group.category?.description ? (
+                          <Text className="font-sans text-slate-500 mt-1">
+                            {group.description || group.category?.description}
+                          </Text>
+                        ) : null}
+                        <Text className="font-sans text-xs text-slate-400 mt-1">
+                          {group.modules.length} module{group.modules.length === 1 ? '' : 's'} ·{' '}
+                          {groupLessons.length} lesson{groupLessons.length === 1 ? '' : 's'}
+                          {groupDone > 0
+                            ? groupDone === groupLessons.length
+                              ? ' · 🎉 Stage complete!'
+                              : ` · ${groupDone} of ${groupLessons.length} finished`
+                            : ''}
+                        </Text>
+                      </View>
+                      <Ionicons
+                        name={stageExpanded ? 'chevron-down' : 'chevron-forward'}
+                        size={22}
+                        color="#B8912A"
+                      />
+                    </Pressable>
+
+                    {stageExpanded &&
+                      group.modules.map((module) => {
+                        const moduleLessons = lessonsByModule[module.id] || [];
+                        const expanded = expandedModuleId === module.id;
+                        const doneCount = moduleLessons.filter((l) =>
+                          completedLessonIds.has(l.id)
+                        ).length;
+                        return (
+                          <View
+                            key={module.id}
+                            className="mt-4 ml-3 rounded-[20px] border border-inkline bg-white shadow-sm overflow-hidden"
+                          >
+                            <Pressable
+                              onPress={() => toggleModule(module.id)}
+                              className="flex-row justify-between items-center p-4"
+                            >
+                              <View className="flex-1 pr-3">
+                                <Text className="font-display text-lg font-semibold text-navy">
+                                  {module.title}
+                                </Text>
+                                {module.description ? (
+                                  <Text className="font-sans text-sm text-slate-500">
+                                    {module.description}
+                                  </Text>
+                                ) : null}
+                                <Text className="font-sans text-xs text-slate-400 mt-1">
+                                  {moduleLessons.length} lesson
+                                  {moduleLessons.length === 1 ? '' : 's'}
+                                  {doneCount > 0
+                                    ? doneCount === moduleLessons.length
+                                      ? ' · 🎉 Module complete!'
+                                      : ` · ${doneCount} of ${moduleLessons.length} finished`
+                                    : ''}
+                                </Text>
+                              </View>
+                              <Ionicons
+                                name={expanded ? 'chevron-down' : 'chevron-forward'}
+                                size={20}
+                                color="#B8912A"
+                              />
+                            </Pressable>
+
+                            {expanded &&
+                              (moduleLessons.length === 0 ? (
+                                <Text className="px-4 pb-4 font-sans text-sm text-slate-400">
+                                  No lessons in this module yet.
+                                </Text>
+                              ) : (
+                                moduleLessons.map((lesson) => {
+                                  const completed = completedLessonIds.has(lesson.id);
+                                  // The first unfinished lesson in the module is
+                                  // "next" - a signpost only; every lesson stays
+                                  // tappable, learners can start anywhere.
+                                  const isNext =
+                                    !completed &&
+                                    moduleLessons.find((l) => !completedLessonIds.has(l.id))?.id ===
+                                      lesson.id;
+                                  return (
+                                    <Pressable
+                                      key={lesson.id}
+                                      onPress={() => router.push(`/lesson/${lesson.id}`)}
+                                      className="flex-row justify-between items-center px-4 py-3 bg-white border-t border-inkline"
+                                    >
+                                      <View className="flex-1 pr-3">
+                                        <Text className="font-sans text-base font-semibold text-slate-800">
+                                          {lesson.title}
+                                        </Text>
+                                        {lesson.description ? (
+                                          <Text className="font-sans text-sm text-slate-400">
+                                            {lesson.description}
+                                          </Text>
+                                        ) : null}
+                                      </View>
+                                      {completed ? (
+                                        <View className="w-7 h-7 rounded-full bg-pitch items-center justify-center">
+                                          <Text className="text-white font-bold text-sm">✓</Text>
+                                        </View>
+                                      ) : isNext ? (
+                                        <View className="px-3 py-1.5 rounded-full bg-gold border-b-4 border-gold-dark">
+                                          <Text className="font-sans text-navy font-bold text-sm">
+                                            ▶ Next
+                                          </Text>
+                                        </View>
+                                      ) : (
+                                        <Text className="font-sans text-gold-dark font-bold">
+                                          Start ›
+                                        </Text>
+                                      )}
+                                    </Pressable>
+                                  );
+                                })
+                              ))}
+                          </View>
+                        );
+                      })}
+                  </View>
+                );
+              })}
+            </>
           )}
         </View>
       </ScrollView>
