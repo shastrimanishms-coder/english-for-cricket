@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 import BelongsToPicker from './BelongsToPicker';
+import SentenceVoices from './SentenceVoices';
 
 // Admin manager for the standalone Speaking Practice area ONLY
 // (interviews + small talk role-plays). Lessons keep their own
@@ -57,6 +58,8 @@ export default function SpeakingManager() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
+  // Which turn's voice-upload panel is open (one at a time).
+  const [openVoiceTurn, setOpenVoiceTurn] = useState<number | null>(null);
   const [category, setCategory] = useState<string>('Interview');
   const [emoji, setEmoji] = useState('🎙️');
   const [description, setDescription] = useState('');
@@ -374,7 +377,8 @@ export default function SpeakingManager() {
             </Text>
             <View className="gap-3">
               {turns.map((turn, i) => (
-                <View key={i} className="flex-row items-start gap-2">
+                <Fragment key={i}>
+                <View className="flex-row items-start gap-2">
                   <Pressable
                     onPress={() =>
                       updateTurn(i, { speaker: turn.speaker === 'other' ? 'learner' : 'other' })
@@ -406,6 +410,27 @@ export default function SpeakingManager() {
                     </Pressable>
                   </View>
                 </View>
+                {turn.speaker === 'other' && turn.text.trim() ? (
+                  <View className="ml-32">
+                    <Pressable
+                      onPress={() => setOpenVoiceTurn(openVoiceTurn === i ? null : i)}
+                      className="self-start px-3 py-1.5 rounded-full bg-slate-100 border border-inkline"
+                    >
+                      <Text className="text-xs font-bold text-slate-600">
+                        {openVoiceTurn === i ? '🎙 Hide voices' : '🎙 Voices for this line'}
+                      </Text>
+                    </Pressable>
+                    {openVoiceTurn === i ? (
+                      <SentenceVoices
+                        key={turn.text.trim()}
+                        text={turn.text}
+                        lineType="dialogue"
+                        refLabel={`Speaking Practice: ${title.trim() || 'Scenario'}`}
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
+                </Fragment>
               ))}
             </View>
             <View className="flex-row gap-2 mt-3">

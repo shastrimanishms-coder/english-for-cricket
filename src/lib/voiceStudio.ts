@@ -535,6 +535,22 @@ export async function removeAllVoiceFiles(slug: string): Promise<number> {
 }
 
 /**
+ * Delete one stored audio file ('<slug>/<name>') from the file
+ * server. Best-effort by design: callers treat a missing file as
+ * already gone.
+ */
+export async function deleteVoiceFile(storagePath: string): Promise<void> {
+  const slash = storagePath.indexOf('/');
+  if (slash <= 0) return;
+  const form = new FormData();
+  form.append('key', VOICE_STORAGE_KEY);
+  form.append('action', 'delete-file');
+  form.append('slug', storagePath.slice(0, slash));
+  form.append('name', storagePath.slice(slash + 1));
+  await postVoiceStorage(form);
+}
+
+/**
  * Delete a voice completely: all of its audio files, then the voice
  * row itself (which cascades to its voice_recordings rows). Returns
  * how many files were removed.

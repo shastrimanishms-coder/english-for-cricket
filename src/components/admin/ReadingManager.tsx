@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -7,10 +7,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { countCoveredSentences } from '../../lib/adminVoiceUploads';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 import BelongsToPicker from './BelongsToPicker';
+import SentenceVoices from './SentenceVoices';
+
+// The same sentence split the learner app narrates with, so the
+// sentences listed for voice uploads are exactly the units playback
+// resolves.
+function splitSentences(text: string): string[] {
+  return (text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [text]).map((s) => s.trim()).filter(Boolean);
+}
 
 // Admin manager for Smart Reading stories. A story is a short text
 // split into pages (1-5 is typical); learners either listen with
@@ -48,6 +57,10 @@ export default function ReadingManager() {
   const [categoryId, setCategoryId] = useState<string>('');
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [pages, setPages] = useState<string[]>(['']);
+  // Voice uploads for this story's sentences.
+  const [showVoices, setShowVoices] = useState(false);
+  const [coverage, setCoverage] = useState<{ covered: number; total: number } | null>(null);
+  const [coverageKey, setCoverageKey] = useState(0);
 
   const taggingAvailable = useLessonTagging('reading_stories');
 
@@ -147,6 +160,31 @@ export default function ReadingManager() {
       setSaving(false);
     }
   };
+
+  // Sentences of the story being edited, in narration order - the
+  // units the voice section below attaches recordings to.
+  const storySentences = pages.flatMap((p) => splitSentences(p));
+
+  // Coverage is counted when the voice section opens and after each
+  // upload or removal inside it - not on every keystroke in the page
+  // editor - so the effect reads the current pages through a ref.
+  const pagesRef = useRef(pages);
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
+
+  useEffect(() => {
+    if (!showVoices) return;
+    let cancelled = false;
+    (async () => {
+      const sentences = pagesRef.current.flatMap((p) => splitSentences(p));
+      const result = await countCoveredSentences(sentences).catch(() => null);
+      if (!cancelled && result) setCoverage(result);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showVoices, coverageKey]);
 
   const togglePublish = async (row: StoryRow) => {
     const { error } = await supabase
@@ -284,6 +322,50 @@ export default function ReadingManager() {
               <Text className="text-sm font-semibold text-slate-600">+ Add page</Text>
             </Pressable>
           </View>
+
+          {storySentences.length > 0 ? (
+            <View className="border-t border-inkline pt-4">
+              <View className="flex-row items-center justify-between flex-wrap gap-2">
+                <Text className="text-sm font-semibold text-text-secondary">
+                  🎙 Voices for this story
+                  {coverage ? (
+                    <Text className="text-slate-400 font-normal">
+                      {' '}— {coverage.covered} of {coverage.total} sentences have a human voice
+                    </Text>
+                  ) : null}
+                </Text>
+                <Pressable
+                  onPress={() => setShowVoices((s) => !s)}
+                  className="px-3 py-2 bg-slate-100 rounded-full border border-inkline"
+                >
+                  <Text className="text-sm font-semibold text-slate-600">{showVoices ? 'Hide' : 'Upload voices'}</Text>
+                </Pressable>
+              </View>
+              {showVoices ? (
+                <View className="mt-3 gap-4">
+                  <Text className="text-xs text-slate-400">
+                    Upload a recording of each sentence for each voice you want students to hear.
+                    Sentences without an upload are read by the device voice. If you edit a
+                    sentence later, its uploads stay with the old text and it shows as unvoiced again.
+                  </Text>
+                  {storySentences.map((sentence, i) => (
+                    <View key={`${i}-${sentence}`}>
+                      <Text className="text-sm text-slate-600">
+                        <Text className="font-bold text-slate-400">{i + 1}. </Text>
+                        {sentence}
+                      </Text>
+                      <SentenceVoices
+                        text={sentence}
+                        lineType="reading"
+                        refLabel={`Smart Reading: ${title.trim() || 'Story'}`}
+                        onChanged={() => setCoverageKey((k) => k + 1)}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           {taggingAvailable ? (
             <View className="border-t border-inkline pt-4">
