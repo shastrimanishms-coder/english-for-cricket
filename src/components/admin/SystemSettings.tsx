@@ -25,6 +25,15 @@ export default function SystemSettings() {
   const [appLogoUrl, setAppLogoUrl] = useState('');
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
+  // Home Page Video: stored in site_settings.home_hero_video_url.
+  // Empty means the home page shows the default ICC explainer.
+  const [heroVideoUrl, setHeroVideoUrl] = useState('');
+  const [videoBusy, setVideoBusy] = useState(false);
+  // Change Password (the signed-in admin's own account).
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -36,6 +45,7 @@ export default function SystemSettings() {
       const settingsMap: Record<string, string> = {};
       settingsData?.forEach(s => settingsMap[s.key] = s.value);
       setAppLogoUrl(settingsMap['app_logo_url'] || '');
+      setHeroVideoUrl(settingsMap['home_hero_video_url'] || '');
       setSupportEmail(settingsMap['support_email'] || 'support@englishforcricket.com');
 
       const { data: usersData, error: usersError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
@@ -101,6 +111,63 @@ export default function SystemSettings() {
     } else {
       Alert.alert('Use Default Logo?', 'The bundled default logo will be shown again.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Yes', onPress: doReset }]);
     }
+  };
+
+  const handleSaveHeroVideo = async () => {
+    const url = heroVideoUrl.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      Alert.alert('Invalid Link', 'Please paste a full link starting with https://');
+      return;
+    }
+    setVideoBusy(true);
+    try {
+      const { error } = await supabase.from('site_settings').upsert([{ key: 'home_hero_video_url', value: url }]);
+      if (error) throw error;
+      setHeroVideoUrl(url);
+      Alert.alert('Success', url
+        ? 'Home page video updated. It is live on the home page now — no rebuild needed.'
+        : 'Home page video cleared. The default ICC video will be shown.');
+    } catch (error: any) { Alert.alert('Save Failed', error.message); }
+    finally { setVideoBusy(false); }
+  };
+
+  // Same pattern as the manager settings: the current password is
+  // verified by re-authenticating before the change is allowed.
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      Alert.alert('Current Password Needed', 'Please enter your current password. This proves the account is yours before it is changed.');
+      return;
+    }
+    if (!newPassword) {
+      Alert.alert('Missing Password', 'Please enter a new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('Password Too Short', 'Your new password needs at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Passwords Do Not Match', 'Please type the same new password in both boxes.');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+      if (!email) throw new Error('Your account email could not be found. Please sign out and sign in again.');
+      const { error: verifyError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+      if (verifyError) {
+        Alert.alert('Current Password Incorrect', 'The current password you entered does not match this account. Please check it and try again.');
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Password Updated', 'Your admin password has been changed. Use the new password the next time you sign in.');
+    } catch (error: any) { Alert.alert('Could Not Change Password', error?.message || 'Something went wrong. Please try again.'); }
+    finally { setChangingPassword(false); }
   };
 
   const handleSaveSettings = async () => {
@@ -208,6 +275,93 @@ export default function SystemSettings() {
               <Text className="text-xs font-semibold text-slate-500">Use Default Logo</Text>
             </Pressable>
           ) : null}
+        </View>
+      </View>
+
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <View>
+          <Text className="font-display text-xl font-semibold text-navy">Home Page Video</Text>
+          <Text className="text-xs text-slate-400 mt-2">
+            The video shown at the top of the public home page. Paste a YouTube link
+            (the normal watch link or the short share link), or a direct link to a video
+            file such as an MP4 on your own hosting. Changes take effect immediately —
+            no rebuild needed. Leave the box empty and save to go back to the default
+            ICC “What is Cricket?” video.
+          </Text>
+        </View>
+        <View>
+          <Text className="text-sm font-semibold text-text-secondary mb-2">Video Link</Text>
+          <TextInput
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
+            placeholder="https://www.youtube.com/watch?v=…  or  https://englishforcricket.com/media/intro.mp4"
+            value={heroVideoUrl}
+            onChangeText={setHeroVideoUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text className="text-sm text-slate-500 mt-3">
+            {heroVideoUrl.trim()
+              ? 'A custom video is currently set for the home page.'
+              : 'Currently showing the default ICC “What is Cricket?” video.'}
+          </Text>
+        </View>
+        <View className="flex-row justify-end pt-4 border-t border-inkline">
+          <View className="w-48">
+            <AnimatedButton title={videoBusy ? "Saving..." : "Save Video"} onPress={handleSaveHeroVideo} disabled={videoBusy} variant="primary" size="sm" />
+          </View>
+        </View>
+      </View>
+
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <View>
+          <Text className="font-display text-xl font-semibold text-navy">Change Admin Password</Text>
+          <Text className="text-xs text-slate-400 mt-2">
+            Changes the password of the admin account you are signed in with.
+            Your current password is required, so a signed-in session alone
+            is never enough to change it.
+          </Text>
+        </View>
+        <View className="flex-col gap-4">
+          <View>
+            <Text className="text-sm font-semibold text-text-secondary mb-2">Current Password</Text>
+            <TextInput
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
+              placeholder="Your current password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          </View>
+          <View className="flex-col md:flex-row gap-4">
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-secondary mb-2">New Password</Text>
+              <TextInput
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
+                placeholder="At least 6 characters"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-text-secondary mb-2">Confirm New Password</Text>
+              <TextInput
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline"
+                placeholder="Type the new password again"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+        </View>
+        <View className="flex-row justify-end pt-4 border-t border-inkline">
+          <View className="w-48">
+            <AnimatedButton title={changingPassword ? "Changing..." : "Change Password"} onPress={handleChangePassword} disabled={changingPassword} variant="primary" size="sm" />
+          </View>
         </View>
       </View>
 

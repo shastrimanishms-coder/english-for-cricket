@@ -51,6 +51,7 @@ export default function LandingPage() {
   // language comes from the visitor's saved choice, else their
   // browser language, else English.
   const [locale, setLocale] = useState<LandingLocale>('en');
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const t = LANDING_STRINGS[locale];
   const isRTL = RTL_LOCALES.includes(locale);
 
@@ -114,6 +115,27 @@ export default function LandingPage() {
   // (the previous behaviour).
   const [existingLegalSlugs, setExistingLegalSlugs] = useState<string[] | null>(null);
 
+  // Home page hero video: an admin can replace it in Admin → System
+  // Settings (site_settings.home_hero_video_url). Empty — or the
+  // setting being unreadable — keeps the default ICC explainer, so
+  // the hero never sits empty.
+  const [heroVideoSetting, setHeroVideoSetting] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('value')
+          .eq('key', 'home_hero_video_url')
+          .maybeSingle();
+        if (!error && data?.value) setHeroVideoSetting(data.value.trim());
+      } catch {
+        // Keep the default video.
+      }
+    })();
+  }, []);
+
   // A signed-in user who lands here — most importantly the Google
   // sign-in return, which Supabase sends back to the site root with the
   // session in the URL — goes straight to their own home instead of
@@ -157,17 +179,21 @@ export default function LandingPage() {
   const showLegalLink = (slug: string) =>
     existingLegalSlugs === null || existingLegalSlugs.includes(slug);
 
-  // Hero video: the ICC's official beginner explainer "What Is Cricket?
-  // Get to know the sport" (YouTube; embedding verified). Kept as a
-  // watch URL and converted to an embed URL exactly the way the video
-  // player screen does it.
-  const HERO_VIDEO_URL = 'https://www.youtube.com/watch?v=g-beFHld19c';
+  // Hero video: by default the ICC's official beginner explainer
+  // "What Is Cricket? Get to know the sport" (YouTube; embedding
+  // verified). An admin can replace it in System Settings with any
+  // YouTube link or a direct video file link (MP4/WebM). Watch URLs
+  // are converted to embed URLs exactly the way the video player
+  // screen does it; file links are played directly.
+  const DEFAULT_HERO_VIDEO_URL = 'https://www.youtube.com/watch?v=g-beFHld19c';
   const getEmbedUrl = (url: string) => {
     if (url.includes('youtube.com/watch?v=')) return url.replace('watch?v=', 'embed/');
     if (url.includes('youtu.be/')) return url.replace('youtu.be/', 'youtube.com/embed/');
     return url;
   };
-  const heroEmbedUrl = `${getEmbedUrl(HERO_VIDEO_URL)}?rel=0`;
+  const heroVideoUrl = heroVideoSetting || DEFAULT_HERO_VIDEO_URL;
+  const heroIsFile = /\.(mp4|webm|mov|m4v)([?#]|$)/i.test(heroVideoUrl);
+  const heroEmbedUrl = `${getEmbedUrl(heroVideoUrl)}?rel=0`;
 
   // Body text on this page is justified (Shastri's direction,
   // 2026-11-21): it suits the page's formal style. Headings, labels
@@ -178,58 +204,71 @@ export default function LandingPage() {
     <ScrollView className="flex-1 bg-canvas">
       <View style={isRTL ? { direction: 'rtl' as const } : undefined}>
       {/* HEADER */}
-      <SafeAreaView edges={['top']} className="w-full bg-white shadow-sm">
+      <SafeAreaView edges={['top']} className="relative z-50 w-full bg-white shadow-sm" style={{ zIndex: 50 }}>
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center px-4 py-4 md:p-6">
-          <View className="flex-row items-center">
+          <View className="h-9 w-12 md:h-14 md:w-[76px]">
             <Image
               source={logoSource}
               onError={logoOnError}
-              style={{ width: 76, height: 56 }}
+              style={{ width: '100%', height: '100%' }}
               resizeMode="contain"
             />
           </View>
-          <View className="flex-row items-center space-x-4 gap-4">
+          <View className="flex-row items-center space-x-2 gap-2 md:space-x-4 md:gap-4">
+            {/* Language dropdown: the page in the visitor's language,
+                chosen from a menu beside the account buttons. The
+                buttons themselves stay in English in every language. */}
+            <View className="relative">
+              <Pressable
+                onPress={() => setLangMenuOpen((open) => !open)}
+                className="flex-row items-center gap-1.5 rounded-full border border-inkline bg-white px-3 py-2 active:opacity-90 md:px-4 md:py-2.5"
+              >
+                <Text className="font-sans text-xs font-semibold text-slate-600 md:text-sm">
+                  {LANDING_LOCALES.find((l) => l.code === locale)?.label ?? 'English'}
+                </Text>
+                <Text className="text-[10px] text-slate-400">{langMenuOpen ? '▴' : '▾'}</Text>
+              </Pressable>
+              {langMenuOpen ? (
+                <>
+                  <Pressable
+                    onPress={() => setLangMenuOpen(false)}
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 } as any}
+                  />
+                  <View
+                    className="absolute end-0 top-full z-50 mt-2 w-44 rounded-2xl border border-inkline bg-white py-2 shadow-lg"
+                    style={{ zIndex: 50 }}
+                  >
+                    {LANDING_LOCALES.map((option) => {
+                      const active = option.code === locale;
+                      return (
+                        <Pressable
+                          key={option.code}
+                          onPress={() => { setLocale(option.code); setLangMenuOpen(false); }}
+                          className="px-4 py-2 active:opacity-80"
+                        >
+                          <Text className={active ? 'font-sans text-sm font-bold text-navy' : 'font-sans text-sm text-slate-600'}>
+                            {option.label}{active ? '  ✓' : ''}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              ) : null}
+            </View>
             <Pressable
               onPress={() => router.push('/login')}
-              className="items-center rounded-full border border-inkline bg-white px-5 py-2.5 active:opacity-90"
+              className="items-center rounded-full border border-inkline bg-white px-3.5 py-2 active:opacity-90 md:px-5 md:py-2.5"
             >
-              <Text className="font-sans text-sm font-bold text-navy">Log In</Text>
+              <Text className="font-sans text-xs font-bold text-navy md:text-sm">Log In</Text>
             </Pressable>
             <Pressable
               onPress={() => router.push('/register')}
-              className="items-center rounded-full border-b-4 border-gold-dark bg-gold px-5 py-2.5 active:opacity-90"
+              className="items-center rounded-full border-b-4 border-gold-dark bg-gold px-3.5 py-2 active:opacity-90 md:px-5 md:py-2.5"
             >
-              <Text className="font-sans text-sm font-bold text-navy">Register</Text>
+              <Text className="font-sans text-xs font-bold text-navy md:text-sm">Register</Text>
             </Pressable>
           </View>
-        </View>
-        {/* Language switcher: the page in the visitor's language.
-            The buttons themselves stay in English in every language. */}
-        <View className="max-w-7xl w-full mx-auto flex-row flex-wrap items-center gap-2 px-4 pb-4 md:px-6">
-          {LANDING_LOCALES.map((option) => {
-            const active = option.code === locale;
-            return (
-              <Pressable
-                key={option.code}
-                onPress={() => setLocale(option.code)}
-                className={
-                  active
-                    ? 'rounded-full bg-navy px-3.5 py-1.5 active:opacity-90'
-                    : 'rounded-full border border-inkline bg-white px-3.5 py-1.5 active:opacity-90'
-                }
-              >
-                <Text
-                  className={
-                    active
-                      ? 'font-sans text-xs font-bold text-gold'
-                      : 'font-sans text-xs font-semibold text-slate-500'
-                  }
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
       </SafeAreaView>
 
@@ -244,8 +283,11 @@ export default function LandingPage() {
             position: 'absolute',
             right: -30,
             bottom: -40,
-            height: 640,
-            width: 360,
+            // Deliberately much taller than the hero video: she stands
+            // behind it, with her head and ears visible above its top
+            // edge instead of disappearing behind the player.
+            height: 820,
+            width: 461,
             opacity: 0.16,
           }}
         />
@@ -321,8 +363,16 @@ export default function LandingPage() {
               className="absolute inset-0 w-full h-full opacity-40"
               resizeMode="cover"
             />
-            {/* Video overlay: the ICC's "What Is Cricket?" explainer */}
-            {Platform.OS === 'web' ? (
+            {/* Video overlay: the admin-chosen home page video, or the
+                ICC's "What Is Cricket?" explainer by default */}
+            {heroIsFile && Platform.OS === 'web' ? (
+              <video
+                src={heroVideoUrl}
+                controls
+                playsInline
+                style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, backgroundColor: '#000' }}
+              />
+            ) : Platform.OS === 'web' ? (
               <iframe
                 src={heroEmbedUrl}
                 style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, border: 'none' }}
@@ -332,7 +382,7 @@ export default function LandingPage() {
               />
             ) : (
               <WebView
-                source={{ uri: heroEmbedUrl }}
+                source={{ uri: heroIsFile ? heroVideoUrl : heroEmbedUrl }}
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                 allowsInlineMediaPlayback
                 mediaPlaybackRequiresUserAction={false}
