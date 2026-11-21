@@ -5,6 +5,14 @@ import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { GoldButton, MicroLabel } from '../components/ui/Elegant';
+import {
+  LANDING_LANG_STORAGE_KEY,
+  LANDING_LOCALES,
+  LANDING_STRINGS,
+  RTL_LOCALES,
+  detectLandingLocale,
+  type LandingLocale,
+} from '../lib/landingStrings';
 import { routeSignedInUser } from '../lib/routeSignedInUser';
 import { supabase } from '../lib/supabase';
 import { useAppLogo } from '../lib/useAppLogo';
@@ -16,6 +24,19 @@ import { useAppLogo } from '../lib/useAppLogo';
 const MASCOT_MALE = require('../../assets/images/mascot-male.png');
 const MASCOT_FEMALE = require('../../assets/images/mascot-female.png');
 
+// Feature icons, in the same order as the features in landingStrings.
+const FEATURE_ICONS = [
+  'library-outline',
+  'mic-outline',
+  'book-outline',
+  'volume-high-outline',
+  'refresh-outline',
+  'star-outline',
+  'calendar-outline',
+  'compass-outline',
+  'school-outline',
+] as const;
+
 export default function LandingPage() {
   const router = useRouter();
 
@@ -23,6 +44,53 @@ export default function LandingPage() {
   // one is set, otherwise the bundled default logo. A remote logo that fails
   // to load falls back to the crest via onError.
   const { source: logoSource, onError: logoOnError } = useAppLogo();
+
+  // ---- Home page language -------------------------------------------
+  // Only this public page is multilingual; the app itself stays in
+  // English, and the buttons stay in English in every language. The
+  // language comes from the visitor's saved choice, else their
+  // browser language, else English.
+  const [locale, setLocale] = useState<LandingLocale>('en');
+  const t = LANDING_STRINGS[locale];
+  const isRTL = RTL_LOCALES.includes(locale);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+      let saved: string | null = null;
+      try {
+        saved = window.localStorage.getItem(LANDING_LANG_STORAGE_KEY);
+      } catch {
+        saved = null;
+      }
+      if (!alive) return;
+      if (saved && LANDING_LOCALES.some((l) => l.code === saved)) {
+        setLocale(saved as LandingLocale);
+      } else {
+        setLocale(detectLandingLocale());
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    try {
+      window.localStorage.setItem(LANDING_LANG_STORAGE_KEY, locale);
+    } catch {
+      // A browser that refuses storage simply re-detects next visit.
+    }
+    document.documentElement.lang = locale;
+    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+    return () => {
+      // The rest of the app is English and left-to-right.
+      document.documentElement.dir = 'ltr';
+      document.documentElement.lang = 'en';
+    };
+  }, [locale, isRTL]);
 
   // Footer legal links point at CMS pages (/p/<slug>). Only show a
   // legal link once its page actually exists in `pages`, so visitors
@@ -86,8 +154,14 @@ export default function LandingPage() {
   };
   const heroEmbedUrl = `${getEmbedUrl(HERO_VIDEO_URL)}?rel=0`;
 
+  // Body text on this page is justified (Shastri's direction,
+  // 2026-11-21): it suits the page's formal style. Headings, labels
+  // and buttons keep their own alignment.
+  const justify = { textAlign: 'justify' as const };
+
   return (
     <ScrollView className="flex-1 bg-canvas">
+      <View style={isRTL ? { direction: 'rtl' as const } : undefined}>
       {/* HEADER */}
       <SafeAreaView edges={['top']} className="w-full bg-white shadow-sm">
         <View className="max-w-7xl w-full mx-auto flex-row justify-between items-center px-4 py-4 md:p-6">
@@ -113,6 +187,34 @@ export default function LandingPage() {
               <Text className="font-sans text-sm font-bold text-navy">Register</Text>
             </Pressable>
           </View>
+        </View>
+        {/* Language switcher: the page in the visitor's language.
+            The buttons themselves stay in English in every language. */}
+        <View className="max-w-7xl w-full mx-auto flex-row flex-wrap items-center gap-2 px-4 pb-4 md:px-6">
+          {LANDING_LOCALES.map((option) => {
+            const active = option.code === locale;
+            return (
+              <Pressable
+                key={option.code}
+                onPress={() => setLocale(option.code)}
+                className={
+                  active
+                    ? 'rounded-full bg-navy px-3.5 py-1.5 active:opacity-90'
+                    : 'rounded-full border border-inkline bg-white px-3.5 py-1.5 active:opacity-90'
+                }
+              >
+                <Text
+                  className={
+                    active
+                      ? 'font-sans text-xs font-bold text-gold'
+                      : 'font-sans text-xs font-semibold text-slate-500'
+                  }
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </SafeAreaView>
 
@@ -154,15 +256,10 @@ export default function LandingPage() {
               English for Cricket
             </Text>
             <Text className="font-display text-4xl md:text-5xl font-semibold text-white mb-6">
-              Learn English Through Cricket
+              {t.heroTitle}
             </Text>
-            <Text className="font-sans text-lg text-slate-300 mb-10 leading-relaxed">
-              English for Cricket is a complete English-learning programme built around the
-              game of cricket. Across 320 structured lessons, learners progress from their
-              first words to confident, independent communication — through listening,
-              speaking, reading and play. The programme is provided by KYCO, the Kansai
-              Youth Cricket Organization, and is free to every learner. It will always
-              remain so.
+            <Text className="font-sans text-lg text-slate-300 mb-10 leading-relaxed" style={justify}>
+              {t.heroIntro}
             </Text>
             <View className="w-full max-w-xs mb-4">
               <GoldButton
@@ -173,22 +270,21 @@ export default function LandingPage() {
             </View>
             <Pressable onPress={() => router.push('/login')} className="mb-6 self-start">
               <Text className="font-sans text-gold-light font-semibold underline">
-                Already have an account? Log in
+                {t.alreadyAccount}
               </Text>
             </Pressable>
-            <Text className="font-sans text-sm text-slate-400 leading-relaxed">
-              Learners at participating schools and clubs receive a username and PIN from
-              their teacher or coach. No email address is required.
+            <Text className="font-sans text-sm text-slate-400 leading-relaxed" style={justify}>
+              {t.pinNote}
             </Text>
 
             {/* Programme figures */}
             <View className="flex-row flex-wrap gap-x-8 gap-y-4 mt-10">
               {[
-                { value: '320', label: 'Lessons' },
-                { value: '5', label: 'Stages' },
-                { value: '40', label: 'Modules' },
-                { value: '2,200+', label: 'Words' },
-                { value: '100%', label: 'Free, always' },
+                { value: '320', label: t.statLessons },
+                { value: '5', label: t.statStages },
+                { value: '40', label: t.statModules },
+                { value: '2,200+', label: t.statWords },
+                { value: '100%', label: t.statFree },
               ].map((stat) => (
                 <View key={stat.label}>
                   <Text className="font-display text-2xl font-semibold text-gold">
@@ -235,79 +331,29 @@ export default function LandingPage() {
       {/* FEATURES SECTION */}
       <View className="w-full">
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20">
-          <MicroLabel className="text-center mb-3">The Programme</MicroLabel>
+          <MicroLabel className="text-center mb-3">{t.programmeLabel}</MicroLabel>
           <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-4">
-            Everything a Learner Needs
+            {t.programmeTitle}
           </Text>
-          <Text className="font-sans text-lg text-slate-500 text-center mb-12 max-w-2xl mx-auto leading-relaxed">
-            A complete course in one place: structured lessons, spoken practice, guided
-            reading and considered review — every element built around cricket, so that
-            each new word arrives with a context that makes it memorable.
+          <Text className="font-sans text-lg text-slate-500 text-center mb-12 max-w-2xl mx-auto leading-relaxed" style={justify}>
+            {t.programmeIntro}
           </Text>
           <View className="flex-row flex-wrap justify-center gap-6">
-            {[
-              {
-                icon: 'library-outline',
-                title: 'The Learning Path',
-                text: 'A structured course of 320 lessons in five stages and forty modules. Each lesson builds carefully on those before it, introducing new language and returning to earlier language in new forms until it is secure.',
-              },
-              {
-                icon: 'mic-outline',
-                title: 'Speaking Practice',
-                text: 'Guided conversations — interviews and everyday small talk — in which learners speak their part aloud and receive a score for every line, against a pass mark of seventy per cent.',
-              },
-              {
-                icon: 'book-outline',
-                title: 'Smart Reading',
-                text: 'Short stories in two forms: Listen and Read, in which each word is highlighted as it is spoken, and Read Aloud, in which the learner\u2019s own reading is scored sentence by sentence.',
-              },
-              {
-                icon: 'volume-high-outline',
-                title: 'Real Human Voices',
-                text: 'Every line of the course is being recorded by real voice artists, in several distinct voices. Learners choose the voice they wish to hear, and listen to natural, human English throughout.',
-              },
-              {
-                icon: 'refresh-outline',
-                title: 'Tricky Words Review',
-                text: 'Words and phrases a learner finds difficult are gathered automatically and presented again for review, so that weaker points receive further practice until they are mastered.',
-              },
-              {
-                icon: 'star-outline',
-                title: 'XP, Stars and Badges',
-                text: 'Learners earn experience points and stars for completed work, and badges for significant achievements. A class may follow its own weekly star board; there are no public rankings.',
-              },
-              {
-                icon: 'calendar-outline',
-                title: 'Study Days and Streaks',
-                text: 'Each learner chooses the days of the week on which they will study. Only those days count towards the learning streak, so a rest day can never break it.',
-              },
-              {
-                icon: 'compass-outline',
-                title: 'Find Your Start',
-                text: 'A short placement assessment recommends the stage at which a new learner should begin. Nothing is locked; the recommendation simply provides a sensible starting point.',
-              },
-              {
-                icon: 'school-outline',
-                title: 'For Schools and Clubs',
-                text: 'Teachers and coaches may enrol a whole class with simple username-and-PIN logins, print a login slip for every learner, and follow the progress of the entire group.',
-              },
-            ].map((feature) => (
+            {t.features.map((feature, index) => (
               <View
                 key={feature.title}
                 className="w-full md:w-[31%] bg-white p-6 rounded-[20px] border border-inkline shadow-sm"
               >
                 <View className="w-12 h-12 rounded-full bg-gold-light items-center justify-center mb-4">
-                  <Ionicons name={feature.icon as any} size={24} color="#0A192F" />
+                  <Ionicons name={FEATURE_ICONS[index] as any} size={24} color="#0A192F" />
                 </View>
                 <Text className="font-sans text-lg font-bold text-navy mb-2">{feature.title}</Text>
-                <Text className="font-sans text-slate-500 leading-relaxed">{feature.text}</Text>
+                <Text className="font-sans text-slate-500 leading-relaxed" style={justify}>{feature.text}</Text>
               </View>
             ))}
           </View>
-          <Text className="font-sans text-slate-500 text-center leading-relaxed mt-12 max-w-2xl mx-auto">
-            Beyond the lessons, a library of cricket games, video lessons and downloadable
-            workbooks accompanies the course — including the ICC&apos;s official
-            introduction to the game.
+          <Text className="font-sans text-slate-500 text-center leading-relaxed mt-12 max-w-2xl mx-auto" style={justify}>
+            {t.beyondLessons}
           </Text>
         </View>
       </View>
@@ -315,36 +361,20 @@ export default function LandingPage() {
       {/* HOW IT WORKS SECTION */}
       <View className="w-full bg-white">
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20">
-          <MicroLabel className="text-center mb-3">Getting Started</MicroLabel>
+          <MicroLabel className="text-center mb-3">{t.startLabel}</MicroLabel>
           <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-12">
-            How It Works
+            {t.howTitle}
           </Text>
           <View className="flex-col md:flex-row gap-6">
-            {[
-              {
-                step: '1',
-                title: 'Register, or receive a PIN',
-                text: 'Create a free account with an email address, or receive a username and PIN from a teacher or coach. Both routes provide full access to the programme.',
-              },
-              {
-                step: '2',
-                title: 'Follow the Learning Path',
-                text: 'Work through the stages in order, at your own pace — at home, at school or at the club. A short placement assessment can identify the appropriate starting point.',
-              },
-              {
-                step: '3',
-                title: 'Practise, review and progress',
-                text: 'Speaking practice, guided reading and targeted review reinforce every lesson, while points, stars and badges provide a clear record of progress.',
-              },
-            ].map((item) => (
-              <View key={item.step} className="flex-1 items-center px-4">
+            {t.steps.map((item, index) => (
+              <View key={item.title} className="flex-1 items-center px-4">
                 <View className="w-12 h-12 rounded-full bg-navy items-center justify-center mb-4">
-                  <Text className="font-display text-white font-semibold text-lg">{item.step}</Text>
+                  <Text className="font-display text-white font-semibold text-lg">{index + 1}</Text>
                 </View>
                 <Text className="font-sans text-lg font-bold text-navy mb-2 text-center">
                   {item.title}
                 </Text>
-                <Text className="font-sans text-slate-500 text-center leading-relaxed">
+                <Text className="font-sans text-slate-500 text-center leading-relaxed" style={justify}>
                   {item.text}
                 </Text>
               </View>
@@ -354,16 +384,10 @@ export default function LandingPage() {
           {/* Pathway strip: the five stages of the course */}
           <View className="mt-16 bg-navy rounded-[20px] px-6 py-8">
             <Text className="font-display text-white font-semibold text-center text-lg mb-6">
-              The five stages of the course
+              {t.stagesTitle}
             </Text>
             <View className="flex-col md:flex-row md:flex-wrap items-center justify-center gap-3">
-              {[
-                { name: 'The Foundation', note: 'First words and sentences' },
-                { name: 'The Rookie', note: 'Everyday English, securely established' },
-                { name: 'The Player', note: 'Independent reading and conversation' },
-                { name: 'The Strategist', note: 'Analysis and the language of the game' },
-                { name: 'The Captain', note: 'Advanced communication and leadership' },
-              ].map((stage, index, arr) => (
+              {t.stages.map((stage, index, arr) => (
                 <View key={stage.name} className="flex-row items-center gap-3">
                   <View className="bg-white/10 border border-white/20 rounded-[14px] px-4 py-2 items-center">
                     <Text className="text-slate-100 font-semibold text-sm">{stage.name}</Text>
@@ -396,30 +420,17 @@ export default function LandingPage() {
           }}
         />
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20 relative">
-          <MicroLabel className="text-center mb-3">Our Commitment</MicroLabel>
+          <MicroLabel className="text-center mb-3">{t.commitmentLabel}</MicroLabel>
           <Text className="font-display text-3xl md:text-4xl font-semibold text-white text-center mb-12">
-            Free. Safe. For Every Learner.
+            {t.commitmentTitle}
           </Text>
           <View className="flex-col md:flex-row gap-10">
-            {[
-              {
-                title: 'Free of charge, permanently',
-                text: 'English for Cricket carries no fees and no advertising, and it never will. Every part of the programme is offered to every learner on equal terms.',
-              },
-              {
-                title: 'Designed for children\u2019s safety',
-                text: 'There are no public profiles, no open messaging and no external advertising. Learners see the progress of their own class only, and nothing further.',
-              },
-              {
-                title: 'Prepared with care',
-                text: 'The programme is designed and maintained by the volunteers of KYCO in Kansai, Japan, for young cricketers — and for every child who would like to learn English through the game.',
-              },
-            ].map((item) => (
+            {t.commitments.map((item) => (
               <View key={item.title} className="flex-1 px-2">
                 <Text className="font-sans text-lg font-bold text-gold mb-2 text-center md:text-left">
                   {item.title}
                 </Text>
-                <Text className="font-sans text-slate-300 text-center md:text-left leading-relaxed">
+                <Text className="font-sans text-slate-300 text-center md:text-left leading-relaxed" style={justify}>
                   {item.text}
                 </Text>
               </View>
@@ -442,29 +453,29 @@ export default function LandingPage() {
         <View className="max-w-7xl w-full mx-auto flex-col items-center p-8 md:p-12">
           <View className="flex-row flex-wrap justify-center gap-4 md:gap-8 mb-6">
             <Link href="/support" asChild>
-              <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">Support</Text>
+              <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{t.support}</Text>
             </Link>
             {/* Legal pages live in the CMS (/p/<slug>); each link is
                 shown only once that page exists - see the check above. */}
             {showLegalLink('terms-and-conditions') && (
               <Link href="/p/terms-and-conditions" asChild>
-                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">Terms & Conditions</Text>
+                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{t.terms}</Text>
               </Link>
             )}
             {showLegalLink('privacy-policy') && (
               <Link href="/p/privacy-policy" asChild>
-                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">Privacy Policy</Text>
+                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{t.privacy}</Text>
               </Link>
             )}
           </View>
           <Text className="text-slate-400 text-sm text-center mb-2">
-            English for Cricket is an educational initiative of KYCO, the Kansai Youth
-            Cricket Organization.
+            {t.initiativeLine}
           </Text>
           <Text className="text-slate-400 text-sm text-center">
-            © 2026 Kansai Youth Cricket Organization. All rights reserved.
+            {t.rightsLine}
           </Text>
         </View>
+      </View>
       </View>
     </ScrollView>
   );

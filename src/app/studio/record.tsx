@@ -29,10 +29,19 @@ import {
 import { showAlert } from '../../lib/showAlert';
 import { toSpeechText } from '../../lib/speechCue';
 import {
+  CONSENT_DATE_LABEL,
+  CONSENT_VERSION,
+  PRIVACY_POLICY_SECTIONS,
+  TERMS_SECTIONS,
+  type ConsentSection,
+} from '../../lib/voiceConsent';
+import {
   CATEGORY_LABELS,
   clearActorSession,
+  declineActorConsent,
   getActorNext,
   getActorSession,
+  recordActorConsent,
   recordingFileExtension,
   saveActorSession,
   setVoiceName,
@@ -408,6 +417,177 @@ function RecorderPanel({ text, hint, submitLabel, onSubmitTake }: RecorderPanelP
   );
 }
 
+// --------------------------------------------------------- consent gate
+
+function ConsentDocument({
+  title,
+  sections,
+}: {
+  title: string;
+  sections: ConsentSection[];
+}) {
+  return (
+    <View className="mt-5">
+      <Text className="font-display text-xl font-semibold text-navy">{title}</Text>
+      {sections.map((section, i) => (
+        <View key={i} className="mt-3">
+          {section.heading ? (
+            <Text className="mb-1 font-sans text-base font-bold text-navy">
+              {section.heading}
+            </Text>
+          ) : null}
+          {section.paragraphs.map((paragraph, j) => (
+            <Text key={j} className="mb-2 font-sans text-sm leading-6 text-slate-600">
+              {paragraph}
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Shown at first login, before voice naming and before any recording:
+ * the actor must read and accept the Voice Actor Privacy Policy and
+ * Terms and Conditions. Accepting is stored with the date and version
+ * (migration 25). Declining deletes the account completely and signs
+ * the actor out, as if the account had never been created.
+ */
+function VoiceConsent({
+  session,
+  onAgreed,
+  onDeclined,
+}: {
+  session: ActorSession;
+  onAgreed: (updated: ActorSession) => void;
+  onDeclined: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [confirmingDecline, setConfirmingDecline] = useState(false);
+
+  const agree = async () => {
+    setBusy(true);
+    try {
+      const ok = await recordActorConsent(session.actorId);
+      if (!ok) {
+        showAlert(
+          'Not set up yet',
+          'The Voice Studio setup is not finished, so your acceptance could not be saved. Please ask the admin to finish setting it up, then sign in again.'
+        );
+        return;
+      }
+      const updated: ActorSession = {
+        ...session,
+        consentAccepted: true,
+        consentVersion: CONSENT_VERSION,
+      };
+      await saveActorSession(updated);
+      onAgreed(updated);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decline = async () => {
+    setBusy(true);
+    try {
+      // Best effort: even if the deletion call cannot be completed,
+      // the actor is signed out and the admin can remove the account.
+      await declineActorConsent(session.actorId);
+    } finally {
+      setBusy(false);
+      onDeclined();
+    }
+  };
+
+  return (
+    <View className="flex-1 bg-canvas">
+      <SafeAreaView edges={['top']} className="w-full bg-navy">
+        <ScreenHeader
+          title="Voice Studio"
+          right={
+            <Pressable
+              onPress={onDeclined}
+              className="rounded-full border border-white/20 bg-white/10 px-4 py-2 active:bg-white/20"
+            >
+              <Text className="font-sans text-sm font-bold text-white">Sign out</Text>
+            </Pressable>
+          }
+        />
+      </SafeAreaView>
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+        <View className="mx-auto w-full max-w-2xl">
+          <ElegantCard className="p-6">
+            <MicroLabel>Before you begin</MicroLabel>
+            <Text className="mt-2 font-display text-3xl font-semibold text-navy">
+              Privacy Policy and Terms
+            </Text>
+            <Text className="mt-3 font-sans text-base leading-6 text-slate-600">
+              Please read both documents below. You must accept them before you
+              can choose the name of your voice or record anything. If you do
+              not accept, your account will be deleted and you will be signed
+              out.
+            </Text>
+
+            <ConsentDocument title="Voice Actor Privacy Policy" sections={PRIVACY_POLICY_SECTIONS} />
+            <ConsentDocument title="Voice Actor Terms and Conditions" sections={TERMS_SECTIONS} />
+            <Text className="mt-4 font-sans text-xs text-slate-400">
+              Last updated: {CONSENT_DATE_LABEL} · Version {CONSENT_VERSION}
+            </Text>
+
+            {confirmingDecline ? (
+              <View className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <Text className="font-sans text-base font-bold text-red-700">
+                  Delete your account?
+                </Text>
+                <Text className="mt-1 font-sans text-sm leading-6 text-red-700">
+                  If you do not accept, your voice actor account will be
+                  deleted completely and you will be signed out. The admin can
+                  create a new account for you later if you change your mind.
+                </Text>
+                <View className="mt-4 gap-3">
+                  <Pressable
+                    onPress={decline}
+                    disabled={busy}
+                    className="items-center rounded-full bg-red-600 px-5 py-3 active:opacity-90"
+                  >
+                    <Text className="font-sans text-sm font-bold text-white">
+                      {busy ? 'Deleting…' : 'Delete my account and sign out'}
+                    </Text>
+                  </Pressable>
+                  <GhostButton
+                    label="Go back and read again"
+                    onPress={() => setConfirmingDecline(false)}
+                    disabled={busy}
+                  />
+                </View>
+              </View>
+            ) : (
+              <View className="mt-6 gap-3">
+                <GoldButton
+                  label={busy ? 'Saving…' : 'I accept both documents'}
+                  onPress={agree}
+                  disabled={busy}
+                />
+                <Pressable
+                  onPress={() => setConfirmingDecline(true)}
+                  disabled={busy}
+                  className="items-center py-2 active:opacity-70"
+                >
+                  <Text className="font-sans text-sm font-semibold text-slate-500 underline">
+                    I do not accept
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </ElegantCard>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 // ------------------------------------------------------- first-login naming
 
 /**
@@ -643,6 +823,19 @@ export default function StudioRecord() {
       <View className="flex-1 items-center justify-center bg-canvas">
         <ActivityIndicator size="large" color="#0A192F" />
       </View>
+    );
+  }
+
+  // First login: consent comes before everything else — no voice
+  // naming and no recording until the actor has accepted the current
+  // Privacy Policy + Terms version.
+  if (!session.consentAccepted) {
+    return (
+      <VoiceConsent
+        session={session}
+        onAgreed={(updated) => setSession(updated)}
+        onDeclined={handleSignOut}
+      />
     );
   }
 

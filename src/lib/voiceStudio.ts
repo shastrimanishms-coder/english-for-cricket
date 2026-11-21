@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import type { StudentKind } from './studentIdentity';
+import { CONSENT_VERSION } from './voiceConsent';
 
 /**
  * Voice Studio (migration 23): human voice recordings for the
@@ -39,6 +40,12 @@ export interface ActorSession {
   voiceSlug: string | null;
   /** False until the actor has chosen their voice's name (one-time). */
   nameChosen: boolean;
+  /**
+   * First-login consent gate (migration 25): false until the actor
+   * has accepted the current Privacy Policy + Terms version.
+   */
+  consentAccepted: boolean;
+  consentVersion: string | null;
   category: VoiceCategory | null;
   introText: string | null;
   introStatus: IntroStatus;
@@ -108,6 +115,13 @@ export async function authenticateActor(
         voiceSlug: (row.voice_slug as string | null) ?? null,
         // An older RPC without the field counts as chosen (no gate).
         nameChosen: row.name_chosen !== false,
+        // Consent gate: an older RPC without the field counts as
+        // accepted; a stored older version is re-asked by the screen.
+        consentAccepted:
+          row.consent_accepted !== false &&
+          (row.consent_version == null ||
+            row.consent_version === CONSENT_VERSION),
+        consentVersion: (row.consent_version as string | null) ?? null,
         category: (row.category as VoiceCategory | null) ?? null,
         introText: (row.intro_text as string | null) ?? null,
         introStatus: (row.intro_status as IntroStatus | null) ?? 'pending',
@@ -260,6 +274,43 @@ export async function setVoiceName(
     };
   } catch {
     return { status: 'unavailable' };
+  }
+}
+
+/**
+ * Store the actor's acceptance of the current Privacy Policy + Terms
+ * version (record_actor_consent RPC, migration 25). False when the
+ * RPC is missing (migration not run yet) or the actor is gone.
+ */
+export async function recordActorConsent(actorId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('record_actor_consent', {
+      p_actor_id: actorId,
+      p_version: CONSENT_VERSION,
+    });
+    if (error || !data) return false;
+    const row = data as Record<string, unknown>;
+    return !row.error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The actor declined the Privacy Policy + Terms: the account is
+ * deleted completely (decline_actor_consent RPC, migration 25) —
+ * actor, voice and any recordings, as if never created.
+ */
+export async function declineActorConsent(actorId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('decline_actor_consent', {
+      p_actor_id: actorId,
+    });
+    if (error || !data) return false;
+    const row = data as Record<string, unknown>;
+    return !row.error;
+  } catch {
+    return false;
   }
 }
 

@@ -24,6 +24,7 @@ export default function OrganizationSettings() {
   const [orgCode, setOrgCode] = useState('');
 
   // Change Password State
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
@@ -127,6 +128,10 @@ export default function OrganizationSettings() {
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword) {
+      showAlert('Current Password Needed', 'Please enter your current password. This proves the account is yours before it is changed.');
+      return;
+    }
     if (!newPassword) {
       showAlert('Missing Password', 'Please enter a new password.');
       return;
@@ -141,8 +146,23 @@ export default function OrganizationSettings() {
     }
     setChangingPassword(true);
     try {
+      // Verify the current password by re-authenticating with it
+      // before allowing the change: a signed-in session alone is not
+      // proof (e.g. a shared school computer left signed in).
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+      if (!email) throw new Error('Your account email could not be found. Please sign out and sign in again.');
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (verifyError) {
+        showAlert('Current Password Incorrect', 'The current password you entered does not match this account. Please check it and try again.');
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       showAlert('Password Updated', 'Your password has been changed. Use the new password the next time you sign in.');
@@ -238,8 +258,21 @@ export default function OrganizationSettings() {
             <View>
               <Text className="font-display text-lg font-semibold text-navy mb-1">Change Password</Text>
               <Text className="font-sans text-sm text-slate-500">
-                Set a new password for your manager account. You will stay signed in here; the new password applies from your next sign-in.
+                Set a new password for your manager account. Enter your current password first, so that only you can make this change. You will stay signed in here; the new password applies from your next sign-in.
               </Text>
+            </View>
+
+            <View>
+              <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Current Password</Text>
+              <TextInput
+                className="w-full bg-canvas p-4 rounded-xl border border-inkline font-sans text-navy text-base"
+                placeholder="Your password now"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
 
             <View>
