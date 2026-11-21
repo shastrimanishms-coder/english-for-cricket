@@ -6,8 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/ui/Elegant';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { awardExtraIfTagged } from '../../lib/extras';
+import {
+  fetchVoicePrefs,
+  resolveVoicesForTexts,
+  setActiveVoiceMap,
+  voiceUrlForText,
+} from '../../lib/lessonVoices';
 import { awardPoints, POINTS } from '../../lib/points';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import { playRecordedLine } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
@@ -218,7 +225,14 @@ export default function SmartReading() {
         finishStory([], true);
       }
     };
-    if (!muted) {
+    let stopRecording: (() => void) | null = null;
+    const recordingUrl = muted ? null : voiceUrlForText(text);
+    if (recordingUrl) {
+      // A human recording of this sentence wins over the device
+      // voice; the safety timer below stretches to fit its natural
+      // pace (the estimate assumes device-voice speed).
+      stopRecording = playRecordedLine(recordingUrl, advance);
+    } else if (!muted) {
       try {
         Speech.speak(text, { language: 'en', rate, onDone: advance, onError: advance });
       } catch {
@@ -227,10 +241,11 @@ export default function SmartReading() {
     }
     // Safety net: some voices never report onDone (and mute mode has no
     // voice at all).
-    timers.push(setTimeout(advance, est + 1800));
+    timers.push(setTimeout(advance, (recordingUrl ? Math.max(est, words * 650) : est) + 1800));
     return () => {
       advanced = true;
       timers.forEach(clearTimeout);
+      if (stopRecording) stopRecording();
       try {
         Speech.stop();
       } catch {
@@ -238,6 +253,31 @@ export default function SmartReading() {
       }
     };
   }, [story, mode, playing, summary, sentence, pageIdx, sentIdx, rateIdx, muted, finishStory]);
+
+  // Human voices: when a story opens, resolve its sentences against
+  // the Voice Studio's approved recordings. Sentences with a
+  // recording are narrated by the real voice; the rest keep the
+  // device voice. (Stories are admin-written, so a sentence joins
+  // the studio script when its story is added there.)
+  useEffect(() => {
+    if (!story) return;
+    let cancelled = false;
+    (async () => {
+      const identity = await getStudentIdentity();
+      const prefs = identity ? await fetchVoicePrefs(identity) : {};
+      const texts = story.pages.flatMap((p) => splitSentences(p));
+      const map = await resolveVoicesForTexts(texts, prefs, []);
+      if (!cancelled) setActiveVoiceMap(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [story]);
+
+  // Leaving the screen clears the active voice map.
+  useEffect(() => {
+    return () => setActiveVoiceMap(null);
+  }, []);
 
   const startListen = (fromPage: number, fromSent: number) => {
     setPageIdx(fromPage);

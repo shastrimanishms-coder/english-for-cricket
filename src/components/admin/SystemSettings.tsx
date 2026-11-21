@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { downloadDatabaseBackup } from '../../lib/backup';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 
@@ -34,6 +35,11 @@ export default function SystemSettings() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+  // Database Backup: last-backup stamp lives in site_settings.
+  const [lastBackupAt, setLastBackupAt] = useState('');
+  const [backupOverdue, setBackupOverdue] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupStatus, setBackupStatus] = useState('');
   const [users, setUsers] = useState<UserProfile[]>([]);
 
   const fetchData = useCallback(async () => {
@@ -46,6 +52,12 @@ export default function SystemSettings() {
       settingsData?.forEach(s => settingsMap[s.key] = s.value);
       setAppLogoUrl(settingsMap['app_logo_url'] || '');
       setHeroVideoUrl(settingsMap['home_hero_video_url'] || '');
+      setLastBackupAt(settingsMap['last_backup_at'] || '');
+      setBackupOverdue(
+        !!settingsMap['last_backup_at'] &&
+          Date.now() - new Date(settingsMap['last_backup_at']).getTime() >
+            7 * 24 * 3600 * 1000
+      );
       setSupportEmail(settingsMap['support_email'] || 'support@englishforcricket.com');
 
       const { data: usersData, error: usersError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
@@ -168,6 +180,33 @@ export default function SystemSettings() {
       Alert.alert('Password Updated', 'Your admin password has been changed. Use the new password the next time you sign in.');
     } catch (error: any) { Alert.alert('Could Not Change Password', error?.message || 'Something went wrong. Please try again.'); }
     finally { setChangingPassword(false); }
+  };
+
+  const handleBackup = async () => {
+    setBackupBusy(true);
+    setBackupStatus('Starting…');
+    try {
+      const summary = await downloadDatabaseBackup((table) =>
+        setBackupStatus(`Reading ${table}…`)
+      );
+      setLastBackupAt(new Date().toISOString());
+      setBackupOverdue(false);
+      setBackupStatus(
+        `Done: ${summary.rows.toLocaleString()} rows from ${summary.tables} tables (${summary.megabytes} MB) saved as ${summary.filename}.` +
+          (summary.skipped.length
+            ? ` Skipped (could not be read): ${summary.skipped.join(', ')}.`
+            : '')
+      );
+      Alert.alert(
+        'Backup Downloaded',
+        'Keep the file somewhere safe, away from this computer if you can. Taking one every week is a good habit.'
+      );
+    } catch (error: any) {
+      setBackupStatus('');
+      Alert.alert('Backup Failed', error?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setBackupBusy(false);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -361,6 +400,36 @@ export default function SystemSettings() {
         <View className="flex-row justify-end pt-4 border-t border-inkline">
           <View className="w-48">
             <AnimatedButton title={changingPassword ? "Changing..." : "Change Password"} onPress={handleChangePassword} disabled={changingPassword} variant="primary" size="sm" />
+          </View>
+        </View>
+      </View>
+
+      <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
+        <View>
+          <Text className="font-display text-xl font-semibold text-navy">Database Backup</Text>
+          <Text className="text-xs text-slate-400 mt-2">
+            The database plan has no automatic backups, so download one
+            regularly — once a week is a good habit. The file holds every
+            learner, lesson, progress record and voice line as data you
+            keep on your own computer. Voice actor passwords are left out
+            on purpose. Voice recordings and other media live on the
+            Lolipop server rather than in the database; copy that media
+            folder by FTP as well for a complete backup.
+          </Text>
+          <Text className="text-sm text-slate-500 mt-3">
+            {lastBackupAt
+              ? `Last backup: ${new Date(lastBackupAt).toLocaleString('en-GB')}${
+                  backupOverdue ? ' — more than a week old, so a fresh one is due.' : ''
+                }`
+              : 'No backup has been downloaded yet.'}
+          </Text>
+          {backupStatus ? (
+            <Text className="text-sm text-slate-500 mt-2">{backupStatus}</Text>
+          ) : null}
+        </View>
+        <View className="flex-row justify-end pt-4 border-t border-inkline">
+          <View className="w-48">
+            <AnimatedButton title={backupBusy ? "Preparing..." : "Download Backup"} onPress={handleBackup} disabled={backupBusy} variant="primary" size="sm" />
           </View>
         </View>
       </View>

@@ -32,8 +32,14 @@ import {
 } from '../../lib/speakingScenarios';
 import { awardExtraIfTagged } from '../../lib/extras';
 import { awardPoints, POINTS } from '../../lib/points';
+import {
+  fetchVoicePrefs,
+  resolveVoicesForTexts,
+  setActiveVoiceMap,
+} from '../../lib/lessonVoices';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
+import type { VoiceCategory } from '../../lib/voiceStudio';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSafeBack } from '../../lib/useSafeBack';
 import {
@@ -451,6 +457,60 @@ export default function SpeakingPractice() {
     }
     return cueLearnerTurn(turn.text);
   }, [mode, scenario, turnIndex, scenarioDone, cueLearnerTurn]);
+
+  // Human voices: resolve the lines this mode will speak against the
+  // Voice Studio's approved recordings. Scenario partners speak in
+  // their own voice category (the same casting as the script:
+  // Reporter/Shopkeeper F1, Coach M1, Friend/Teammate B1); lesson
+  // lines take whichever category recorded them. Lines without a
+  // recording keep the device voice via speakWithCallback's fallback.
+  useEffect(() => {
+    if (mode === 'scenario') {
+      if (!scenario) return;
+      let cancelled = false;
+      (async () => {
+        const identity = await getStudentIdentity();
+        const prefs = identity ? await fetchVoicePrefs(identity) : {};
+        const partnerCategory: Record<string, VoiceCategory> = {
+          Reporter: 'F1',
+          Shopkeeper: 'F1',
+          Coach: 'M1',
+          Friend: 'B1',
+          Teammate: 'B1',
+        };
+        const cat = partnerCategory[scenario.otherName];
+        const texts = scenario.turns
+          .filter((t) => t.speaker === 'other')
+          .map((t) => t.text);
+        const map = await resolveVoicesForTexts(texts, prefs, cat ? [cat] : []);
+        if (!cancelled) setActiveVoiceMap(map);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (mode === 'lines' && items.length > 0) {
+      let cancelled = false;
+      (async () => {
+        const identity = await getStudentIdentity();
+        const prefs = identity ? await fetchVoicePrefs(identity) : {};
+        const map = await resolveVoicesForTexts(
+          items.map((i) => i.text),
+          prefs,
+          []
+        );
+        if (!cancelled) setActiveVoiceMap(map);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [mode, scenario, items]);
+
+  // Leaving the screen clears the active voice map.
+  useEffect(() => {
+    return () => setActiveVoiceMap(null);
+  }, []);
 
   // Whether this browser has any voice at all: with none installed
   // (common on Linux desktops), Listen is silent and the learner

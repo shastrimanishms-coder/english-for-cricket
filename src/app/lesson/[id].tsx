@@ -40,7 +40,14 @@ import {
   type AwardedBadge,
 } from '../../lib/badgeAwards';
 import { awardPoints, isTodayAStudyDay, POINTS } from '../../lib/points';
+import {
+  fetchVoicePrefs,
+  resolveVoicesForTexts,
+  setActiveVoiceMap,
+  voiceUrlForText,
+} from '../../lib/lessonVoices';
 import { getStudentIdentity } from '../../lib/studentIdentity';
+import type { VoiceCategory } from '../../lib/voiceStudio';
 import { scoreMessage, scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
 import {
@@ -81,6 +88,7 @@ interface Lesson {
   id: string;
   title: string;
   module_id: string | null;
+  order_index: number;
 }
 
 interface SlideAttempt {
@@ -959,6 +967,8 @@ export default function LessonPlayer() {
 
   const startTimeRef = useRef<number>(0); // set on mount in the effect below
   const recordedRef = useRef(false);
+  // This lesson's module number (1-8), for voice-category parity.
+  const moduleNumberRef = useRef(0);
 
   const fetchLessonData = useCallback(async () => {
     try {
@@ -967,11 +977,25 @@ export default function LessonPlayer() {
 
       const { data: lessonData, error: lessonError } = await supabase
         .from('curriculum_lessons')
-        .select('id, title, module_id')
+        .select('id, title, module_id, order_index')
         .eq('id', id)
         .single();
       if (lessonError) throw lessonError;
       setLesson(lessonData);
+
+      // The module's order_index encodes its number (stage * 100 +
+      // module); the number's parity picks this lesson's model and
+      // "you" voice categories for human-voice resolution.
+      if (lessonData.module_id) {
+        const { data: moduleData } = await supabase
+          .from('curriculum_modules')
+          .select('order_index')
+          .eq('id', lessonData.module_id)
+          .maybeSingle();
+        if (moduleData?.order_index) {
+          moduleNumberRef.current = moduleData.order_index % 100;
+        }
+      }
 
       const { data: slideData, error: slideError } = await supabase
         .from('lesson_slides')
@@ -998,10 +1022,40 @@ export default function LessonPlayer() {
     })();
   }, [fetchLessonData]);
 
+  // Human voices: once the slides are in, resolve every line this
+  // lesson can speak against the Voice Studio's approved recordings
+  // and publish the result as the active voice map. Lines with a
+  // recording then play in a real voice everywhere this screen speaks
+  // (listen buttons, speak-along panels, speaking slides); the rest
+  // keep the device voice. Best-effort by design - a failure here
+  // changes nothing about how the lesson plays.
+  useEffect(() => {
+    if (slides.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const identity = await getStudentIdentity();
+      const prefs = identity ? await fetchVoicePrefs(identity) : {};
+      const texts: (string | null)[] = [];
+      slides.forEach((s) => {
+        texts.push(s.correct_answer, s.prompt_text);
+        (s.options?.panels || []).forEach((p) => texts.push(p.text));
+      });
+      const moduleNo = moduleNumberRef.current;
+      const preferred: VoiceCategory[] =
+        moduleNo === 0 ? [] : moduleNo % 2 === 1 ? ['M1', 'B1'] : ['F1', 'G1'];
+      const map = await resolveVoicesForTexts(texts, prefs, preferred);
+      if (!cancelled) setActiveVoiceMap(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slides]);
+
   // Release the lazily created player when the screen unmounts
   // (createAudioPlayer does not manage the lifecycle for us).
   useEffect(() => {
     return () => {
+      setActiveVoiceMap(null);
       playerRef.current?.release();
       playerRef.current = null;
       try {
@@ -1063,12 +1117,16 @@ export default function LessonPlayer() {
     }
   }, []);
 
-  // Recorded audio wins whenever a slide actually has some; only an
-  // empty audio_url falls back to speaking the text.
+  // Recorded audio wins whenever a slide actually has some. A slide
+  // with no audio_url of its own still gets a human voice when the
+  // Voice Studio has an approved recording for its exact line (the
+  // prefetch below resolves those into the active voice map); only a
+  // line with no recording at all falls back to the device voice.
   const playOrSpeak = useCallback(
     (url: string | null | undefined, text: string | null | undefined) => {
-      if (url) {
-        playAudio(url);
+      const effectiveUrl = url || voiceUrlForText(text);
+      if (effectiveUrl) {
+        playAudio(effectiveUrl);
       } else {
         speakText(text);
       }
@@ -1088,11 +1146,12 @@ export default function LessonPlayer() {
       text: string | null | undefined,
       onDone: () => void
     ) => {
-      if (!url) {
+      const effectiveUrl = url || voiceUrlForText(text);
+      if (!effectiveUrl) {
         speakWithCallback(text || '', onDone);
         return;
       }
-      playAudio(url);
+      playAudio(effectiveUrl);
       const player = playerRef.current;
       if (!player) {
         onDone();
@@ -1402,7 +1461,7 @@ export default function LessonPlayer() {
         // eleven."), not just the tapped word ("team").
         const sentence = completedSentence(slide.prompt_text, panel.text);
         if (sentence) {
-          speakText(sentence);
+          playOrSpeak(null, sentence);
         } else {
           playOrSpeak(panel.audio_url, panel.text);
         }
@@ -1432,7 +1491,7 @@ export default function LessonPlayer() {
         });
       }
     },
-    [attempts, playOrSpeak, speakText, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
+    [attempts, playOrSpeak, feedbackHaptic, feedbackAnim, updateAttempt, recordFirstResult]
   );
 
   const handleTypingCheck = useCallback(

@@ -13,8 +13,67 @@ import * as Speech from 'expo-speech';
 // buttons always remain as the manual path.
 
 import dingAsset from '../../assets/sounds/ding.wav';
+import { voiceUrlForText } from './lessonVoices';
 
 let dingPlayer: AudioPlayer | null = null;
+
+// The human-voice line player: when the current screen has resolved a
+// Voice Studio recording for the line about to be spoken, the
+// recording plays through here instead of the device voice. Kept
+// separate from the ding player so the two never fight over a source.
+let linePlayer: AudioPlayer | null = null;
+let linePoll: ReturnType<typeof setInterval> | null = null;
+
+function stopRecordingLine(): void {
+  if (linePoll) {
+    clearInterval(linePoll);
+    linePoll = null;
+  }
+  try {
+    linePlayer?.pause();
+  } catch {
+    // Pausing is best-effort.
+  }
+}
+
+/**
+ * Play a recorded line and call onEnded when it finishes. Mirrors the
+ * lesson player's watch-the-player pattern: poll until playback has
+ * started and then stopped, and give up waiting if it never starts
+ * (a blocked autoplay must not stall the speaking flow - the caller's
+ * own safety timer also fires). Returns false when playback could not
+ * even be attempted, so the caller can fall back to the device voice.
+ */
+function playRecordingLine(url: string, onEnded: () => void): boolean {
+  try {
+    stopRecordingLine();
+    if (!linePlayer) {
+      linePlayer = createAudioPlayer({ uri: url });
+    } else {
+      linePlayer.replace({ uri: url });
+    }
+    linePlayer.play();
+    const player = linePlayer;
+    let started = false;
+    const waited = Date.now();
+    linePoll = setInterval(() => {
+      try {
+        if (player.playing || player.currentTime > 0) started = true;
+        if ((started && !player.playing) || (!started && Date.now() - waited > 2500)) {
+          stopRecordingLine();
+          onEnded();
+        }
+      } catch {
+        stopRecordingLine();
+        onEnded();
+      }
+    }, 200);
+    return true;
+  } catch (error) {
+    console.log('Recorded line playback unavailable:', error);
+    return false;
+  }
+}
 
 /** The "your turn" chime. Lazily created (never during render). */
 export function playDing(): void {
@@ -32,6 +91,33 @@ export function playDing(): void {
   } catch (error) {
     console.log('Ding playback unavailable:', error);
   }
+}
+
+/**
+ * Play a recorded line for screens with their own narration flow
+ * (Smart Reading): onEnded fires when the recording finishes, and the
+ * returned function stops it early (and suppresses onEnded). If the
+ * recording cannot be played at all, onEnded fires at once so the
+ * caller's own timers remain the only clock.
+ */
+export function playRecordedLine(
+  url: string,
+  onEnded: () => void
+): () => void {
+  let ended = false;
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    onEnded();
+  };
+  if (!playRecordingLine(url, finish)) {
+    finish();
+    return () => {};
+  }
+  return () => {
+    ended = true;
+    stopRecordingLine();
+  };
 }
 
 /**
@@ -97,6 +183,20 @@ export function speakWithCallback(text: string, onDone?: () => void): void {
   // is only the safety net for voices that never report finishing.
   const timeoutMs = Math.min(12000, Math.max(2200, words * 650 + 1800));
   setTimeout(fire, timeoutMs);
+  // A human recording, when the current screen resolved one for this
+  // exact line, always wins over the device voice. The mic floor set
+  // above still applies: a recording's real length is close to the
+  // word-count estimate, and the floor only ever errs on the safe
+  // side (a slightly longer pause before the microphone opens).
+  const recordingUrl = voiceUrlForText(text);
+  if (recordingUrl) {
+    try {
+      Speech.stop();
+    } catch {
+      // Nothing to stop; the recording attempt proceeds regardless.
+    }
+    if (playRecordingLine(recordingUrl, fire)) return;
+  }
   try {
     Speech.stop();
     Speech.speak(spoken, {
@@ -180,6 +280,7 @@ export function waitUntilSafeToListen(maxMs = 10000): Promise<void> {
 export function cancelSpeechCue(): void {
   speakSeq++;
   micFloorUntil = 0;
+  stopRecordingLine();
   try {
     Speech.stop();
   } catch {
