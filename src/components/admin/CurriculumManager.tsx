@@ -45,6 +45,9 @@ export default function CurriculumManager() {
   const [stageTitle, setStageTitle] = useState('');
   const [stageOrder, setStageOrder] = useState('0');
   const [stageSaving, setStageSaving] = useState(false);
+  // Which stage groups are expanded in the modules list (all start
+  // collapsed so the list opens short).
+  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
   
   // Form State
   const [editId, setEditId] = useState<string | null>(null);
@@ -255,6 +258,60 @@ export default function CurriculumManager() {
 
   const isModuleView = activeView === 'modules';
 
+  // ---- Collapsible stage groups for the modules list -----------------
+  // Forty modules in one flat list is unwieldy, so the modules view
+  // groups them under their stage with tap-to-expand headers; a module
+  // row itself is shared with the (short) lessons list.
+  const toggleStageGroup = (key: string) =>
+    setExpandedStages((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const orphanModules = modules.filter(
+    (m) => !m.stage_id || !stages.some((s) => s.id === m.stage_id),
+  );
+
+  const renderItemRow = (item: any, isLast: boolean) => (
+    <View
+      key={item.id}
+      className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${isLast ? '' : 'border-b border-inkline'}`}
+    >
+      <View className="flex-row items-center gap-4 flex-1">
+        <View className="w-10 h-10 rounded-full bg-pitch/10 items-center justify-center">
+          <Text className="font-bold text-pitch">{item.order_index}</Text>
+        </View>
+        <View>
+          <Text className="font-bold text-text-primary text-base">{item.title}</Text>
+          {item.description ? <Text className="text-sm text-slate-500 mt-1">{item.description}</Text> : null}
+        </View>
+      </View>
+      <View className="flex-row gap-3">
+        {isModuleView && (
+          <Pressable onPress={() => openLessonsView(item)} className="px-3 py-1.5 bg-canvas rounded-full border border-inkline">
+            <Text className="text-navy text-sm font-semibold">Manage Lessons →</Text>
+          </Pressable>
+        )}
+        <Pressable onPress={() => handleEdit(item)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
+          <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
+        </Pressable>
+        <Pressable onPress={() => handleDelete(item.id, item.title)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
+          <Text className="text-red-600 text-sm font-semibold">Delete</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderStageGroupHeader = (groupKey: string, label: string, count: number, expanded: boolean) => (
+    <Pressable
+      onPress={() => toggleStageGroup(groupKey)}
+      className="flex-row items-center justify-between px-4 py-3.5 bg-slate-50 border-b border-inkline"
+    >
+      <Text className="font-display font-semibold text-navy">
+        {expanded ? '▾' : '▸'}  {label}
+        <Text className="font-sans text-slate-400 font-normal text-sm">   ·   {count} modules</Text>
+      </Text>
+      <Text className="text-xs font-bold text-gold-dark uppercase tracking-wider">{expanded ? 'Hide' : 'Show'}</Text>
+    </Pressable>
+  );
+
   return (
     <View className="space-y-8 gap-8">
       {/* Header Area */}
@@ -433,53 +490,44 @@ export default function CurriculumManager() {
         </View>
       ) : null}
 
-      {/* Dynamic List */}
+      {/* Dynamic List: modules are grouped under collapsible stage
+          headers; lessons (one module at a time) stay a short flat list. */}
       <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-        ) : (isModuleView ? modules : lessons).length === 0 ? (
+        ) : isModuleView ? (
+          modules.length === 0 ? (
+            <View className="p-8 items-center">
+              <Text className="text-slate-500">No Modules added yet.</Text>
+            </View>
+          ) : stagesAvailable && stages.length > 0 ? (
+            <>
+              {stages.map((stage) => {
+                const groupModules = modules.filter((m) => m.stage_id === stage.id);
+                const expanded = !!expandedStages[stage.id];
+                return (
+                  <View key={stage.id}>
+                    {renderStageGroupHeader(stage.id, `${stage.order_index}. ${stage.title}`, groupModules.length, expanded)}
+                    {expanded ? groupModules.map((m, i) => renderItemRow(m, i === groupModules.length - 1)) : null}
+                  </View>
+                );
+              })}
+              {orphanModules.length > 0 ? (
+                <View>
+                  {renderStageGroupHeader('__none', 'No stage', orphanModules.length, !!expandedStages['__none'])}
+                  {expandedStages['__none'] ? orphanModules.map((m, i) => renderItemRow(m, i === orphanModules.length - 1)) : null}
+                </View>
+              ) : null}
+            </>
+          ) : (
+            modules.map((m, i) => renderItemRow(m, i === modules.length - 1))
+          )
+        ) : lessons.length === 0 ? (
           <View className="p-8 items-center">
-            <Text className="text-slate-500">No {isModuleView ? 'Modules' : 'Lessons'} added yet.</Text>
+            <Text className="text-slate-500">No Lessons added yet.</Text>
           </View>
         ) : (
-          (isModuleView ? modules : lessons).map((item: any, index: number) => {
-            const arrLength = isModuleView ? modules.length : lessons.length;
-            return (
-              <View 
-                key={item.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== arrLength - 1 ? 'border-b border-inkline' : ''}`}
-              >
-                <View className="flex-row items-center gap-4 flex-1">
-                  <View className="w-10 h-10 rounded-full bg-pitch/10 items-center justify-center">
-                    <Text className="font-bold text-pitch">{item.order_index}</Text>
-                  </View>
-                  <View>
-                    <Text className="font-bold text-text-primary text-base">{item.title}</Text>
-                    {isModuleView && item.stage_id ? (
-                      <Text className="text-xs font-bold text-pitch mt-0.5">
-                        {stages.find((s) => s.id === item.stage_id)?.title || 'Stage'}
-                      </Text>
-                    ) : null}
-                    {item.description ? <Text className="text-sm text-slate-500 mt-1">{item.description}</Text> : null}
-                  </View>
-                </View>
-                
-                <View className="flex-row gap-3">
-                  {isModuleView && (
-                    <Pressable onPress={() => openLessonsView(item)} className="px-3 py-1.5 bg-canvas rounded-full border border-inkline">
-                      <Text className="text-navy text-sm font-semibold">Manage Lessons →</Text>
-                    </Pressable>
-                  )}
-                  <Pressable onPress={() => handleEdit(item)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
-                    <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
-                  </Pressable>
-                  <Pressable onPress={() => handleDelete(item.id, item.title)} className="px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
-                    <Text className="text-red-600 text-sm font-semibold">Delete</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })
+          lessons.map((l, i) => renderItemRow(l, i === lessons.length - 1))
         )}
       </View>
     </View>

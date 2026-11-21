@@ -54,6 +54,21 @@ export default function LandingPage() {
   const t = LANDING_STRINGS[locale];
   const isRTL = RTL_LOCALES.includes(locale);
 
+  // Urdu and Pashto are written in the Nastaliq script, whose glyphs
+  // stand far taller than Latin ones. With Latin line heights the
+  // lines crowd together and spill over whatever sits below them, so
+  // the RTL languages get generous line heights on every text block.
+  const lh = {
+    title: isRTL ? { lineHeight: 78 } : undefined,
+    h2: isRTL ? { lineHeight: 58 } : undefined,
+    cardTitle: isRTL ? { lineHeight: 38 } : undefined,
+    stageHead: isRTL ? { lineHeight: 42 } : undefined,
+    bodyLg: isRTL ? { lineHeight: 46 } : undefined,
+    body: isRTL ? { lineHeight: 34 } : undefined,
+    small: isRTL ? { lineHeight: 27 } : undefined,
+    micro: isRTL ? { lineHeight: 22 } : undefined,
+  };
+
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -248,17 +263,17 @@ export default function LandingPage() {
             transform: [{ scaleX: -1 }],
           }}
         />
-        <View className="max-w-7xl w-full mx-auto flex-col md:flex-row items-center px-6 py-16 md:py-24 relative">
+        <View className="max-w-7xl w-full mx-auto flex-col md:flex-row items-center px-6 py-16 md:py-24 relative gap-12">
 
           {/* Left Side: Text and Call to Action */}
-          <View className="flex-1 md:pr-12 w-full mb-12 md:mb-0">
+          <View className="flex-1 w-full">
             <Text className="font-sans text-[11px] font-bold text-gold tracking-[2.5px] uppercase mb-4">
               English for Cricket
             </Text>
-            <Text className="font-display text-4xl md:text-5xl font-semibold text-white mb-6">
+            <Text className="font-display text-4xl md:text-5xl font-semibold text-white mb-6" style={lh.title}>
               {t.heroTitle}
             </Text>
-            <Text className="font-sans text-lg text-slate-300 mb-10 leading-relaxed" style={justify}>
+            <Text className="font-sans text-lg text-slate-300 mb-10 leading-relaxed" style={[justify, lh.bodyLg]}>
               {t.heroIntro}
             </Text>
             <View className="w-full max-w-xs mb-4">
@@ -269,11 +284,11 @@ export default function LandingPage() {
               />
             </View>
             <Pressable onPress={() => router.push('/login')} className="mb-6 self-start">
-              <Text className="font-sans text-gold-light font-semibold underline">
+              <Text className="font-sans text-gold-light font-semibold underline" style={lh.body}>
                 {t.alreadyAccount}
               </Text>
             </Pressable>
-            <Text className="font-sans text-sm text-slate-400 leading-relaxed" style={justify}>
+            <Text className="font-sans text-sm text-slate-400 leading-relaxed" style={[justify, lh.small]}>
               {t.pinNote}
             </Text>
 
@@ -290,7 +305,7 @@ export default function LandingPage() {
                   <Text className="font-display text-2xl font-semibold text-gold">
                     {stat.value}
                   </Text>
-                  <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider">
+                  <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
                     {stat.label}
                   </Text>
                 </View>
@@ -299,7 +314,7 @@ export default function LandingPage() {
           </View>
 
           {/* Right Side: Intro Video with Poster Image */}
-          <View className="flex-1 w-full aspect-video md:aspect-auto md:h-80 rounded-[20px] overflow-hidden bg-navy-deep shadow-lg relative">
+          <View className="w-full md:flex-1 aspect-video md:aspect-auto md:h-80 rounded-[20px] overflow-hidden bg-navy-deep shadow-lg relative">
             {/* Background Poster Image */}
             <Image
               source={{ uri: 'https://images.unsplash.com/photo-1531415074968-036ba1b575da?q=80&w=1000&auto=format&fit=crop' }}
@@ -332,10 +347,10 @@ export default function LandingPage() {
       <View className="w-full">
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20">
           <MicroLabel className="text-center mb-3">{t.programmeLabel}</MicroLabel>
-          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-4">
+          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-4" style={lh.h2}>
             {t.programmeTitle}
           </Text>
-          <Text className="font-sans text-lg text-slate-500 text-center mb-12 max-w-2xl mx-auto leading-relaxed" style={justify}>
+          <Text className="font-sans text-lg text-slate-500 text-center mb-12 max-w-2xl mx-auto leading-relaxed" style={[justify, lh.bodyLg]}>
             {t.programmeIntro}
           </Text>
           <View className="flex-row flex-wrap justify-center gap-6">
@@ -347,12 +362,12 @@ export default function LandingPage() {
                 <View className="w-12 h-12 rounded-full bg-gold-light items-center justify-center mb-4">
                   <Ionicons name={FEATURE_ICONS[index] as any} size={24} color="#0A192F" />
                 </View>
-                <Text className="font-sans text-lg font-bold text-navy mb-2">{feature.title}</Text>
-                <Text className="font-sans text-slate-500 leading-relaxed" style={justify}>{feature.text}</Text>
+                <Text className="font-sans text-lg font-bold text-navy mb-2" style={lh.cardTitle}>{feature.title}</Text>
+                <Text className="font-sans text-slate-500 leading-relaxed" style={[justify, lh.body]}>{feature.text}</Text>
               </View>
             ))}
           </View>
-          <Text className="font-sans text-slate-500 text-center leading-relaxed mt-12 max-w-2xl mx-auto" style={justify}>
+          <Text className="font-sans text-slate-500 text-center leading-relaxed mt-12 max-w-2xl mx-auto" style={[justify, lh.body]}>
             {t.beyondLessons}
           </Text>
         </View>
@@ -362,7 +377,7 @@ export default function LandingPage() {
       <View className="w-full bg-white">
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20">
           <MicroLabel className="text-center mb-3">{t.startLabel}</MicroLabel>
-          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-12">
+          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-12" style={lh.h2}>
             {t.howTitle}
           </Text>
           <View className="flex-col md:flex-row gap-6">
@@ -371,10 +386,10 @@ export default function LandingPage() {
                 <View className="w-12 h-12 rounded-full bg-navy items-center justify-center mb-4">
                   <Text className="font-display text-white font-semibold text-lg">{index + 1}</Text>
                 </View>
-                <Text className="font-sans text-lg font-bold text-navy mb-2 text-center">
+                <Text className="font-sans text-lg font-bold text-navy mb-2 text-center" style={lh.cardTitle}>
                   {item.title}
                 </Text>
-                <Text className="font-sans text-slate-500 text-center leading-relaxed" style={justify}>
+                <Text className="font-sans text-slate-500 text-center leading-relaxed" style={[justify, lh.body]}>
                   {item.text}
                 </Text>
               </View>
@@ -383,7 +398,7 @@ export default function LandingPage() {
 
           {/* Pathway strip: the five stages of the course */}
           <View className="mt-16 bg-navy rounded-[20px] px-6 py-8">
-            <Text className="font-display text-white font-semibold text-center text-lg mb-6">
+            <Text className="font-display text-white font-semibold text-center text-lg mb-6" style={lh.stageHead}>
               {t.stagesTitle}
             </Text>
             <View className="flex-col md:flex-row md:flex-wrap items-center justify-center gap-3">
@@ -391,10 +406,10 @@ export default function LandingPage() {
                 <View key={stage.name} className="flex-row items-center gap-3">
                   <View className="bg-white/10 border border-white/20 rounded-[14px] px-4 py-2 items-center">
                     <Text className="text-slate-100 font-semibold text-sm">{stage.name}</Text>
-                    <Text className="text-slate-400 text-xs text-center mt-0.5">{stage.note}</Text>
+                    <Text className="text-slate-400 text-xs text-center mt-0.5" style={lh.micro}>{stage.note}</Text>
                   </View>
                   {index < arr.length - 1 && (
-                    <Text className="text-gold font-bold hidden md:flex">→</Text>
+                    <Text className="text-gold font-bold hidden md:flex">{isRTL ? '←' : '→'}</Text>
                   )}
                 </View>
               ))}
@@ -421,16 +436,16 @@ export default function LandingPage() {
         />
         <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20 relative">
           <MicroLabel className="text-center mb-3">{t.commitmentLabel}</MicroLabel>
-          <Text className="font-display text-3xl md:text-4xl font-semibold text-white text-center mb-12">
+          <Text className="font-display text-3xl md:text-4xl font-semibold text-white text-center mb-12" style={lh.h2}>
             {t.commitmentTitle}
           </Text>
           <View className="flex-col md:flex-row gap-10">
             {t.commitments.map((item) => (
               <View key={item.title} className="flex-1 px-2">
-                <Text className="font-sans text-lg font-bold text-gold mb-2 text-center md:text-left">
+                <Text className="font-sans text-lg font-bold text-gold mb-2 text-center md:text-start" style={lh.cardTitle}>
                   {item.title}
                 </Text>
-                <Text className="font-sans text-slate-300 text-center md:text-left leading-relaxed" style={justify}>
+                <Text className="font-sans text-slate-300 text-center md:text-start leading-relaxed" style={[justify, lh.body]}>
                   {item.text}
                 </Text>
               </View>
@@ -453,25 +468,25 @@ export default function LandingPage() {
         <View className="max-w-7xl w-full mx-auto flex-col items-center p-8 md:p-12">
           <View className="flex-row flex-wrap justify-center gap-4 md:gap-8 mb-6">
             <Link href="/support" asChild>
-              <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{t.support}</Text>
+              <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{LANDING_STRINGS.en.support}</Text>
             </Link>
             {/* Legal pages live in the CMS (/p/<slug>); each link is
                 shown only once that page exists - see the check above. */}
             {showLegalLink('terms-and-conditions') && (
               <Link href="/p/terms-and-conditions" asChild>
-                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{t.terms}</Text>
+                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{LANDING_STRINGS.en.terms}</Text>
               </Link>
             )}
             {showLegalLink('privacy-policy') && (
               <Link href="/p/privacy-policy" asChild>
-                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{t.privacy}</Text>
+                <Text className="font-sans text-slate-500 font-semibold hover:text-gold-dark">{LANDING_STRINGS.en.privacy}</Text>
               </Link>
             )}
           </View>
-          <Text className="text-slate-400 text-sm text-center mb-2">
+          <Text className="text-slate-400 text-sm text-center mb-2" style={lh.small}>
             {t.initiativeLine}
           </Text>
-          <Text className="text-slate-400 text-sm text-center">
+          <Text className="text-slate-400 text-sm text-center" style={lh.small}>
             {t.rightsLine}
           </Text>
         </View>

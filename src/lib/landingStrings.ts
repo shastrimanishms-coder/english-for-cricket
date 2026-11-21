@@ -17,7 +17,7 @@
  * Homepage-Translations-DRAFT.md (2026-11-21).
  */
 
-export type LandingLocale = 'en' | 'ja' | 'hi' | 'ur' | 'ps' | 'sw' | 'de';
+export type LandingLocale = 'en' | 'ja' | 'hi' | 'ur' | 'ps' | 'sw' | 'de' | 'zu';
 
 export const LANDING_LOCALES: { code: LandingLocale; label: string }[] = [
   { code: 'en', label: 'English' },
@@ -27,6 +27,7 @@ export const LANDING_LOCALES: { code: LandingLocale; label: string }[] = [
   { code: 'ps', label: 'پښتو' },
   { code: 'sw', label: 'Kiswahili' },
   { code: 'de', label: 'Deutsch' },
+  { code: 'zu', label: 'isiZulu' },
 ];
 
 /** Languages written right-to-left: the page layout flips for them. */
@@ -807,6 +808,109 @@ const DE: LandingStrings = {
   rightsLine: '© 2026 Kansai Youth Cricket Organization. Alle Rechte vorbehalten.',
 };
 
+const ZU: LandingStrings = {
+  heroTitle: 'Funda isiNgisi Ngekhilikithi',
+  heroIntro:
+    'English for Cricket wuhlelo oluphelele lokufunda isiNgisi olwakhelwe phezu komdlalo wekhilikithi. Ngemifundo ehleliwe engama-320, abafundi bathuthuka besuka emagameni abo okuqala baye ekukhulumeni ngokuzethemba nangokuzimela — ngokulalela, ukukhuluma, ukufunda nangokudlala. Lolu hlelo luhlinzekwa yi-KYCO, i-Kansai Youth Cricket Organization, futhi lumahhala kuwo wonke umfundi. Futhi luyohlala lunjalokazi.',
+  alreadyAccount: 'Usuvele unayo i-akhawunti? Ngena',
+  pinNote:
+    'Abafundi ezikoleni nasemakilabheni abamba iqhaza bathola igama lomsebenzisi ne-PIN kuthisha noma kumqeqeshi wabo. Ayikho i-imeyili edingekayo.',
+  statLessons: 'Izifundo',
+  statStages: 'Izigaba',
+  statModules: 'Amamojuli',
+  statWords: 'Amagama',
+  statFree: 'Mahhala, njalo',
+  programmeLabel: 'Uhlelo',
+  programmeTitle: 'Konke Okudingwa Umfundi',
+  programmeIntro:
+    'Isifundo esiphelele endaweni eyodwa: izifundo ezihleliwe, ukuzilolonga ukukhuluma, ukufunda okuqondiswayo nokubuyekeza okucatshangwe kahle — yonke into yakhelwe phezu kwekhilikithi, ukuze igama ngalinye elisha lifike nomongo olenza likhumbuleke.',
+  features: [
+    {
+      title: 'Indlela Yokufunda',
+      text: 'Isifundo esihleliwe sezifundo ezingama-320 ezigabeni ezinhlanu nasemamojulini angamashumi amane. Isifundo ngasinye sakhela ngokucophelela phezu kwalezo ezingaphambi kwaso, sethula ulimi olusha futhi sibuyela olimini lwangaphambilini ngezindlela ezintsha ize luvikeleke.',
+    },
+    {
+      title: 'Ukuzilolonga Ukukhuluma',
+      text: 'Izingxoxo eziqondiswayo — izingxoxiswano nengxoxo nje yansuku zonke — lapho abafundi bekhuluma ingxenye yabo ngokuzwakalayo futhi bathola amaphuzu omugqa ngamunye, lapho ukuphumelela kungamaphesenti angamashumi ayisikhombisa.',
+    },
+    {
+      title: 'Ukufunda Okuhlakaniphile',
+      text: 'Izindaba ezimfushane ngezindlela ezimbili: Lalela Futhi Funda, lapho igama ngalinye ligqanyiswa njengoba likhulunywa, kanye noFunda Ngokuzwakalayo, lapho ukufunda komfundi uqobo kuthola amaphuzu isigwebo ngesigwebo.',
+    },
+    {
+      title: 'Amazwi Angempela Abantu',
+      text: 'Yonke imigqa yesifundo irekhodwa ngabaculi bangempela bamazwi, ngamazwi amaningi ahlukene. Abafundi bakhetha izwi abafisa ukulizwa, futhi balalela isiNgisi esingokwemvelo, esabantu kuso sonke isifundo.',
+    },
+    {
+      title: 'Ukubuyekezwa Kwamagama Anzima',
+      text: 'Amagama nemishwana umfundi ayithola inzima iqoqwa ngokuzenzekela futhi yethulwa futhi ukuze ibuyekezwe, ukuze amaphuzu abuthaka athole ukuzilolonga okwengeziwe aze anqotshwe.',
+    },
+    {
+      title: 'Ama-XP, Izinkanyezi Namabheji',
+      text: 'Abafundi bathola amaphuzu olwazi nezinkanyezi ngomsebenzi oqediwe, namabheji ngezinto ezinkulu abazifinyelele. Ikilasi lingalandela ibhodi yalo yezinkanyezi yamasonto onke; ayikho imigqa yasesidlangalaleni.',
+    },
+    {
+      title: 'Izinsuku Zokufunda Nokulandelana',
+      text: 'Umfundi ngamunye ukhetha izinsuku zesonto azofunda ngazo. Yilezo zinsuku kuphela ezibalwa ekulandeleni kokufunda, ngakho usuku lokuphumula alusoze lukuqamule.',
+    },
+    {
+      title: 'Thola Isiqalo Sakho',
+      text: 'Ukuhlola okufushane kwezinga kuncoma isigaba lapho umfundi omusha kufanele aqale khona. Ayikho into evaliwe; isincomo simane sihlinzeke indawo yokuqala enengqondo.',
+    },
+    {
+      title: 'Ezikole Namaqembu',
+      text: 'Othisha nabaqeqeshi bangabhalisa ikilasi lonke ngokungena okulula ngegama lomsebenzisi ne-PIN, baphrinthe isiliphu sokungena somfundi ngamunye, futhi balandele inqubekela phambili yeqembu lonke.',
+    },
+  ],
+  beyondLessons:
+    'Ngaphezu kwezifundo, umtapo wemidlalo yekhilikithi, izifundo zevidiyo nezincwadi zomsebenzi ezilandekayo uhamba nesifundo — kuhlanganisa nesingeniso esisemthethweni se-ICC somdlalo.',
+  startLabel: 'Ukuqala',
+  howTitle: 'Kusebenza Kanjani',
+  steps: [
+    {
+      title: 'Bhalisa, noma thola i-PIN',
+      text: 'Dala i-akhawunti yamahhala ngekheli le-imeyili, noma thola igama lomsebenzisi ne-PIN kuthisha noma kumqeqeshi. Zombili lezi zindlela zihlinzeka ukufinyelela okugcwele ohlelweni.',
+    },
+    {
+      title: 'Landela Indlela Yokufunda',
+      text: 'Sebenza izigaba ngokulandelana, ngesivinini sakho — ekhaya, esikoleni noma ekilabheni. Ukuhlola okufushane kwezinga kungakhomba indawo yokuqala efanele.',
+    },
+    {
+      title: 'Zilolonge, buyekeza futhi uthuthuke',
+      text: 'Ukuzilolonga ukukhuluma, ukufunda okuqondiswayo nokubuyekeza okuhlosiwe kuqinisa sonke isifundo, kuyilapho amaphuzu, izinkanyezi namabheji kuhlinzeka irekhodi elicacile lenqubekela phambili.',
+    },
+  ],
+  stagesTitle: 'Izigaba ezinhlanu zesifundo',
+  stages: [
+    { name: 'The Foundation', note: 'Amagama nemisho yokuqala' },
+    { name: 'The Rookie', note: 'IsiNgisi sansuku zonke, sisungulwe ngokuvikeleka' },
+    { name: 'The Player', note: 'Ukufunda nokuxoxa ngokuzimela' },
+    { name: 'The Strategist', note: 'Ukuhlaziya nolimi lomdlalo' },
+    { name: 'The Captain', note: 'Ukuxhumana okuthuthukile nobuholi' },
+  ],
+  commitmentLabel: 'Isithembiso Sethu',
+  commitmentTitle: 'Mahhala. Kuphephile. Kuwo Wonke Umfundi.',
+  commitments: [
+    {
+      title: 'Mahhala ngokuphelele, unomphela',
+      text: 'English for Cricket ayinayo imali ekhokhwayo futhi ayinazo izikhangiso, futhi ayisoze ibe nazo. Yonke ingxenye yohlelo inikelwa kuwo wonke umfundi ngemibandela elinganayo.',
+    },
+    {
+      title: 'Yakhelwe ukuphepha kwezingane',
+      text: 'Ayikho imiprofayili yasesidlangalaleni, ayikho imiyalezo evulekile futhi ayikho izikhangiso zangaphandle. Abafundi babona inqubekela phambili yekilasi labo kuphela, futhi akukho okunye.',
+    },
+    {
+      title: 'Ilungiswe ngokucophelela',
+      text: 'Lolu hlelo luklanywe futhi lugcinwa ngamavolontiya e-KYCO eKansai, eJapan, olwenzelwe abadlali bekhilikithi abasha — kanye nayo yonke ingane engathanda ukufunda isiNgisi ngalo mdlalo.',
+    },
+  ],
+  support: 'Support',
+  terms: 'Terms & Conditions',
+  privacy: 'Privacy Policy',
+  initiativeLine: 'English for Cricket wuhlelo lwezemfundo lwe-KYCO, i-Kansai Youth Cricket Organization.',
+  rightsLine: '© 2026 Kansai Youth Cricket Organization. Wonke amalungelo agodliwe.',
+};
+
 export const LANDING_STRINGS: Record<LandingLocale, LandingStrings> = {
   en: EN,
   ja: JA,
@@ -815,4 +919,5 @@ export const LANDING_STRINGS: Record<LandingLocale, LandingStrings> = {
   ps: PS,
   sw: SW,
   de: DE,
+  zu: ZU,
 };

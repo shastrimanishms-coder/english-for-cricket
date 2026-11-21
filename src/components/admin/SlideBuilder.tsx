@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 
 // Database Interfaces
-interface Module { id: string; title: string; order_index: number; }
+interface Stage { id: string; title: string; order_index: number; }
+interface Module { id: string; title: string; order_index: number; stage_id?: string | null; }
 interface Lesson { id: string; title: string; order_index: number; }
 interface Slide {
   id: string;
@@ -32,8 +33,12 @@ export default function SlideBuilder() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [slides, setSlides] = useState<Slide[]>([]);
   
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [selectedStageId, setSelectedStageId] = useState<string>('');
   const [selectedModuleId, setSelectedModuleId] = useState<string>('');
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
+  // Which of the three target dropdowns is open (Stage -> Module -> Lesson).
+  const [openMenu, setOpenMenu] = useState<'stage' | 'module' | 'lesson' | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,9 +63,17 @@ export default function SlideBuilder() {
       const { data, error } = await supabase.from('curriculum_modules').select('*').order('order_index');
       if (error) throw error;
       setModules(data || []);
-      if (data && data.length > 0) setSelectedModuleId(data[0].id);
-    } catch (error: any) { Alert.alert('Error', error.message); } 
+      if (data && data.length > 0) {
+        setSelectedModuleId(data[0].id);
+        if (data[0].stage_id) setSelectedStageId(data[0].stage_id);
+      }
+    } catch (error: any) { Alert.alert('Error', error.message); }
     finally { setLoading(false); }
+  }, []);
+
+  const fetchStages = useCallback(async () => {
+    const { data, error } = await supabase.from('curriculum_stages').select('*').order('order_index');
+    if (!error) setStages((data || []) as Stage[]);
   }, []);
 
   const fetchLessons = useCallback(async (modId: string) => {
@@ -84,9 +97,10 @@ export default function SlideBuilder() {
 
   useEffect(() => {
     (async () => {
+      await fetchStages();
       await fetchModules();
     })();
-  }, [fetchModules]);
+  }, [fetchModules, fetchStages]);
 
   useEffect(() => {
     if (selectedModuleId) {
@@ -113,6 +127,16 @@ export default function SlideBuilder() {
     setSelectedModuleId(modId);
     setSelectedLessonId('');
     setSlides([]);
+    const mod = modules.find((m) => m.id === modId);
+    if (mod?.stage_id) setSelectedStageId(mod.stage_id);
+  };
+
+  // Choosing a stage jumps to its first module (and clears the lesson),
+  // so the three dropdowns always describe one consistent target.
+  const handleSelectStage = (stageId: string) => {
+    setSelectedStageId(stageId);
+    const first = modules.find((m) => m.stage_id === stageId);
+    if (first) handleSelectModule(first.id);
   };
 
   const updatePanel = (index: number, field: string, value: any) => {
@@ -307,30 +331,71 @@ export default function SlideBuilder() {
     );
   };
 
+  // ---- Target dropdowns (Stage -> Module -> Lesson) ------------------
+  const stageModules = stages.length > 0 && selectedStageId
+    ? modules.filter((m) => m.stage_id === selectedStageId)
+    : modules;
+  const selectedStage = stages.find((s) => s.id === selectedStageId);
+  const selectedModule = modules.find((m) => m.id === selectedModuleId);
+  const selectedLesson = lessons.find((l) => l.id === selectedLessonId);
+
+  const renderTargetBox = (
+    menu: 'stage' | 'module' | 'lesson',
+    label: string,
+    value: string,
+    disabled = false,
+  ) => (
+    <Pressable
+      onPress={() => { if (!disabled) setOpenMenu(openMenu === menu ? null : menu); }}
+      className={`flex-1 min-w-[180px] bg-white/10 rounded-xl px-4 py-3 border ${openMenu === menu ? 'border-gold' : 'border-white/10'} ${disabled ? 'opacity-50' : ''}`}
+    >
+      <Text className="text-[10px] font-bold tracking-widest text-gold uppercase mb-0.5">{label}</Text>
+      <View className="flex-row items-center justify-between gap-2">
+        <Text className="text-white font-semibold flex-1" numberOfLines={1}>{value}</Text>
+        <Text className="text-gold font-bold">{openMenu === menu ? '▴' : '▾'}</Text>
+      </View>
+    </Pressable>
+  );
+
+  const renderOptionRow = (id: string, title: string, selected: boolean, onPress: () => void) => (
+    <Pressable key={id} onPress={onPress} className={`px-4 py-2.5 rounded-lg ${selected ? 'bg-gold' : 'hover:bg-white/10'}`}>
+      <Text className={`text-sm ${selected ? 'text-navy font-bold' : 'text-slate-200'}`}>{title}</Text>
+    </Pressable>
+  );
+
   return (
     <View className="space-y-6">
       <View className="flex-row justify-between items-center mb-2">
         <Text className="font-display text-3xl font-semibold text-navy">Rosetta Slide Builder</Text>
       </View>
 
-      {/* Target Selector */}
-      <View className="bg-navy p-4 rounded-[20px] flex-col md:flex-row gap-4 items-center z-10 shadow-sm">
-        <Text className="font-sans text-white font-bold whitespace-nowrap">Editing Target:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 max-h-12 bg-white/10 rounded-lg p-1">
-          {modules.map(mod => (
-            <Pressable key={mod.id} onPress={() => handleSelectModule(mod.id)} className={`px-3 py-1.5 rounded-full ${selectedModuleId === mod.id ? 'bg-gold' : 'hover:bg-white/10'}`}>
-              <Text className={`text-sm ${selectedModuleId === mod.id ? 'text-navy font-bold' : 'text-slate-300'}`}>{mod.title}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-        <Text className="text-white font-bold">›</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-1 max-h-12 bg-white/10 rounded-lg p-1">
-          {lessons.map(les => (
-            <Pressable key={les.id} onPress={() => setSelectedLessonId(les.id)} className={`px-3 py-1.5 rounded-full ${selectedLessonId === les.id ? 'bg-gold' : 'hover:bg-white/10'}`}>
-              <Text className={`text-sm ${selectedLessonId === les.id ? 'text-navy font-bold' : 'text-slate-300'}`}>{les.title}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+      {/* Target Selector: three dropdowns, Stage -> Module -> Lesson.
+          The old single-line scrolling pill rows were hard to use with
+          forty modules, so each level now opens a full list. */}
+      <View className="bg-navy p-4 rounded-[20px] z-10 shadow-sm">
+        <Text className="font-sans text-white font-bold mb-3">Editing Target:</Text>
+        <View className="flex-row flex-wrap gap-3">
+          {stages.length > 0
+            ? renderTargetBox('stage', 'Stage', selectedStage ? `${selectedStage.order_index}. ${selectedStage.title}` : 'Choose a stage')
+            : null}
+          {renderTargetBox('module', 'Module', selectedModule ? selectedModule.title : 'Choose a module')}
+          {renderTargetBox('lesson', 'Lesson', selectedLesson ? selectedLesson.title : 'Choose a lesson', !selectedModuleId)}
+        </View>
+        {openMenu === 'stage' ? (
+          <ScrollView className="mt-3 max-h-64 bg-white/5 rounded-xl p-1">
+            {stages.map((s) => renderOptionRow(s.id, `${s.order_index}. ${s.title}`, s.id === selectedStageId, () => { handleSelectStage(s.id); setOpenMenu(null); }))}
+          </ScrollView>
+        ) : null}
+        {openMenu === 'module' ? (
+          <ScrollView className="mt-3 max-h-64 bg-white/5 rounded-xl p-1">
+            {stageModules.map((m) => renderOptionRow(m.id, m.title, m.id === selectedModuleId, () => { handleSelectModule(m.id); setOpenMenu(null); }))}
+          </ScrollView>
+        ) : null}
+        {openMenu === 'lesson' ? (
+          <ScrollView className="mt-3 max-h-64 bg-white/5 rounded-xl p-1">
+            {lessons.map((l) => renderOptionRow(l.id, l.title, l.id === selectedLessonId, () => { setSelectedLessonId(l.id); setOpenMenu(null); }))}
+          </ScrollView>
+        ) : null}
       </View>
 
       {!selectedLessonId ? (
