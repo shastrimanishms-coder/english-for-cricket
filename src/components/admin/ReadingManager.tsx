@@ -57,6 +57,9 @@ export default function ReadingManager() {
   const [categoryId, setCategoryId] = useState<string>('');
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [pages, setPages] = useState<string[]>(['']);
+  // Comprehension questions (Round 39), edited as one line per question:
+  // Question :: Option 1 :: Option 2 :: Option 3 :: <correct option number>
+  const [questionsText, setQuestionsText] = useState('');
   // Voice uploads for this story's sentences.
   const [showVoices, setShowVoices] = useState(false);
   const [coverage, setCoverage] = useState<{ covered: number; total: number } | null>(null);
@@ -102,6 +105,7 @@ export default function ReadingManager() {
     setCategoryId('');
     setLessonId(null);
     setPages(['']);
+    setQuestionsText('');
     setShowForm(true);
   };
 
@@ -114,6 +118,13 @@ export default function ReadingManager() {
     setCategoryId(row.category_id || '');
     setLessonId(row.lesson_id ?? null);
     setPages(Array.isArray(row.pages) && row.pages.length ? row.pages.map(String) : ['']);
+    setQuestionsText(
+      Array.isArray((row as any).questions)
+        ? (row as any).questions
+            .map((item: any) => `${item.q} :: ${(item.options || []).join(' :: ')} :: ${(item.answer ?? 0) + 1}`)
+            .join('\n')
+        : '',
+    );
     setShowForm(true);
   };
 
@@ -132,9 +143,19 @@ export default function ReadingManager() {
       showAlert('No Pages', 'Write at least one page of the story.');
       return;
     }
+    const parsedQuestions = questionsText
+      .split('\n')
+      .map((line) => line.split('::').map((s) => s.trim()))
+      .filter((parts) => parts.length >= 5 && parts[0].length > 0)
+      .map((parts) => ({
+        q: parts[0],
+        options: [parts[1], parts[2], parts[3]].filter((o) => o.length > 0),
+        answer: Math.min(Math.max(parseInt(parts[4], 10) || 1, 1), 3) - 1,
+      }))
+      .filter((item) => item.options.length >= 2);
     setSaving(true);
     try {
-      const payload = {
+      const basePayload = {
         title: title.trim(),
         emoji: emoji.trim() || '📖',
         description: description.trim(),
@@ -143,15 +164,23 @@ export default function ReadingManager() {
         pages: cleanPages,
         ...(taggingAvailable ? { lesson_id: lessonId } : {}),
       };
-      if (editId) {
-        const { error } = await supabase.from('reading_stories').update(payload).eq('id', editId);
-        if (error) throw error;
-      } else {
+      const payload: any = { ...basePayload, questions: parsedQuestions };
+      const saveWith = async (p: any) => {
+        if (editId) {
+          const { error } = await supabase.from('reading_stories').update(p).eq('id', editId);
+          return error;
+        }
         const { error } = await supabase
           .from('reading_stories')
-          .insert([{ ...payload, order_index: stories.length }]);
-        if (error) throw error;
+          .insert([{ ...p, order_index: stories.length }]);
+        return error;
+      };
+      let error = await saveWith(payload);
+      if (error && /questions/.test(error.message)) {
+        // Migration 30 not run yet: save without the questions column.
+        error = await saveWith(basePayload);
       }
+      if (error) throw error;
       cancelEdit();
       await fetchData();
     } catch (error: any) {
@@ -321,6 +350,23 @@ export default function ReadingManager() {
             <Pressable onPress={() => setPages([...pages, ''])} className="self-start px-3 py-2 bg-slate-100 rounded-full border border-inkline">
               <Text className="text-sm font-semibold text-slate-600">+ Add page</Text>
             </Pressable>
+          </View>
+
+          <View>
+            <Text className="text-sm font-semibold text-text-secondary">Comprehension Questions (optional)</Text>
+            <Text className="text-xs text-slate-400 mb-2">
+              One question per line: Question :: Option 1 :: Option 2 :: Option 3 :: correct option number (1, 2 or 3).
+              Learners answer them on the story-finished screen.
+            </Text>
+            <TextInput
+              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
+              placeholder={'Who is the story about? :: Ken :: Mira :: The coach :: 1'}
+              value={questionsText}
+              onChangeText={setQuestionsText}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
           </View>
 
           {storySentences.length > 0 ? (

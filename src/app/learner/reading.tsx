@@ -14,10 +14,16 @@ import {
 } from '../../lib/lessonVoices';
 import { awardPoints, POINTS } from '../../lib/points';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
-import { playRecordedLine } from '../../lib/speechCue';
+import { playDing, playRecordedLine } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
+
+interface StoryQuestion {
+  q: string;
+  options: string[];
+  answer: number;
+}
 
 interface Story {
   id: string;
@@ -29,6 +35,67 @@ interface Story {
   pages: string[];
   level: string;
   order_index: number;
+  questions?: StoryQuestion[];
+}
+
+// Comprehension questions shown on the story-finished screen (Round 39).
+// One question at a time; a wrong tap can be retried, and the score
+// counts first-try answers only.
+function StoryQuestions({ questions }: { questions: StoryQuestion[] }) {
+  const [idx, setIdx] = useState(0);
+  const [firstTry, setFirstTry] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [missed, setMissed] = useState(false);
+  const current = questions[idx];
+
+  if (!current) {
+    return (
+      <View className="w-full max-w-sm bg-white border border-inkline rounded-3xl p-5 mb-8 items-center">
+        <Text className="font-display text-xl font-semibold text-navy mb-1">Questions complete!</Text>
+        <Text className="font-sans text-slate-500 text-center">
+          You answered {firstTry} of {questions.length} on the first try ⭐
+        </Text>
+      </View>
+    );
+  }
+
+  const choose = (i: number) => {
+    if (picked !== null && picked === current.answer) return;
+    setPicked(i);
+    if (i === current.answer) {
+      playDing();
+      if (!missed) setFirstTry((n) => n + 1);
+      setTimeout(() => { setIdx((n) => n + 1); setPicked(null); setMissed(false); }, 900);
+    } else {
+      setMissed(true);
+    }
+  };
+
+  return (
+    <View className="w-full max-w-sm bg-white border border-inkline rounded-3xl p-5 mb-8">
+      <Text className="font-sans font-bold text-gold-dark text-sm mb-1">Quick Questions · {idx + 1} of {questions.length}</Text>
+      <Text className="font-display text-xl font-semibold text-navy mb-4">{current.q}</Text>
+      <View className="gap-2">
+        {current.options.map((opt, i) => {
+          const isPicked = picked === i;
+          const isRight = isPicked && i === current.answer;
+          const isWrong = isPicked && i !== current.answer;
+          return (
+            <Pressable
+              key={i}
+              onPress={() => choose(i)}
+              className={`rounded-full px-5 py-3 border-2 ${isRight ? 'bg-green-50 border-pitch' : isWrong ? 'bg-red-50 border-red-300' : 'bg-canvas border-inkline'}`}
+            >
+              <Text className="font-sans font-bold text-slate-700">{opt}{isRight ? ' ✓' : ''}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {missed && picked !== current.answer ? (
+        <Text className="font-sans text-slate-500 mt-3 text-center">Not quite — try again!</Text>
+      ) : null}
+    </View>
+  );
 }
 
 interface Category {
@@ -435,6 +502,9 @@ export default function SmartReading() {
                 <Text className="font-sans text-lg text-slate-500 mb-6">Speed: about {summary.wpm} words per minute</Text>
               ) : null}
               <Text className="font-sans text-gold-dark font-bold mb-8">+{POINTS.READING_XP} XP</Text>
+              {story.questions && story.questions.length > 0 ? (
+                <StoryQuestions key={story.id} questions={story.questions} />
+              ) : null}
               <Pressable onPress={backToShelf} className="px-8 py-4 bg-gold border-b-4 border-gold-dark rounded-full items-center mb-3 w-full max-w-sm">
                 <Text className="font-sans text-navy font-bold">Back to Stories</Text>
               </Pressable>

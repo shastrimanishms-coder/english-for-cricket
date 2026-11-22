@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import BuiltinGame from '../../components/games/BuiltinGame';
 import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
 import { awardExtraIfTagged } from '../../lib/extras';
 import { getStudentIdentity } from '../../lib/studentIdentity';
@@ -22,6 +23,8 @@ interface GameDetails {
   title: string;
   game_url: string;
   lesson_id?: string | null;
+  engine?: string | null;
+  data?: any;
 }
 
 type EmbedStatus = 'loading' | 'ready' | 'error';
@@ -129,9 +132,20 @@ export default function GamePlayer() {
       setFetchError(null);
       let { data, error } = await supabase
         .from('games')
-        .select('id, title, game_url, lesson_id')
+        .select('id, title, game_url, lesson_id, engine, data')
         .eq('id', id)
         .maybeSingle();
+
+      if (error && /engine|data/.test(error.message)) {
+        // Migration 30 not run yet: built-in game columns do not exist.
+        const retry = await supabase
+          .from('games')
+          .select('id, title, game_url, lesson_id')
+          .eq('id', id)
+          .maybeSingle();
+        data = retry.data as typeof data;
+        error = retry.error;
+      }
 
       if (error && /lesson_id/.test(error.message)) {
         // Migration 17 not run yet: the tag column does not exist.
@@ -173,6 +187,10 @@ export default function GamePlayer() {
   // the frame may still manage where the fetch could not.
   useEffect(() => {
     if (!game) return;
+    if (game.engine) {
+      // Built-in game: nothing to embed; it renders directly.
+      return;
+    }
     const url = game.game_url || '';
     if (!/\.html?($|[?#])/i.test(url)) return;
     let live = true;
@@ -265,7 +283,13 @@ export default function GamePlayer() {
       ) : null}
 
       <View className="flex-1 pt-16">
-        {embedStatus === 'error' ? (
+        {game.engine ? (
+          <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
+            <View className="w-full max-w-3xl mx-auto">
+              <BuiltinGame engine={game.engine} data={game.data} title={game.title} />
+            </View>
+          </ScrollView>
+        ) : embedStatus === 'error' ? (
           <View className="flex-1 items-center justify-center p-6">
             <Text className="text-white font-display text-xl font-semibold mb-2 text-center">
               This game couldn&apos;t be loaded
