@@ -5,7 +5,10 @@ import { contentTypeForFileName } from '../../lib/fileTypes';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
-import BelongsToPicker from './BelongsToPicker';
+import AdminDropdown from './AdminDropdown';
+import ContentTagging from './ContentTagging';
+import BuiltinGame from '../games/BuiltinGame';
+import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 
 interface Category {
@@ -17,8 +20,12 @@ interface Game {
   id: string;
   title: string;
   description: string;
-  category_id: string;
+  category_id: string | null;
   lesson_id?: string | null;
+  stage_id?: string | null;
+  module_id?: string | null;
+  engine?: string | null;
+  data?: any;
   game_url: string;
   thumbnail_url: string;
 }
@@ -35,7 +42,24 @@ export default function GamesManager() {
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [lessonId, setLessonId] = useState<string | null>(null);
+  const [stageId, setStageId] = useState<string | null>(null);
+  const [moduleId, setModuleId] = useState<string | null>(null);
   const taggingAvailable = useLessonTagging('games');
+  const [stageTagging, setStageTagging] = useState(false);
+  const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
+  const [previewGame, setPreviewGame] = useState<Game | null>(null);
+  // List filters (dropdowns, Round 42)
+  const [fCategory, setFCategory] = useState('');
+  const [fStage, setFStage] = useState('');
+  const [fModule, setFModule] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const { error } = await supabase.from('games').select('stage_id').limit(1);
+      setStageTagging(!error);
+      setTaxonomy(await fetchTaxonomy());
+    })();
+  }, []);
   
   const [gameUrl, setGameUrl] = useState('');
   const [selectedGameFile, setSelectedGameFile] = useState<any>(null);
@@ -138,12 +162,17 @@ export default function GamesManager() {
     return data.publicUrl;
   };
 
+  const editingGame = editId ? games.find((g) => g.id === editId) : undefined;
+  const isBuiltinEdit = !!editingGame?.engine;
+
   const handleSave = async () => {
-    if (!title.trim() || !categoryId) {
-      showAlert('Missing Fields', 'Title and Category are required.');
+    if (!title.trim()) {
+      showAlert('Missing Fields', 'A title is required.');
       return;
     }
-    if (!gameUrl && !selectedGameFile) {
+    // Built-in games play from their data - they have no file and must
+    // never be blocked by the file requirement (Round 42 fix).
+    if (!isBuiltinEdit && !gameUrl && !selectedGameFile) {
       showAlert('Missing File', 'Please upload the Game File (HTML/ZIP).');
       return;
     }
@@ -163,30 +192,20 @@ export default function GamesManager() {
         finalThumbUrl = await uploadFileToSupabase(selectedImage, 'thumb');
       }
 
+      const payload: any = {
+        title: title.trim(),
+        description: description.trim(),
+        category_id: categoryId || null,
+        ...(taggingAvailable ? { lesson_id: lessonId } : {}),
+        ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
+        game_url: finalGameUrl,
+        thumbnail_url: finalThumbUrl,
+      };
       if (editId) {
-        const { error } = await supabase
-          .from('games')
-          .update({
-            title: title.trim(),
-            description: description.trim(),
-            category_id: categoryId,
-            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
-            game_url: finalGameUrl,
-            thumbnail_url: finalThumbUrl
-          })
-          .eq('id', editId);
+        const { error } = await supabase.from('games').update(payload).eq('id', editId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('games')
-          .insert([{
-            title: title.trim(),
-            description: description.trim(),
-            category_id: categoryId,
-            ...(taggingAvailable ? { lesson_id: lessonId } : {}),
-            game_url: finalGameUrl,
-            thumbnail_url: finalThumbUrl
-          }]);
+        const { error } = await supabase.from('games').insert([payload]);
         if (error) throw error;
       }
 
@@ -203,8 +222,10 @@ export default function GamesManager() {
     setEditId(game.id);
     setTitle(game.title);
     setDescription(game.description || '');
-    setCategoryId(game.category_id);
+    setCategoryId(game.category_id || '');
     setLessonId(game.lesson_id ?? null);
+    setStageId(game.stage_id ?? null);
+    setModuleId(game.module_id ?? null);
     setGameUrl(game.game_url);
     setThumbnailUrl(game.thumbnail_url || '');
     setSelectedImage(null);
@@ -259,8 +280,19 @@ export default function GamesManager() {
     setSelectedImage(null);
     setSelectedGameFile(null);
     setLessonId(null);
+    setStageId(null);
+    setModuleId(null);
     if (categories.length > 0) setCategoryId(categories[0].id);
   };
+
+  const visibleGames = games.filter((g) => {
+    if (fCategory && g.category_id !== fCategory) return false;
+    if (fStage && g.stage_id !== fStage) return false;
+    if (fModule && g.module_id !== fModule) return false;
+    return true;
+  });
+  const stageName = (id?: string | null) => taxonomy?.stages.find((s) => s.id === id)?.title || '';
+  const moduleName = (id?: string | null) => taxonomy?.modules.find((m) => m.id === id)?.title || '';
 
   return (
     <View className="space-y-8 gap-8">
@@ -274,43 +306,32 @@ export default function GamesManager() {
           {editId ? 'Edit Game Module' : 'Upload New Game'}
         </Text>
         
-        <View className="flex-col md:flex-row gap-4">
-          <View className="flex-1">
-            <Text className="text-sm font-semibold text-text-secondary mb-2">Game Title</Text>
-            <TextInput
-              className="w-full bg-canvas p-4 rounded-xl border border-inkline"
-              placeholder="e.g., Jumping Bird"
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm font-semibold text-text-secondary mb-2">Category</Text>
-            {categories.length === 0 ? (
-              <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a &apos;Games&apos; category first.</Text>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setCategoryId(cat.id)}
-                    className={`mr-2 px-4 py-3 rounded-full border ${categoryId === cat.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-                  >
-                    <Text className={`font-semibold text-sm ${categoryId === cat.id ? 'text-white' : 'text-slate-600'}`}>
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </View>
+        <View>
+          <Text className="text-sm font-semibold text-text-secondary mb-2">Game Title</Text>
+          <TextInput
+            className="w-full bg-canvas p-4 rounded-xl border border-inkline"
+            placeholder="e.g., Jumping Bird"
+            value={title}
+            onChangeText={setTitle}
+          />
         </View>
 
-        {taggingAvailable ? (
-          <View className="border-t border-inkline pt-4">
-            <BelongsToPicker value={lessonId} onChange={setLessonId} />
-          </View>
-        ) : null}
+        <View className="border-t border-inkline pt-4">
+          <ContentTagging
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryId={setCategoryId}
+            stageId={stageId}
+            onStageId={setStageId}
+            moduleId={moduleId}
+            onModuleId={setModuleId}
+            lessonId={lessonId}
+            onLessonId={setLessonId}
+          />
+          {categories.length === 0 ? (
+            <Text className="text-xs text-slate-400 mt-2">No Games categories yet — create them under Categories and they will appear in the dropdown.</Text>
+          ) : null}
+        </View>
 
         <View>
           <Text className="text-sm font-semibold text-text-secondary mb-2">Short Intro / How to Play</Text>
@@ -323,11 +344,20 @@ export default function GamesManager() {
         </View>
 
         <View className="flex-col md:flex-row gap-6 border-t border-inkline pt-6">
-          {/* Game File Upload */}
+          {/* Game File Upload - built-in games have no file at all */}
+          {isBuiltinEdit ? (
+            <View className="flex-1 bg-navy/5 border border-inkline rounded-xl p-4">
+              <Text className="text-sm font-bold text-navy">Built-in game — no file needed</Text>
+              <Text className="text-xs text-slate-500 mt-1">
+                This game plays inside the app from its built-in data (engine: {editingGame?.engine}). There is no file to upload;
+                use Play/Test in the list below to try it here.
+              </Text>
+            </View>
+          ) : (
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">1. Upload Game File (.html or .zip)</Text>
             <View className="flex-row items-center gap-4">
-              <Pressable 
+              <Pressable
                 onPress={pickGameFile}
                 className="px-4 py-3 bg-navy rounded-full"
               >
@@ -344,7 +374,8 @@ export default function GamesManager() {
               </View>
             </View>
           </View>
-          
+          )}
+
           {/* Thumbnail Upload */}
           <View className="flex-1">
             <Text className="text-sm font-semibold text-text-secondary mb-2">2. Upload Game Thumbnail</Text>
@@ -375,14 +406,57 @@ export default function GamesManager() {
             </View>
           )}
           <View className="w-48">
-            <AnimatedButton 
-              title={saving ? "Uploading..." : "Save & Upload Game"} 
-              onPress={handleSave} 
-              disabled={saving || categories.length === 0} 
-              variant="primary" 
-              size="sm" 
+            <AnimatedButton
+              title={saving ? "Saving..." : "Save Game"}
+              onPress={handleSave}
+              disabled={saving}
+              variant="primary"
+              size="sm"
             />
           </View>
+        </View>
+      </View>
+
+      {/* Built-in game preview */}
+      {previewGame ? (
+        <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
+          <View className="flex-row items-center justify-between p-4 border-b border-inkline">
+            <Text className="font-display text-lg font-semibold text-navy">Testing: {previewGame.title}</Text>
+            <Pressable onPress={() => setPreviewGame(null)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
+              <Text className="text-text-secondary text-sm font-semibold">Close</Text>
+            </Pressable>
+          </View>
+          <ScrollView className="p-4" style={{ maxHeight: 560 }}>
+            <BuiltinGame key={previewGame.id} engine={previewGame.engine || ''} data={previewGame.data} title={previewGame.title} />
+          </ScrollView>
+        </View>
+      ) : null}
+
+      {/* List filters */}
+      <View className="flex-col md:flex-row gap-4">
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Category</Text>
+          <AdminDropdown value={fCategory} onChange={setFCategory} options={categories.map((c) => ({ id: c.id, label: c.name }))} placeholder="All categories" noneLabel="All categories" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Stage</Text>
+          <AdminDropdown
+            value={fStage}
+            onChange={(id) => { setFStage(id); setFModule(''); }}
+            options={(taxonomy?.stages || []).map((s) => ({ id: s.id, label: s.title }))}
+            placeholder="All stages"
+            noneLabel="All stages"
+          />
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Module</Text>
+          <AdminDropdown
+            value={fModule}
+            onChange={setFModule}
+            options={(taxonomy?.modules || []).filter((m) => !fStage || m.stage_id === fStage).map((m) => ({ id: m.id, label: m.title }))}
+            placeholder="All modules"
+            noneLabel="All modules"
+          />
         </View>
       </View>
 
@@ -390,17 +464,18 @@ export default function GamesManager() {
       <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
         {loading ? (
           <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-        ) : games.length === 0 ? (
+        ) : visibleGames.length === 0 ? (
           <View className="p-8 items-center">
-            <Text className="text-slate-500">No games added yet.</Text>
+            <Text className="text-slate-500">{games.length === 0 ? 'No games added yet.' : 'No games match these filters.'}</Text>
           </View>
         ) : (
-          games.map((game, index) => {
-            const catName = categories.find(c => c.id === game.category_id)?.name || 'Unknown Category';
+          visibleGames.map((game, index) => {
+            const catName = categories.find(c => c.id === game.category_id)?.name || 'No category';
+            const tagLine = [stageName(game.stage_id), moduleName(game.module_id)].filter(Boolean).join(' · ');
             return (
-              <View 
-                key={game.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== games.length - 1 ? 'border-b border-inkline' : ''}`}
+              <View
+                key={game.id}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== visibleGames.length - 1 ? 'border-b border-inkline' : ''}`}
               >
                 <View className="flex-row items-center gap-4 flex-1">
                   {game.thumbnail_url ? (
@@ -412,13 +487,22 @@ export default function GamesManager() {
                   )}
                   <View>
                     <Text className="font-bold text-text-primary text-base">{game.title}</Text>
-                    <Text className="text-pitch text-xs font-bold uppercase tracking-wider mt-1">{catName}</Text>
+                    <Text className="text-pitch text-xs font-bold uppercase tracking-wider mt-1">
+                      {catName}{game.engine ? ' · Built-in' : ''}
+                    </Text>
+                    {tagLine ? <Text className="text-slate-400 text-xs mt-0.5">{tagLine}</Text> : null}
                   </View>
                 </View>
-                
+
                 <View className="flex-row gap-3">
                   <Pressable onPress={() => {
-                    if (Platform.OS === 'web') window.open(game.game_url, '_blank');
+                    if (game.engine) {
+                      setPreviewGame(game);
+                    } else if (Platform.OS === 'web' && game.game_url) {
+                      window.open(game.game_url, '_blank');
+                    } else {
+                      showAlert('No File', 'This game has no file and is not a built-in game.');
+                    }
                   }} className="px-3 py-1.5 bg-canvas rounded-full border border-inkline">
                     <Text className="text-navy text-sm font-semibold">Play/Test</Text>
                   </Pressable>

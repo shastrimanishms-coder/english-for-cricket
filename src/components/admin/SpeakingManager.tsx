@@ -11,7 +11,8 @@ import {
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
-import BelongsToPicker from './BelongsToPicker';
+import AdminDropdown from './AdminDropdown';
+import ContentTagging from './ContentTagging';
 import SentenceVoices from './SentenceVoices';
 
 // Admin manager for the standalone Speaking Practice area ONLY
@@ -44,6 +45,8 @@ interface ScenarioRow {
   created_at: string;
   lesson_id?: string | null;
   category_id?: string | null;
+  stage_id?: string | null;
+  module_id?: string | null;
 }
 
 const CATEGORIES = ['Interview', 'Small Talk'] as const;
@@ -66,6 +69,9 @@ export default function SpeakingManager() {
   const [otherName, setOtherName] = useState('');
   const [turns, setTurns] = useState<ScenarioTurn[]>([]);
   const [lessonId, setLessonId] = useState<string | null>(null);
+  const [stageId, setStageId] = useState<string | null>(null);
+  const [moduleId, setModuleId] = useState<string | null>(null);
+  const [stageTagging, setStageTagging] = useState(false);
   const [categoryId, setCategoryId] = useState<string>('');
   const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
   const taggingAvailable = useLessonTagging('speaking_scenarios');
@@ -99,6 +105,8 @@ export default function SpeakingManager() {
       await fetchData();
       const { data } = await supabase.from('categories').select('id, name').eq('type', 'speaking').order('name');
       setSpeakingCats((data || []) as { id: string; name: string }[]);
+      const { error: stageErr } = await supabase.from('speaking_scenarios').select('stage_id').limit(1);
+      setStageTagging(!stageErr);
     })();
   }, [fetchData]);
 
@@ -113,6 +121,10 @@ export default function SpeakingManager() {
       { speaker: 'other', text: '' },
       { speaker: 'learner', text: '' },
     ]);
+    setLessonId(null);
+    setStageId(null);
+    setModuleId(null);
+    setCategoryId('');
     setShowForm(true);
   };
 
@@ -125,6 +137,8 @@ export default function SpeakingManager() {
     setOtherName(row.other_name || '');
     setTurns(Array.isArray(row.turns) ? row.turns : []);
     setLessonId(row.lesson_id ?? null);
+    setStageId(row.stage_id ?? null);
+    setModuleId(row.module_id ?? null);
     setCategoryId(row.category_id ?? '');
     setShowForm(true);
   };
@@ -183,6 +197,7 @@ export default function SpeakingManager() {
         other_name: otherName.trim() || 'Partner',
         turns: cleanTurns,
         ...(taggingAvailable ? { lesson_id: lessonId, category_id: categoryId || null } : {}),
+        ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
       };
       if (editId) {
         const { error } = await supabase
@@ -316,20 +331,16 @@ export default function SpeakingManager() {
 
           <View className="flex-col md:flex-row gap-4">
             <View className="flex-1">
-              <Text className="text-sm font-semibold text-text-secondary mb-2">Category</Text>
-              <View className="flex-row gap-2">
-                {CATEGORIES.map(cat => (
-                  <Pressable
-                    key={cat}
-                    onPress={() => setCategory(cat)}
-                    className={`px-4 py-3 rounded-full border ${category === cat ? 'bg-navy border-navy' : 'bg-white border-inkline'}`}
-                  >
-                    <Text className={`font-bold text-sm ${category === cat ? 'text-white' : 'text-text-secondary'}`}>
-                      {cat === 'Interview' ? '🎙️ Interview' : '💬 Small Talk'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+              <Text className="text-sm font-semibold text-text-secondary mb-2">Type</Text>
+              <AdminDropdown
+                value={category}
+                onChange={(id) => id && setCategory(id)}
+                options={CATEGORIES.map((cat) => ({
+                  id: cat,
+                  label: cat === 'Interview' ? '🎙️ Interview' : '💬 Small Talk',
+                }))}
+                noneLabel="Choose a type"
+              />
             </View>
             <View className="flex-1">
               <Text className="text-sm font-semibold text-text-secondary mb-2">Short Description</Text>
@@ -342,33 +353,20 @@ export default function SpeakingManager() {
             </View>
           </View>
 
-          {taggingAvailable ? (
-            <View className="gap-4 border-t border-inkline pt-4">
-              {speakingCats.length > 0 ? (
-                <View>
-                  <Text className="text-sm font-semibold text-text-secondary mb-2">Shelf Category (optional)</Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    <Pressable
-                      onPress={() => setCategoryId('')}
-                      className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-                    >
-                      <Text className={`text-xs font-semibold ${categoryId === '' ? 'text-white' : 'text-slate-600'}`}>None</Text>
-                    </Pressable>
-                    {speakingCats.map((c) => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => setCategoryId(c.id)}
-                        className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-                      >
-                        <Text className={`text-xs font-semibold ${categoryId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-              <BelongsToPicker value={lessonId} onChange={setLessonId} />
-            </View>
-          ) : null}
+          <View className="border-t border-inkline pt-4">
+            <ContentTagging
+              categories={speakingCats}
+              categoryId={categoryId}
+              onCategoryId={setCategoryId}
+              categoryLabel="Shelf Category (optional)"
+              stageId={stageId}
+              onStageId={setStageId}
+              moduleId={moduleId}
+              onModuleId={setModuleId}
+              lessonId={lessonId}
+              onLessonId={setLessonId}
+            />
+          </View>
 
           {/* Dialogue editor */}
           <View>

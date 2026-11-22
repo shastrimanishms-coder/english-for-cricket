@@ -11,7 +11,7 @@ import { countCoveredSentences } from '../../lib/adminVoiceUploads';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
-import BelongsToPicker from './BelongsToPicker';
+import ContentTagging from './ContentTagging';
 import SentenceVoices from './SentenceVoices';
 
 // The same sentence split the learner app narrates with, so the
@@ -35,6 +35,8 @@ interface StoryRow {
   emoji: string;
   category_id: string | null;
   lesson_id: string | null;
+  stage_id?: string | null;
+  module_id?: string | null;
   pages: string[];
   level: string;
   is_published: boolean;
@@ -56,6 +58,9 @@ export default function ReadingManager() {
   const [level, setLevel] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [lessonId, setLessonId] = useState<string | null>(null);
+  const [stageId, setStageId] = useState<string | null>(null);
+  const [moduleId, setModuleId] = useState<string | null>(null);
+  const [stageTagging, setStageTagging] = useState(false);
   const [pages, setPages] = useState<string[]>(['']);
   // Comprehension questions (Round 39), edited as one line per question:
   // Question :: Option 1 :: Option 2 :: Option 3 :: <correct option number>
@@ -66,6 +71,13 @@ export default function ReadingManager() {
   const [coverageKey, setCoverageKey] = useState(0);
 
   const taggingAvailable = useLessonTagging('reading_stories');
+
+  useEffect(() => {
+    (async () => {
+      const { error } = await supabase.from('reading_stories').select('stage_id').limit(1);
+      setStageTagging(!error);
+    })();
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -104,6 +116,8 @@ export default function ReadingManager() {
     setLevel('');
     setCategoryId('');
     setLessonId(null);
+    setStageId(null);
+    setModuleId(null);
     setPages(['']);
     setQuestionsText('');
     setShowForm(true);
@@ -117,6 +131,8 @@ export default function ReadingManager() {
     setLevel(row.level || '');
     setCategoryId(row.category_id || '');
     setLessonId(row.lesson_id ?? null);
+    setStageId(row.stage_id ?? null);
+    setModuleId(row.module_id ?? null);
     setPages(Array.isArray(row.pages) && row.pages.length ? row.pages.map(String) : ['']);
     setQuestionsText(
       Array.isArray((row as any).questions)
@@ -163,6 +179,7 @@ export default function ReadingManager() {
         category_id: categoryId || null,
         pages: cleanPages,
         ...(taggingAvailable ? { lesson_id: lessonId } : {}),
+        ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
       };
       const payload: any = { ...basePayload, questions: parsedQuestions };
       const saveWith = async (p: any) => {
@@ -300,30 +317,6 @@ export default function ReadingManager() {
             />
           </View>
 
-          <View>
-            <Text className="text-sm font-semibold text-text-secondary mb-2">Shelf Category (optional)</Text>
-            <View className="flex-row flex-wrap gap-2">
-              <Pressable
-                onPress={() => setCategoryId('')}
-                className={`px-3 py-2 rounded-full border ${categoryId === '' ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-              >
-                <Text className={`text-xs font-semibold ${categoryId === '' ? 'text-white' : 'text-slate-600'}`}>None</Text>
-              </Pressable>
-              {categories.map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => setCategoryId(c.id)}
-                  className={`px-3 py-2 rounded-full border ${categoryId === c.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-                >
-                  <Text className={`text-xs font-semibold ${categoryId === c.id ? 'text-white' : 'text-slate-600'}`}>{c.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {categories.length === 0 ? (
-              <Text className="text-xs text-slate-400 mt-2">No reading categories yet — create them in the Categories Manager (type: Smart Reading).</Text>
-            ) : null}
-          </View>
-
           <View className="gap-3">
             <Text className="text-sm font-semibold text-text-secondary">Pages (short pages read best — 3 to 6 sentences each)</Text>
             {pages.map((page, i) => (
@@ -413,11 +406,23 @@ export default function ReadingManager() {
             </View>
           ) : null}
 
-          {taggingAvailable ? (
-            <View className="border-t border-inkline pt-4">
-              <BelongsToPicker value={lessonId} onChange={setLessonId} />
-            </View>
-          ) : null}
+          <View className="border-t border-inkline pt-4">
+            <ContentTagging
+              categories={categories}
+              categoryId={categoryId}
+              onCategoryId={setCategoryId}
+              categoryLabel="Shelf Category (optional)"
+              stageId={stageId}
+              onStageId={setStageId}
+              moduleId={moduleId}
+              onModuleId={setModuleId}
+              lessonId={lessonId}
+              onLessonId={setLessonId}
+            />
+            {categories.length === 0 ? (
+              <Text className="text-xs text-slate-400 mt-2">No reading categories yet — create them in the Categories Manager (type: Smart Reading).</Text>
+            ) : null}
+          </View>
 
           <View className="flex-row justify-end gap-3">
             <Pressable onPress={cancelEdit} className="px-5 py-3 bg-white border border-inkline rounded-full">
