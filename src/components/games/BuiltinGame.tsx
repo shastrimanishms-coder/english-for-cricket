@@ -134,7 +134,7 @@ function TapGame({ engine, data }: { engine: string; data: any }) {
                   <Text className="font-display text-6xl font-semibold text-navy">{opt.value}</Text>
                 </View>
               ) : (
-                <Image source={{ uri: opt.image }} style={{ width: '100%', height: 128 }} resizeMode="cover" />
+                <Image source={{ uri: opt.image }} style={{ width: '100%', height: 128, backgroundColor: '#FFFFFF' }} resizeMode="contain" />
               )}
             </Pressable>
           );
@@ -199,7 +199,7 @@ function MemoryPairs({ data }: { data: any }) {
             <Pressable key={card.key} onPress={() => flip(card)} className={`w-[31%] h-28 rounded-2xl border-2 mb-3 overflow-hidden items-center justify-center ${faceUp ? 'border-gold bg-white' : 'border-navy bg-navy'}`}>
               {faceUp ? (
                 card.kind === 'image' ? (
-                  <Image source={{ uri: card.item.image }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  <Image source={{ uri: card.item.image }} style={{ width: '100%', height: '100%', backgroundColor: '#FFFFFF' }} resizeMode="contain" />
                 ) : (
                   <Text className="font-display text-lg font-semibold text-navy px-1 text-center">{card.item.word}</Text>
                 )
