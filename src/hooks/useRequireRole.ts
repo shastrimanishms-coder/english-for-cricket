@@ -7,7 +7,7 @@ export type RoleGuardStatus = 'checking' | 'authorized';
 // The single home route per role - mirrors the routing decisions made in
 // login.tsx after a successful email sign-in.
 function homeRouteForRole(role: string | null | undefined) {
-  if (role === 'super_admin') return '/admin' as const;
+  if (role === 'super_admin' || role === 'content_manager') return '/admin' as const;
   if (role === 'manager') return '/manager' as const;
   return '/learner' as const;
 }

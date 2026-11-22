@@ -60,7 +60,7 @@ interface AdminUserEmail {
   email: string;
 }
 
-const ROLE_OPTIONS = ['super_admin', 'manager', 'individual_learner'] as const;
+const ROLE_OPTIONS = ['super_admin', 'content_manager', 'manager', 'individual_learner'] as const;
 
 function formatDuration(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
@@ -287,6 +287,19 @@ export default function UsersManager() {
     if (!editDisplayName.trim()) {
       Alert.alert('Missing Field', 'Display name cannot be empty.');
       return;
+    }
+    // Content Manager rule (also enforced by a database guard in
+    // migration 20261122000028): the account's login email must be an
+    // @englishforcricket.com address created for that person.
+    if (editRole === 'content_manager') {
+      const email = emailById.get(editingId);
+      if (!email || !email.toLowerCase().endsWith('@englishforcricket.com')) {
+        Alert.alert(
+          'Content Manager Rule',
+          'A Content Manager account must use an @englishforcricket.com email address. Create the mailbox for this person first, have them register with that address, and then set this role.'
+        );
+        return;
+      }
     }
     setSavingEdit(true);
     try {
@@ -702,6 +715,13 @@ export default function UsersManager() {
                   </Pressable>
                 ))}
               </View>
+              {editRole === 'content_manager' && (
+                <Text className="text-xs text-slate-500 mt-2">
+                  Content Managers sign in at the normal login page and see only the content
+                  sections (Learning Path, Games, Downloads, Speaking Practice, Smart Reading).
+                  Their account email must end with @englishforcricket.com.
+                </Text>
+              )}
             </View>
             <View className="flex-col md:flex-row gap-4">
               <View className="flex-1">

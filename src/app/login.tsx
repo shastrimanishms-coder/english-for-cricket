@@ -87,7 +87,7 @@ export default function LoginScreen() {
         }
 
         const userRole = profileData.role;
-        if (userRole === 'super_admin') {
+        if (userRole === 'super_admin' || userRole === 'content_manager') {
           router.replace('/admin');
         } else if (userRole === 'manager') {
           router.replace('/manager');

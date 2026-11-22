@@ -24,7 +24,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const ADMIN_MENU = [
+interface AdminMenuItem {
+  id: string;
+  label: string;
+  icon: string;
+  subItems?: { id: string; label: string }[];
+}
+
+const ADMIN_MENU: AdminMenuItem[] = [
   { id: 'overview', label: 'Dashboard Overview', icon: '📊' },
   { 
     id: 'learning_path', 
@@ -69,6 +76,20 @@ const ADMIN_MENU = [
   { id: 'support_faqs', label: 'Support & FAQs', icon: '❓' },
   { id: 'settings', label: 'System Settings', icon: '⚙️' },
 ];
+
+// The only sections a Content Manager may open (Round 37): learning
+// content creation and editing, nothing else. The sidebar is filtered
+// to these tabs and renderMainContent refuses the rest, but the real
+// enforcement is RLS (migration 20261122000028) - a content_manager
+// session cannot read or write the other tables at all.
+const CONTENT_MANAGER_TABS = new Set([
+  'curriculum',
+  'slide_builder',
+  'downloads',
+  'games',
+  'speaking',
+  'reading',
+]);
 
 // Local-date period starts for the overview growth stats. The week
 // starts on Monday.
@@ -150,15 +171,51 @@ export default function SuperAdminDashboard() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isNarrowLayout = windowWidth < 768;
-  // Defense-in-depth: only super_admin sessions may see the CMS at all.
-  // (RLS on the tables remains the real enforcement.)
-  const guardStatus = useRequireRole(['super_admin']);
+  // Defense-in-depth: only super_admin and content_manager sessions may
+  // see the CMS at all. (RLS on the tables remains the real enforcement.)
+  const guardStatus = useRequireRole(['super_admin', 'content_manager']);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     learning_path: false,
     taxonomy: false,
     assets: false,
   });
+
+  // The signed-in admin's own role, so a Content Manager sees only the
+  // content sections. Loaded once from the same profile row the guard
+  // checks; null while loading (the guard spinner covers that period).
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      const role = (data?.role as string) ?? null;
+      setViewerRole(role);
+      if (role === 'content_manager') {
+        setExpandedMenus(prev => ({ ...prev, learning_path: true, assets: true }));
+      }
+    })();
+  }, []);
+  const isContentManager = viewerRole === 'content_manager';
+
+  // Sidebar entries visible to this viewer: for a Content Manager, only
+  // the content sections (parents keep just their permitted children).
+  const visibleMenu = isContentManager
+    ? ADMIN_MENU.flatMap(item => {
+        if (item.subItems) {
+          const subs = item.subItems.filter(sub => CONTENT_MANAGER_TABS.has(sub.id));
+          return subs.length > 0 ? [{ ...item, subItems: subs }] : [];
+        }
+        return CONTENT_MANAGER_TABS.has(item.id) ? [item] : [];
+      })
+    : ADMIN_MENU;
 
   // Overview counts - null shows '—' when a count cannot be loaded.
   const [overviewCounts, setOverviewCounts] = useState<{
@@ -323,10 +380,14 @@ export default function SuperAdminDashboard() {
   }, []);
 
   useEffect(() => {
+    // The overview is a super_admin section; Content Managers land on
+    // the Learning Path instead and never trigger its queries (most
+    // would be refused by RLS anyway).
+    if (viewerRole !== 'super_admin') return;
     (async () => {
       await Promise.all([fetchOverviewCounts(), fetchOverviewExtra()]);
     })();
-  }, [fetchOverviewCounts, fetchOverviewExtra]);
+  }, [viewerRole, fetchOverviewCounts, fetchOverviewExtra]);
 
   // Shortcut navigation: switch tab and expand its sidebar parent menu
   // when the tab lives under a collapsible section.
@@ -349,7 +410,11 @@ export default function SuperAdminDashboard() {
   };
 
   const renderMainContent = () => {
-    switch (activeTab) {
+    // A Content Manager can never render a section outside their list,
+    // whatever the tab state says - they get the Learning Path instead.
+    const effectiveTab =
+      isContentManager && !CONTENT_MANAGER_TABS.has(activeTab) ? 'curriculum' : activeTab;
+    switch (effectiveTab) {
       case 'overview': {
         const maxCountryCount = overviewExtra.countries && overviewExtra.countries.length > 0
           ? overviewExtra.countries[0].count
@@ -552,14 +617,15 @@ export default function SuperAdminDashboard() {
         <ScrollView style={isNarrowLayout ? { maxHeight: windowHeight * 0.38 } : undefined}>
           <View className="p-6 border-b border-white/10 mb-4">
             <Text className="font-display text-2xl font-semibold text-white tracking-wide">KYCO</Text>
-            <Text className="font-sans text-gold text-[11px] font-bold tracking-[2.5px] uppercase mt-1">Super Admin CMS</Text>
+            <Text className="font-sans text-gold text-[11px] font-bold tracking-[2.5px] uppercase mt-1">{isContentManager ? 'Content Manager' : 'Super Admin CMS'}</Text>
           </View>
 
           <View className="px-4 space-y-1 gap-1 pb-6">
-            {ADMIN_MENU.map((item) => {
-              const hasSubItems = item.subItems && item.subItems.length > 0;
+            {visibleMenu.map((item) => {
+              const subItems = item.subItems ?? [];
+              const hasSubItems = subItems.length > 0;
               const isExpanded = expandedMenus[item.id];
-              const isActivePrimary = activeTab === item.id || (hasSubItems && item.subItems.some(sub => sub.id === activeTab));
+              const isActivePrimary = activeTab === item.id || (hasSubItems && subItems.some(sub => sub.id === activeTab));
 
               return (
                 <View key={item.id}>
@@ -582,7 +648,7 @@ export default function SuperAdminDashboard() {
                   {/* Collapsible Sub-Items */}
                   {hasSubItems && isExpanded && (
                     <View className="mt-1 mb-2 ml-10 space-y-1 gap-1 border-l-2 border-white/15 pl-3">
-                      {item.subItems.map((subItem) => {
+                      {subItems.map((subItem) => {
                         const isSubActive = activeTab === subItem.id;
                         return (
                           <Pressable

@@ -29,7 +29,7 @@ export async function routeSignedInUser(
       .eq('id', session.user.id)
       .single();
 
-    if (profile?.role === 'super_admin') {
+    if (profile?.role === 'super_admin' || profile?.role === 'content_manager') {
       replace('/admin');
     } else if (profile?.role === 'manager') {
       replace('/manager');

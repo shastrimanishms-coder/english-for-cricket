@@ -14,6 +14,21 @@ interface FAQ {
   order_index: number;
 }
 
+// The fixed list of support topics (Round 37). The chosen topic becomes
+// the start of the message subject in the admin inbox, so every message
+// arrives already sorted into a subject area.
+const SUPPORT_TOPICS = [
+  'General question',
+  'Account and sign-in',
+  'Lessons and the learning path',
+  'Speaking practice and microphone',
+  'Voices and audio',
+  'Games, videos and downloads',
+  'Smart Reading',
+  'For parents, schools and clubs',
+  'Technical problem',
+] as const;
+
 // Learner-facing Help Center. Content is managed in the admin panel
 // (Support & FAQs). support_faqs has no publish flag, so every row the
 // admin saves is shown here, grouped by section.
@@ -29,6 +44,7 @@ export default function SupportScreen() {
   // inbox - there is no email service connected yet, so nothing is mailed.
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
+  const [formTopic, setFormTopic] = useState<string>('General question');
   const [formSubject, setFormSubject] = useState('');
   const [formMessage, setFormMessage] = useState('');
   const [formSending, setFormSending] = useState(false);
@@ -38,7 +54,10 @@ export default function SupportScreen() {
   const handleSendMessage = async () => {
     const name = formName.trim();
     const email = formEmail.trim();
-    const subject = formSubject.trim();
+    const subjectText = formSubject.trim();
+    // The inbox subject is the topic, plus the sender's own subject
+    // line when they wrote one: "Voices and audio: No sound on iPad".
+    const subject = subjectText ? `${formTopic}: ${subjectText}` : formTopic;
     const message = formMessage.trim();
 
     if (!name || !email || !message) {
@@ -54,7 +73,7 @@ export default function SupportScreen() {
     setFormError(null);
     try {
       const { error } = await supabase.from('support_messages').insert([
-        { name, email, subject: subject || null, message },
+        { name, email, subject, message },
       ]);
       if (error) throw error;
       // Best-effort email notification through the send-support-email
@@ -70,6 +89,7 @@ export default function SupportScreen() {
       }
       setFormName('');
       setFormEmail('');
+      setFormTopic('General question');
       setFormSubject('');
       setFormMessage('');
       setFormSent(true);
@@ -227,6 +247,25 @@ export default function SupportScreen() {
                   keyboardType="email-address"
                   editable={!formSending}
                 />
+
+                <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Topic *</Text>
+                <View className="flex-row flex-wrap gap-2 mb-4">
+                  {SUPPORT_TOPICS.map(topic => {
+                    const selected = formTopic === topic;
+                    return (
+                      <Pressable
+                        key={topic}
+                        onPress={() => setFormTopic(topic)}
+                        disabled={formSending}
+                        className={`px-3 py-2 rounded-full border ${selected ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
+                      >
+                        <Text className={`font-sans font-semibold text-sm ${selected ? 'text-white' : 'text-slate-500'}`}>
+                          {topic}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
                 <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Subject (optional)</Text>
                 <TextInput
