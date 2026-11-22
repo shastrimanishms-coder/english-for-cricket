@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import {
+  individualMarkedEmail,
+  individualReminderEmail,
+  managerMarkedEmail,
+  managerReminderEmail,
+  sendAdminEmail,
+} from '../../lib/adminMail';
 import { ROLE_NOTES, roleLabel } from '../../lib/roleLabels';
 import { groupStudentsByClass } from '../../lib/studentGroups';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +21,7 @@ interface UserProfile {
   last_login_at: string | null;
   is_archived: boolean;
   reminder_level: number;
+  marked_for_deletion_at?: string | null; // migration 31 (absent until run)
 }
 
 interface Organization {
@@ -204,35 +212,122 @@ export default function UsersManager() {
   const statsFor = (kind: 'auth' | 'sub_account', id: string) => statsByKey.get(`${kind}:${id}`);
 
   // --- RETENTION ENGINE LOGIC ---
-  const pendingReminders = students.filter(s => {
-    if (s.marked_for_deletion_at) return false;
-    const days = getDaysSince(s.last_login_at);
-    if (days >= 28 && s.reminder_level < 4) return true;
-    if (days >= 21 && days < 28 && s.reminder_level < 3) return true;
-    if (days >= 14 && days < 21 && s.reminder_level < 2) return true;
-    if (days >= 7 && days < 14 && s.reminder_level < 1) return true;
-    return false;
-  });
+  // One pipeline for BOTH kinds of account: students (sub_accounts,
+  // emailed via their school/club manager - they have no email of
+  // their own) and individual accounts (user_profiles, emailed
+  // directly). Bands: reminders at 7/14/21/28 days inactive, mark for
+  // deletion at 30 days, permanent deletion 90 days after the mark,
+  // always behind the Execute button's confirmation. A reminder level
+  // only advances when its email was actually sent (Round 40 fix: the
+  // old version advanced levels without sending anything).
+  const bandLevel = (days: number) => (days >= 28 ? 4 : days >= 21 ? 3 : days >= 14 ? 2 : days >= 7 ? 1 : 0);
+  // "Inactive" means no ACTIVITY, not just no fresh login: a student
+  // with a saved PIN session may never re-login while learning daily.
+  // The stats RPC already computes last activity across logins,
+  // activity logs and lesson completions - use it, with the login
+  // stamp and the account's creation as fallbacks.
+  const studentLastActive = (s: SubAccount) =>
+    statsFor('sub_account', s.id)?.last_active_at ?? s.last_login_at ?? s.created_at;
+  const profileLastActive = (p: UserProfile) =>
+    statsFor('auth', p.id)?.last_active_at ?? p.last_login_at ?? p.created_at;
+  const isStaff = (p: UserProfile) => p.role === 'super_admin' || p.role === 'content_manager';
 
-  const pendingDeletions = students.filter(s => getDaysSince(s.last_login_at) >= 30 && !s.marked_for_deletion_at);
-  const pendingHardDeletes = students.filter(s => s.marked_for_deletion_at && getDaysSince(s.marked_for_deletion_at) >= 90);
+  const pendingReminders = students.filter(
+    s => !s.marked_for_deletion_at && bandLevel(getDaysSince(studentLastActive(s))) > (s.reminder_level ?? 0),
+  );
+  const pendingProfileReminders = managers.filter(
+    p => !isStaff(p) && !p.is_archived && !p.marked_for_deletion_at &&
+      bandLevel(getDaysSince(profileLastActive(p))) > (p.reminder_level ?? 0),
+  );
+
+  const pendingDeletions = students.filter(s => getDaysSince(studentLastActive(s)) >= 30 && !s.marked_for_deletion_at);
+  const pendingProfileDeletions = managers.filter(
+    p => !isStaff(p) && !p.is_archived && !p.marked_for_deletion_at && getDaysSince(profileLastActive(p)) >= 30,
+  );
+
+  // Marked 90+ days ago AND still inactive. Anyone who came back
+  // (active within 30 days) is NOT deleted - their mark is cleared in
+  // the hard-delete run instead, as the notice emails promise.
+  const pendingHardDeletes = students.filter(
+    s => s.marked_for_deletion_at && getDaysSince(s.marked_for_deletion_at) >= 90 && getDaysSince(studentLastActive(s)) >= 30,
+  );
+  const pendingProfileHardDeletes = managers.filter(
+    p => p.marked_for_deletion_at && getDaysSince(p.marked_for_deletion_at) >= 90 && getDaysSince(profileLastActive(p)) >= 30,
+  );
+  const returnedStudents = students.filter(
+    s => s.marked_for_deletion_at && getDaysSince(s.marked_for_deletion_at) >= 90 && getDaysSince(studentLastActive(s)) < 30,
+  );
+  const returnedProfiles = managers.filter(
+    p => p.marked_for_deletion_at && getDaysSince(p.marked_for_deletion_at) >= 90 && getDaysSince(profileLastActive(p)) < 30,
+  );
+
+  const totalReminders = pendingReminders.length + pendingProfileReminders.length;
+  const totalMarks = pendingDeletions.length + pendingProfileDeletions.length;
+  const totalHardDeletes = pendingHardDeletes.length + pendingProfileHardDeletes.length;
 
   const processReminders = async () => {
     setProcessing(true);
     try {
-      // In Phase 2, we will connect this to your SMTP email API.
-      // For now, it updates the database states so the queue clears.
-      for (const s of pendingReminders) {
-        const days = getDaysSince(s.last_login_at);
-        let newLevel = s.reminder_level;
-        if (days >= 28) newLevel = 4;
-        else if (days >= 21) newLevel = 3;
-        else if (days >= 14) newLevel = 2;
-        else if (days >= 7) newLevel = 1;
+      let emailsSent = 0;
+      let covered = 0;
+      let skipped = 0;
+      let failed = 0;
 
-        await supabase.from('sub_accounts').update({ reminder_level: newLevel }).eq('id', s.id);
+      // Students: one grouped email per manager.
+      const orgById = new Map(organizations.map(o => [o.id, o]));
+      const byManager = new Map<string, SubAccount[]>();
+      for (const s of pendingReminders) {
+        const org = orgById.get(s.organization_id);
+        const email = org ? emailById.get(org.manager_id) : undefined;
+        if (!org || !email) { skipped++; continue; }
+        const list = byManager.get(email) || [];
+        list.push(s);
+        byManager.set(email, list);
       }
-      Alert.alert('Success', `${pendingReminders.length} reminder emails processed and logged.`);
+      for (const [email, list] of byManager) {
+        const mail = managerReminderEmail(
+          list.map(s => ({
+            name: s.display_name || s.username,
+            days: getDaysSince(studentLastActive(s)),
+            level: bandLevel(getDaysSince(studentLastActive(s))),
+          })),
+        );
+        const res = await sendAdminEmail(email, mail.subject, mail.body);
+        if (res.ok) {
+          emailsSent++;
+          covered += list.length;
+          for (const s of list) {
+            await supabase.from('sub_accounts')
+              .update({ reminder_level: bandLevel(getDaysSince(studentLastActive(s))) })
+              .eq('id', s.id);
+          }
+        } else {
+          failed++;
+        }
+      }
+
+      // Individual accounts: a personal email each.
+      for (const p of pendingProfileReminders) {
+        const email = emailById.get(p.id);
+        if (!email) { skipped++; continue; }
+        const days = getDaysSince(profileLastActive(p));
+        const mail = individualReminderEmail(bandLevel(days), days);
+        const res = await sendAdminEmail(email, mail.subject, mail.body);
+        if (res.ok) {
+          emailsSent++;
+          covered++;
+          await supabase.from('user_profiles').update({ reminder_level: bandLevel(days) }).eq('id', p.id);
+        } else {
+          failed++;
+        }
+      }
+
+      Alert.alert(
+        'Reminders Processed',
+        `${emailsSent} email(s) sent, covering ${covered} account(s).` +
+          (skipped ? ` ${skipped} account(s) had no email address to send to and remain in the queue.` : '') +
+          (failed ? ` ${failed} email(s) could not be sent - the accounts remain in the queue; check that the mail service is reachable and try again.` : ''),
+      );
       await fetchData();
     } catch (e: any) { Alert.alert('Error', e.message); }
     finally { setProcessing(false); }
@@ -241,31 +336,96 @@ export default function UsersManager() {
   const processDeletionMarks = async () => {
     setProcessing(true);
     try {
+      const now = new Date().toISOString();
       for (const s of pendingDeletions) {
-        await supabase.from('sub_accounts').update({ marked_for_deletion_at: new Date().toISOString() }).eq('id', s.id);
+        await supabase.from('sub_accounts').update({ marked_for_deletion_at: now }).eq('id', s.id);
       }
-      Alert.alert('Success', `${pendingDeletions.length} accounts marked for deletion.`);
+      for (const p of pendingProfileDeletions) {
+        await supabase.from('user_profiles').update({ marked_for_deletion_at: now }).eq('id', p.id);
+      }
+
+      // Notices (best effort - the marks stand even if a mail fails).
+      let notices = 0;
+      const orgById = new Map(organizations.map(o => [o.id, o]));
+      const markedByManager = new Map<string, string[]>();
+      for (const s of pendingDeletions) {
+        const org = orgById.get(s.organization_id);
+        const email = org ? emailById.get(org.manager_id) : undefined;
+        if (!org || !email) continue;
+        const list = markedByManager.get(email) || [];
+        list.push(s.display_name || s.username);
+        markedByManager.set(email, list);
+      }
+      for (const [email, names] of markedByManager) {
+        const mail = managerMarkedEmail(names);
+        const res = await sendAdminEmail(email, mail.subject, mail.body);
+        if (res.ok) notices++;
+      }
+      for (const p of pendingProfileDeletions) {
+        const email = emailById.get(p.id);
+        if (!email) continue;
+        const mail = individualMarkedEmail();
+        const res = await sendAdminEmail(email, mail.subject, mail.body);
+        if (res.ok) notices++;
+      }
+
+      Alert.alert(
+        'Marked for Deletion',
+        `${totalMarks} account(s) marked for deletion. They will be permanently deleted 90 days from now unless they sign in.` +
+          (notices ? ` ${notices} notice email(s) sent.` : ''),
+      );
       await fetchData();
     } catch (e: any) { Alert.alert('Error', e.message); }
     finally { setProcessing(false); }
   };
 
   const processHardDeletes = async () => {
-    const confirm = () => {
+    const confirm = async () => {
       setProcessing(true);
-      Promise.all(pendingHardDeletes.map(s => supabase.from('sub_accounts').delete().eq('id', s.id)))
-        .then(() => {
-          Alert.alert('Success', `${pendingHardDeletes.length} accounts permanently deleted.`);
-          fetchData();
-        })
-        .catch(e => Alert.alert('Error', e.message))
-        .finally(() => setProcessing(false));
+      try {
+        let deleted = 0;
+        const problems: string[] = [];
+        // Accounts that came back after being marked: clear the mark
+        // and reset their reminders instead of deleting them.
+        let returned = 0;
+        for (const s of returnedStudents) {
+          const { error } = await supabase.from('sub_accounts')
+            .update({ marked_for_deletion_at: null, reminder_level: 0 })
+            .eq('id', s.id);
+          if (!error) returned++;
+        }
+        for (const p of returnedProfiles) {
+          const { error } = await supabase.from('user_profiles')
+            .update({ marked_for_deletion_at: null, reminder_level: 0 })
+            .eq('id', p.id);
+          if (!error) returned++;
+        }
+        for (const s of pendingHardDeletes) {
+          const { error } = await supabase.from('sub_accounts').delete().eq('id', s.id);
+          if (error) problems.push(`${s.display_name || s.username}: ${error.message}`);
+          else deleted++;
+        }
+        for (const p of pendingProfileHardDeletes) {
+          const { data, error } = await supabase.rpc('admin_delete_user', { p_user_id: p.id });
+          if (error) problems.push(`${p.display_name || 'Account'}: ${error.message}`);
+          else if (data && data.ok === false) problems.push(`${p.display_name || 'Account'}: ${data.error}`);
+          else deleted++;
+        }
+        Alert.alert(
+          'Permanent Deletion Done',
+          `${deleted} account(s) permanently deleted.` +
+            (returned ? ` ${returned} account(s) had come back, so their deletion marks were cleared instead.` : '') +
+            (problems.length ? `\n\nCould not delete:\n${problems.join('\n')}` : ''),
+        );
+        await fetchData();
+      } catch (e: any) { Alert.alert('Error', e.message); }
+      finally { setProcessing(false); }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`PERMANENTLY delete ${pendingHardDeletes.length} accounts? This cannot be undone.`)) confirm();
+      if (window.confirm(`PERMANENTLY delete ${totalHardDeletes} accounts? This cannot be undone.`)) confirm();
     } else {
-      Alert.alert('WARNING', `Permanently delete ${pendingHardDeletes.length} accounts?`, [
+      Alert.alert('WARNING', `Permanently delete ${totalHardDeletes} accounts?`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete Forever', style: 'destructive', onPress: confirm }
       ]);
@@ -325,33 +485,25 @@ export default function UsersManager() {
     }
   };
 
-  // True account deletion goes through the delete-user Edge Function
-  // (it holds the service-role key and calls the Auth Admin API).
-  // Deleting only the user_profiles row would leave the login alive,
-  // so that is never offered as a substitute.
+  // True account deletion goes through the admin_delete_user database
+  // function (migration 31, Round 40), which removes the login itself
+  // (auth.users) - deleting only the user_profiles row would leave the
+  // login alive, so that is never offered as a substitute. The older
+  // delete-user Edge Function route is retired in its favour: the
+  // function applies the same rules (App Manager only, no self-delete,
+  // managers with students are refused).
   const deleteMasterAccount = (profile: UserProfile) => {
     const name = profile.display_name || 'this user';
     const run = async () => {
       setProcessing(true);
       try {
-        const { data, error } = await supabase.functions.invoke('delete-user', {
-          body: { user_id: profile.id },
-        });
+        const { data, error } = await supabase.rpc('admin_delete_user', { p_user_id: profile.id });
 
         if (error) {
-          const status = (error as any)?.context?.status;
-          let serverMessage = '';
-          try {
-            const body = await (error as any)?.context?.json?.();
-            if (body?.error) serverMessage = body.error;
-          } catch { /* response body was not JSON */ }
-
-          if (serverMessage) {
-            Alert.alert('Cannot Delete Account', serverMessage);
-          } else if (status === 404 || /not found/i.test(error.message || '')) {
+          if (/admin_delete_user/.test(error.message || '') || (error as any)?.code === 'PGRST202') {
             Alert.alert(
-              'Delete Function Not Deployed',
-              'True account deletion needs the delete-user Edge Function, which is not deployed yet. Deleting only the profile row would leave the login account alive, so nothing was deleted. See supabase/functions/README.md for the deploy steps.'
+              'Database Update Needed',
+              'Account deletion needs the latest database update. Run Round40-Setup.sql in the Supabase SQL editor, then try again. Nothing was deleted.'
             );
           } else {
             Alert.alert('Delete Failed', error.message);
@@ -359,7 +511,7 @@ export default function UsersManager() {
           return;
         }
 
-        if (data?.error) {
+        if (data && data.ok === false) {
           Alert.alert('Cannot Delete Account', data.error);
           return;
         }
@@ -822,14 +974,14 @@ export default function UsersManager() {
           <View className="flex-row items-center justify-between bg-navy/5 border border-inkline p-4 rounded-2xl">
             <View>
               <Text className="font-sans font-bold text-navy text-base">Send Reminder Emails</Text>
-              <Text className="text-sm text-slate-500 mt-1">7, 14, 21, and 28-day notices.</Text>
+              <Text className="text-sm text-slate-500 mt-1">7, 14, 21, and 28-day notices. Individuals are emailed directly; students via their manager.</Text>
             </View>
             <View className="flex-row items-center gap-4">
-              <Text className="font-display font-semibold text-2xl text-navy">{pendingReminders.length}</Text>
+              <Text className="font-display font-semibold text-2xl text-navy">{totalReminders}</Text>
               <Pressable
                 onPress={processReminders}
-                disabled={processing || pendingReminders.length === 0}
-                className={`px-4 py-2 rounded-full ${pendingReminders.length > 0 ? 'bg-navy' : 'bg-slate-300'}`}
+                disabled={processing || totalReminders === 0}
+                className={`px-4 py-2 rounded-full ${totalReminders > 0 ? 'bg-navy' : 'bg-slate-300'}`}
               >
                 <Text className="text-white font-bold">Process</Text>
               </Pressable>
@@ -840,14 +992,14 @@ export default function UsersManager() {
           <View className="flex-row items-center justify-between bg-amber-50 border border-amber-200 p-4 rounded-xl">
             <View>
               <Text className="font-bold text-amber-900 text-base">Mark for Deletion (30 Days)</Text>
-              <Text className="text-sm text-amber-700 mt-1">Flags accounts inactive for 30+ days.</Text>
+              <Text className="text-sm text-amber-700 mt-1">Flags accounts inactive for 30+ days and emails a notice.</Text>
             </View>
             <View className="flex-row items-center gap-4">
-              <Text className="font-display font-semibold text-2xl text-amber-900">{pendingDeletions.length}</Text>
+              <Text className="font-display font-semibold text-2xl text-amber-900">{totalMarks}</Text>
               <Pressable
                 onPress={processDeletionMarks}
-                disabled={processing || pendingDeletions.length === 0}
-                className={`px-4 py-2 rounded-full ${pendingDeletions.length > 0 ? 'bg-amber-600' : 'bg-slate-300'}`}
+                disabled={processing || totalMarks === 0}
+                className={`px-4 py-2 rounded-full ${totalMarks > 0 ? 'bg-amber-600' : 'bg-slate-300'}`}
               >
                 <Text className="text-white font-bold">Process</Text>
               </Pressable>
@@ -858,14 +1010,14 @@ export default function UsersManager() {
           <View className="flex-row items-center justify-between bg-red-50 border border-red-200 p-4 rounded-xl">
             <View>
               <Text className="font-bold text-red-900 text-base">Permanent Deletion (90 Days)</Text>
-              <Text className="text-sm text-red-700 mt-1">Deletes accounts flagged 90+ days ago.</Text>
+              <Text className="text-sm text-red-700 mt-1">Deletes accounts flagged 90+ days ago. Asks for confirmation first.</Text>
             </View>
             <View className="flex-row items-center gap-4">
-              <Text className="font-display font-semibold text-2xl text-red-900">{pendingHardDeletes.length}</Text>
+              <Text className="font-display font-semibold text-2xl text-red-900">{totalHardDeletes}</Text>
               <Pressable
                 onPress={processHardDeletes}
-                disabled={processing || pendingHardDeletes.length === 0}
-                className={`px-4 py-2 rounded-full ${pendingHardDeletes.length > 0 ? 'bg-red-600' : 'bg-slate-300'}`}
+                disabled={processing || totalHardDeletes === 0}
+                className={`px-4 py-2 rounded-full ${totalHardDeletes > 0 ? 'bg-red-600' : 'bg-slate-300'}`}
               >
                 <Text className="text-white font-bold">Execute</Text>
               </Pressable>
