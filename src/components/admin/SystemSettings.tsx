@@ -1,22 +1,15 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { downloadDatabaseBackup } from '../../lib/backup';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
-
-interface UserProfile {
-  id: string;
-  role: string;
-  created_at: string;
-}
 
 // Bundled default logo (full English for Cricket lockup), shown whenever
 // no custom logo is set.
 const BUNDLED_LOGO = require('../../../assets/images/logo-full.png');
 
 export default function SystemSettings() {
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Settings State
@@ -40,11 +33,9 @@ export default function SystemSettings() {
   const [backupOverdue, setBackupOverdue] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupStatus, setBackupStatus] = useState('');
-  const [users, setUsers] = useState<UserProfile[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
       const { data: settingsData, error: settingsError } = await supabase.from('site_settings').select('*');
       if (settingsError) throw settingsError;
 
@@ -59,12 +50,7 @@ export default function SystemSettings() {
             7 * 24 * 3600 * 1000
       );
       setSupportEmail(settingsMap['support_email'] || 'support@englishforcricket.com');
-
-      const { data: usersData, error: usersError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
-      if (usersError) throw usersError;
-      setUsers(usersData || []);
-    } catch (error: any) { Alert.alert('Error', error.message); } 
-    finally { setLoading(false); }
+    } catch (error: any) { Alert.alert('Error', error.message); }
   }, []);
 
   useEffect(() => {
@@ -221,22 +207,6 @@ export default function SystemSettings() {
       Alert.alert('Success', 'System settings saved.');
     } catch (error: any) { Alert.alert('Save Failed', error.message); } 
     finally { setSaving(false); }
-  };
-
-  const handleToggleRole = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === 'super_admin' ? 'manager' : 'super_admin';
-    const confirmAction = async () => {
-      try {
-        const { error } = await supabase.from('user_profiles').update({ role: newRole }).eq('id', userId);
-        if (error) throw error;
-        await fetchData();
-      } catch (error: any) { Alert.alert('Update Failed', error.message); }
-    };
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Change role to ${newRole}?`)) confirmAction();
-    } else {
-      Alert.alert('Confirm Role Change', `Change role?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Yes', style: 'destructive', onPress: confirmAction }]);
-    }
   };
 
   // Effective logo for the previews: the uploaded one when set (and
@@ -435,28 +405,17 @@ export default function SystemSettings() {
       </View>
 
       <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm">
-        <View className="mb-6">
-          <Text className="font-display text-xl font-semibold text-navy">Admin Role Management</Text>
+        <View className="mb-4">
+          <Text className="font-display text-xl font-semibold text-navy">User Roles</Text>
         </View>
-        <View className="border border-inkline rounded-xl overflow-hidden">
-          {loading ? <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-          : users.map((user, index) => {
-            const isSuperAdmin = user.role === 'super_admin';
-            return (
-              <View key={user.id} className={`p-4 flex-row items-center justify-between ${index !== users.length - 1 ? 'border-b border-inkline' : ''}`}>
-                <View className="w-1/2">
-                  <Text className="font-mono text-sm text-slate-600">{user.id}</Text>
-                </View>
-                <View className={`px-2.5 py-1 rounded-md ${isSuperAdmin ? 'bg-gold/20' : 'bg-slate-100'}`}>
-                  <Text className={`text-xs font-bold uppercase ${isSuperAdmin ? 'text-gold-dark' : 'text-slate-500'}`}>{user.role.replace('_', ' ')}</Text>
-                </View>
-                <Pressable onPress={() => handleToggleRole(user.id, user.role)} className={`px-3 py-1.5 rounded border ${isSuperAdmin ? 'bg-slate-100 border-inkline' : 'bg-pitch/10 border-pitch/30'}`}>
-                  <Text className={`text-xs font-semibold ${isSuperAdmin ? 'text-slate-500' : 'text-pitch'}`}>{isSuperAdmin ? 'Demote to Manager' : 'Make Super Admin'}</Text>
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
+        <Text className="text-sm text-text-secondary leading-6">
+          Roles are changed in Users &amp; Organizations, where each account is shown with its
+          name and email and every role is explained before you choose it. App Manager and
+          Content Manager accounts must use an @englishforcricket.com email address, and that
+          rule is checked there and in the database. (Round 38 removed the old one-click role
+          buttons from this page - they listed accounts by ID only and could promote any
+          account without the email check.)
+        </Text>
       </View>
     </View>
   );

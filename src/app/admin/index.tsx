@@ -617,7 +617,7 @@ export default function SuperAdminDashboard() {
         <ScrollView style={isNarrowLayout ? { maxHeight: windowHeight * 0.38 } : undefined}>
           <View className="p-6 border-b border-white/10 mb-4">
             <Text className="font-display text-2xl font-semibold text-white tracking-wide">KYCO</Text>
-            <Text className="font-sans text-gold text-[11px] font-bold tracking-[2.5px] uppercase mt-1">{isContentManager ? 'Content Manager' : 'Super Admin CMS'}</Text>
+            <Text className="font-sans text-gold text-[11px] font-bold tracking-[2.5px] uppercase mt-1">{isContentManager ? 'Content Manager' : 'App Manager'}</Text>
           </View>
 
           <View className="px-4 space-y-1 gap-1 pb-6">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { ROLE_NOTES, roleLabel } from '../../lib/roleLabels';
 import { groupStudentsByClass } from '../../lib/studentGroups';
 import { supabase } from '../../lib/supabase';
 
@@ -288,15 +289,17 @@ export default function UsersManager() {
       Alert.alert('Missing Field', 'Display name cannot be empty.');
       return;
     }
-    // Content Manager rule (also enforced by a database guard in
-    // migration 20261122000028): the account's login email must be an
-    // @englishforcricket.com address created for that person.
-    if (editRole === 'content_manager') {
+    // App Manager / Content Manager rule (also enforced by a database
+    // guard, migrations 20261122000028 + 20261122000029): the account's
+    // login email must be an @englishforcricket.com address created
+    // for that person. The 'manager' role is a school / club / parent
+    // account and is deliberately NOT covered by this rule.
+    if (editRole === 'content_manager' || editRole === 'super_admin') {
       const email = emailById.get(editingId);
       if (!email || !email.toLowerCase().endsWith('@englishforcricket.com')) {
         Alert.alert(
-          'Content Manager Rule',
-          'A Content Manager account must use an @englishforcricket.com email address. Create the mailbox for this person first, have them register with that address, and then set this role.'
+          editRole === 'super_admin' ? 'App Manager Rule' : 'Content Manager Rule',
+          `A ${roleLabel(editRole)} account must use an @englishforcricket.com email address. Create the mailbox for this person first, have them register with that address, and then set this role.`
         );
         return;
       }
@@ -646,7 +649,7 @@ export default function UsersManager() {
               <Text className="font-display font-semibold text-lg text-navy">{profile.display_name || 'Unnamed User'}</Text>
               <View className={`px-2.5 py-1 rounded-md ${isSuperAdmin ? 'bg-gold/20' : 'bg-slate-200'}`}>
                 <Text className={`text-xs font-bold uppercase ${isSuperAdmin ? 'text-gold-dark' : 'text-slate-600'}`}>
-                  {profile.role.replace('_', ' ')}
+                  {roleLabel(profile.role)}
                 </Text>
               </View>
               {profile.is_archived && (
@@ -710,17 +713,13 @@ export default function UsersManager() {
                     className={`px-3 py-2 rounded-full border ${editRole === r ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
                   >
                     <Text className={`font-semibold text-sm ${editRole === r ? 'text-white' : 'text-text-secondary'}`}>
-                      {r.replace('_', ' ')}
+                      {roleLabel(r)}
                     </Text>
                   </Pressable>
                 ))}
               </View>
-              {editRole === 'content_manager' && (
-                <Text className="text-xs text-slate-500 mt-2">
-                  Content Managers sign in at the normal login page and see only the content
-                  sections (Learning Path, Games, Downloads, Speaking Practice, Smart Reading).
-                  Their account email must end with @englishforcricket.com.
-                </Text>
+              {ROLE_NOTES[editRole] && (
+                <Text className="text-xs text-slate-500 mt-2">{ROLE_NOTES[editRole]}</Text>
               )}
             </View>
             <View className="flex-col md:flex-row gap-4">
