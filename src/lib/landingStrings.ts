@@ -61,6 +61,14 @@ export interface LandingStrings {
   statModules: string;
   statWords: string;
   statFree: string;
+  statGames: string;
+  statSpeaking: string;
+  statReading: string;
+  statGrowing: string;
+  tipsLabel: string;
+  tipsTitle: string;
+  tipsIntro: string;
+  tips: { title: string; text: string }[];
   programmeLabel: string;
   programmeTitle: string;
   programmeIntro: string;
@@ -93,6 +101,21 @@ const EN: LandingStrings = {
   statModules: 'Modules',
   statWords: 'Words',
   statFree: 'Free, always',
+  statGames: "Games",
+  statSpeaking: "Speaking Practice",
+  statReading: "Reading Texts",
+  statGrowing: "and growing",
+  tipsLabel: "For Learners",
+  tipsTitle: "How to Get the Best from English for Cricket",
+  tipsIntro: "Six simple habits that make a real difference. None of them takes long, and together they turn short practice sessions into steady progress.",
+  tips: [
+    { title: "Study a Little Every Day", text: "Short, regular practice is more effective than one long session. Choose your study days in your profile, keep to them, and let your streak grow. Even fifteen minutes a day will move you forward." },
+    { title: "Listen First, Then Speak", text: "In every lesson, listen to the voice carefully before you speak. Then say the line aloud at the same speed, and try to match the sound as closely as you can." },
+    { title: "Speak Your Part Aloud", text: "In Speaking Practice, always say your lines out loud, even when nobody is listening. Speaking aloud builds pronunciation, rhythm and confidence in a way that silent reading cannot." },
+    { title: "Read Aloud in Smart Reading", text: "When you read a story or an article, read it aloud at least once. Then answer the questions from memory before you look back at the text." },
+    { title: "Review Your Tricky Words", text: "The programme remembers the words and lines that were difficult for you and brings them back for review. Visit your Tricky Words regularly; a word reviewed three times is rarely forgotten." },
+    { title: "Practise Together", text: "Practise conversations with a friend, a parent or a teammate, taking one part each. Explaining a word or a rule to someone else is one of the surest ways to make it your own." },
+  ],
   programmeLabel: 'The Programme',
   programmeTitle: 'Everything a Learner Needs',
   programmeIntro:
@@ -197,6 +220,21 @@ const JA: LandingStrings = {
   statModules: 'モジュール',
   statWords: '語以上',
   statFree: 'ずっと無料',
+  statGames: "ゲーム",
+  statSpeaking: "スピーキング練習",
+  statReading: "リーディング教材",
+  statGrowing: "さらに増加中",
+  tipsLabel: "学習者の皆さまへ",
+  tipsTitle: "English for Cricket を最大限に活用する方法",
+  tipsIntro: "確かな効果のある、6つのシンプルな習慣をご紹介します。どれも時間はかかりませんが、続けることで短い練習が着実な上達につながります。",
+  tips: [
+    { title: "毎日少しずつ学ぶ", text: "長時間を一度に学ぶより、短時間を定期的に続ける方が効果的です。プロフィールで学習する曜日を選び、それを守って連続記録を伸ばしましょう。1日15分でも前進できます。" },
+    { title: "まず聞いて、それから話す", text: "どのレッスンでも、話す前に音声をよく聞いてください。そのあと、同じ速さで声に出して言い、できるだけ音を真似してみましょう。" },
+    { title: "自分のセリフは声に出して", text: "スピーキング練習では、誰も聞いていなくても、必ず自分のセリフを声に出して言いましょう。声に出すことで、黙読では得られない発音、リズム、自信が身につきます。" },
+    { title: "スマートリーディングは音読で", text: "物語や記事を読むときは、少なくとも一度は声に出して読みましょう。そのあと、本文を見直す前に、覚えている内容で質問に答えてみてください。" },
+    { title: "苦手な単語を見直す", text: "プログラムは、難しかった単語や文を覚えていて、復習のために再び出題します。「Tricky Words」を定期的に見直しましょう。3回復習した単語は、めったに忘れません。" },
+    { title: "一緒に練習する", text: "友だち、保護者、チームメイトと役割を分けて会話を練習しましょう。単語やルールを誰かに説明することは、それを自分のものにする最も確かな方法の一つです。" },
+  ],
   programmeLabel: 'プログラム',
   programmeTitle: '学習者に必要なすべてがここに',
   programmeIntro:
@@ -301,6 +339,21 @@ const HI: LandingStrings = {
   statModules: 'मॉड्यूल',
   statWords: 'शब्द',
   statFree: 'निःशुल्क, सदैव',
+  statGames: "खेल",
+  statSpeaking: "बोलने का अभ्यास",
+  statReading: "पठन पाठ",
+  statGrowing: "और बढ़ रहे हैं",
+  tipsLabel: "शिक्षार्थियों के लिए",
+  tipsTitle: "English for Cricket से सर्वोत्तम लाभ कैसे प्राप्त करें",
+  tipsIntro: "छह सरल आदतें जो वास्तविक अंतर लाती हैं। इनमें से किसी में भी अधिक समय नहीं लगता, और साथ मिलकर ये छोटे अभ्यास सत्रों को स्थिर प्रगति में बदल देती हैं।",
+  tips: [
+    { title: "हर दिन थोड़ा अध्ययन करें", text: "एक लंबे सत्र की तुलना में छोटा, नियमित अभ्यास अधिक प्रभावी होता है। अपनी प्रोफ़ाइल में अपने अध्ययन के दिन चुनें, उनका पालन करें और अपनी श्रृंखला को बढ़ने दें। दिन में पंद्रह मिनट भी आपको आगे बढ़ाएंगे।" },
+    { title: "पहले सुनें, फिर बोलें", text: "हर पाठ में, बोलने से पहले आवाज़ को ध्यान से सुनें। फिर पंक्ति को उसी गति से ज़ोर से कहें और ध्वनि से यथासंभव मेल करने का प्रयास करें।" },
+    { title: "अपनी भूमिका ज़ोर से बोलें", text: "बोलने के अभ्यास में, हमेशा अपनी पंक्तियाँ ज़ोर से कहें, भले ही कोई सुन न रहा हो। ज़ोर से बोलने से उच्चारण, लय और आत्मविश्वास बनता है, जो मौन पठन से नहीं बन सकता।" },
+    { title: "स्मार्ट रीडिंग में ज़ोर से पढ़ें", text: "जब आप कोई कहानी या लेख पढ़ें, तो उसे कम से कम एक बार ज़ोर से पढ़ें। फिर पाठ की ओर वापस देखने से पहले स्मृति से प्रश्नों के उत्तर दें।" },
+    { title: "अपने कठिन शब्दों की समीक्षा करें", text: "कार्यक्रम उन शब्दों और पंक्तियों को याद रखता है जो आपके लिए कठिन थीं और उन्हें समीक्षा के लिए वापस लाता है। अपने Tricky Words नियमित रूप से देखें; तीन बार समीक्षा किया गया शब्द शायद ही कभी भूलता है।" },
+    { title: "साथ मिलकर अभ्यास करें", text: "किसी मित्र, माता-पिता या टीम के साथी के साथ बातचीत का अभ्यास करें, प्रत्येक एक भूमिका निभाए। किसी अन्य व्यक्ति को कोई शब्द या नियम समझाना उसे अपना बनाने के सबसे निश्चित तरीकों में से एक है।" },
+  ],
   programmeLabel: 'कार्यक्रम',
   programmeTitle: 'एक शिक्षार्थी को जो कुछ भी चाहिए',
   programmeIntro:
@@ -405,6 +458,21 @@ const UR: LandingStrings = {
   statModules: 'ماڈیول',
   statWords: 'الفاظ',
   statFree: 'مفت، ہمیشہ',
+  statGames: "کھیل",
+  statSpeaking: "بولنے کی مشق",
+  statReading: "مطالعے کی تحریریں",
+  statGrowing: "اور بڑھ رہے ہیں",
+  tipsLabel: "طلبہ کے لیے",
+  tipsTitle: "English for Cricket سے بہترین فائدہ کیسے حاصل کریں",
+  tipsIntro: "چھ سادہ عادات جو حقیقی فرق پیدا کرتی ہیں۔ ان میں سے کسی میں بھی زیادہ وقت نہیں لگتا، اور مل کر یہ مختصر مشق کو مستحکم پیش رفت میں بدل دیتی ہیں۔",
+  tips: [
+    { title: "ہر دن تھوڑا مطالعہ کریں", text: "ایک طویل نشست کے مقابلے میں مختصر، باقاعدہ مشق زیادہ مؤثر ہوتی ہے۔ اپنے پروفائل میں اپنے مطالعے کے دن منتخب کریں، ان پر قائم رہیں اور اپنا سلسلہ بڑھنے دیں۔ دن میں پندرہ منٹ بھی آپ کو آگے بڑھائیں گے۔" },
+    { title: "پہلے سنیں، پھر بولیں", text: "ہر سبق میں، بولنے سے پہلے آواز کو توجہ سے سنیں۔ پھر جملہ اسی رفتار سے بلند آواز میں کہیں اور آواز سے حتی الامکان میل کرنے کی کوشش کریں۔" },
+    { title: "اپنا حصہ بلند آواز میں بولیں", text: "بولنے کی مشق میں، ہمیشہ اپنے جملے بلند آواز میں کہیں، چاہے کوئی سن نہ رہا ہو۔ بلند آواز میں بولنے سے تلفظ، روانی اور اعتماد پیدا ہوتا ہے جو خاموش مطالعے سے نہیں ہو سکتا۔" },
+    { title: "سمارٹ ریڈنگ میں بلند آواز سے پڑھیں", text: "جب آپ کوئی کہانی یا مضمون پڑھیں تو اسے کم از کم ایک بار بلند آواز سے پڑھیں۔ پھر متن کی طرف واپس دیکھنے سے پہلے یادداشت سے سوالات کے جواب دیں۔" },
+    { title: "اپنے مشکل الفاظ کا جائزہ لیں", text: "یہ پروگرام ان الفاظ اور جملوں کو یاد رکھتا ہے جو آپ کے لیے مشکل تھے اور انہیں جائزے کے لیے واپس لاتا ہے۔ اپنے Tricky Words باقاعدگی سے دیکھیں؛ تین بار جائزہ لیا گیا لفظ شاذ و نادر ہی بھولتا ہے۔" },
+    { title: "مل کر مشق کریں", text: "کسی دوست، والدین یا ٹیم کے ساتھی کے ساتھ گفتگو کی مشق کریں، ہر ایک ایک حصہ لے۔ کسی دوسرے شخص کو کوئی لفظ یا قاعدہ سمجھانا اسے اپنا بنانے کے یقینی ترین طریقوں میں سے ایک ہے۔" },
+  ],
   programmeLabel: 'پروگرام',
   programmeTitle: 'سیکھنے والے کو درکار ہر چیز',
   programmeIntro:
@@ -509,6 +577,21 @@ const PS: LandingStrings = {
   statModules: 'ماډلونه',
   statWords: 'ټکي',
   statFree: 'وړیا، تل',
+  statGames: "لوبې",
+  statSpeaking: "د خبرو کولو تمرین",
+  statReading: "د لوستلو متنونه",
+  statGrowing: "او نور هم زیاتیږي",
+  tipsLabel: "د زده کوونکو لپاره",
+  tipsTitle: "څنګه له English for Cricket څخه غوره ګټه واخلو",
+  tipsIntro: "شپږ ساده عادتونه چې ریښتینی بدلون راولي. هېڅ یو یې ډېر وخت نه نیسي، او په ګډه لنډ تمرین په ثابت پرمختګ بدلوي.",
+  tips: [
+    { title: "هره ورځ لږ مطالعه وکړئ", text: "لنډ، منظم تمرین له یوې اوږدې ناستې څخه ډېر اغېزمن دی. په خپل پروفایل کې د مطالعې ورځې وټاکئ، پرې عمل وکړئ او خپل تسلسل ته وده ورکړئ. په ورځ کې پنځلس دقیقې هم تاسو پرمخ وړي." },
+    { title: "لومړی واورئ، بیا خبرې وکړئ", text: "په هر لوست کې، له خبرو کولو مخکې غږ په پام سره واورئ. بیا کرښه په هماغه چټکتیا په لوړ غږ ووایئ او هڅه وکړئ چې له غږ سره یې څومره چې کېدای شي یو شان کړئ." },
+    { title: "خپله برخه په لوړ غږ ووایئ", text: "د خبرو کولو په تمرین کې، تل خپلې کرښې په لوړ غږ ووایئ، که څه هم هېڅوک یې نه اوري. په لوړ غږ ویل تلفظ، تال او باور جوړوي، چې خاموش لوستل یې نه شي جوړولای." },
+    { title: "په سمارټ ریډینګ کې په لوړ غږ ولولئ", text: "کله چې کیسه یا مقاله لولئ، لږ تر لږه یو ځل یې په لوړ غږ ولولئ. بیا متن ته له بېرته کتلو مخکې له حافظې څخه پوښتنو ته ځواب ورکړئ." },
+    { title: "خپل سخت ټکي بیا وګورئ", text: "پروګرام هغه ټکي او کرښې په یاد لري چې ستاسو لپاره سخت وو او د بیاکتنې لپاره یې بېرته راوړي. خپل Tricky Words په منظمه توګه وګورئ؛ هغه ټکی چې درې ځله وکتلی شي، ډېر لږ هېریږي." },
+    { title: "په ګډه تمرین وکړئ", text: "له ملګري، مور او پلار یا د ټیم له ملګري سره خبرې اترې تمرین کړئ، هر یو یوه برخه واخلي. بل چا ته د یوه ټکي یا قاعدې تشریح کول د هغه د خپلولو له باوري لارو څخه یوه ده." },
+  ],
   programmeLabel: 'پروګرام',
   programmeTitle: 'هر څه چې یو زده کوونکی ورته اړتیا لري',
   programmeIntro:
@@ -612,6 +695,21 @@ const SW: LandingStrings = {
   statModules: 'Moduli',
   statWords: 'Maneno',
   statFree: 'Bure, daima',
+  statGames: "Michezo",
+  statSpeaking: "Mazoezi ya Kuzungumza",
+  statReading: "Maandishi ya Kusoma",
+  statGrowing: "na yanaongezeka",
+  tipsLabel: "Kwa Wanafunzi",
+  tipsTitle: "Jinsi ya Kupata Faida Kamili kutoka English for Cricket",
+  tipsIntro: "Tabia sita rahisi zinazoleta tofauti halisi. Hakuna inayochukua muda mrefu, na kwa pamoja zinageuza mazoezi mafupi kuwa maendeleo thabiti.",
+  tips: [
+    { title: "Jifunze Kidogo Kila Siku", text: "Mazoezi mafupi ya kawaida yana ufanisi zaidi kuliko kipindi kimoja kirefu. Chagua siku zako za kujifunza katika wasifu wako, zifuate, na acha mfululizo wako ukue. Hata dakika kumi na tano kwa siku zitakusogeza mbele." },
+    { title: "Sikiliza Kwanza, Kisha Zungumza", text: "Katika kila somo, sikiliza sauti kwa makini kabla ya kuzungumza. Kisha sema mstari huo kwa sauti kwa kasi ile ile, na jaribu kuilinganisha sauti hiyo kadri uwezavyo." },
+    { title: "Zungumza Sehemu Yako kwa Sauti", text: "Katika Mazoezi ya Kuzungumza, sema mistari yako kwa sauti kila wakati, hata kama hakuna anayesikiliza. Kuzungumza kwa sauti hujenga matamshi, mdundo na ujasiri kwa njia ambayo kusoma kimya hakuwezi." },
+    { title: "Soma kwa Sauti katika Smart Reading", text: "Unaposoma hadithi au makala, isome kwa sauti angalau mara moja. Kisha jibu maswali kwa kumbukumbu kabla ya kutazama maandishi tena." },
+    { title: "Kagua Maneno Yako Magumu", text: "Programu hukumbuka maneno na mistari iliyokuwa migumu kwako na kuyarudisha kwa ajili ya ukaguzi. Tembelea Tricky Words zako mara kwa mara; neno lililokaguliwa mara tatu halisahauliki kwa urahisi." },
+    { title: "Fanya Mazoezi Pamoja", text: "Fanya mazoezi ya mazungumzo na rafiki, mzazi au mchezaji mwenzako, kila mmoja akichukua sehemu moja. Kumwelezea mtu mwingine neno au kanuni ni mojawapo ya njia za uhakika za kulifanya kuwa lako." },
+  ],
   programmeLabel: 'Programu',
   programmeTitle: 'Kila Kitu Anachohitaji Mwanafunzi',
   programmeIntro:
@@ -716,6 +814,21 @@ const DE: LandingStrings = {
   statModules: 'Module',
   statWords: 'Wörter',
   statFree: 'kostenlos, für immer',
+  statGames: "Spiele",
+  statSpeaking: "Sprechübungen",
+  statReading: "Lesetexte",
+  statGrowing: "und es werden mehr",
+  tipsLabel: "Für Lernende",
+  tipsTitle: "So holen Sie das Beste aus English for Cricket heraus",
+  tipsIntro: "Sechs einfache Gewohnheiten, die einen echten Unterschied machen. Keine davon kostet viel Zeit, und gemeinsam verwandeln sie kurze Übungseinheiten in stetigen Fortschritt.",
+  tips: [
+    { title: "Lernen Sie jeden Tag ein wenig", text: "Kurzes, regelmäßiges Üben ist wirksamer als eine einzige lange Einheit. Wählen Sie Ihre Lerntage in Ihrem Profil, halten Sie sie ein und lassen Sie Ihre Serie wachsen. Schon fünfzehn Minuten am Tag bringen Sie voran." },
+    { title: "Zuerst zuhören, dann sprechen", text: "Hören Sie sich in jeder Lektion die Stimme genau an, bevor Sie sprechen. Sagen Sie den Satz dann laut und im gleichen Tempo und versuchen Sie, den Klang so genau wie möglich zu treffen." },
+    { title: "Sprechen Sie Ihren Teil laut", text: "Sagen Sie Ihre Sätze in den Sprechübungen immer laut, auch wenn niemand zuhört. Lautes Sprechen stärkt Aussprache, Rhythmus und Selbstvertrauen auf eine Weise, die stilles Lesen nicht vermag." },
+    { title: "Lesen Sie in Smart Reading laut", text: "Wenn Sie eine Geschichte oder einen Artikel lesen, lesen Sie ihn mindestens einmal laut. Beantworten Sie die Fragen dann aus dem Gedächtnis, bevor Sie wieder in den Text schauen." },
+    { title: "Wiederholen Sie Ihre schwierigen Wörter", text: "Das Programm merkt sich die Wörter und Sätze, die Ihnen schwergefallen sind, und bringt sie zur Wiederholung zurück. Schauen Sie Ihre Tricky Words regelmäßig durch; ein dreimal wiederholtes Wort wird selten vergessen." },
+    { title: "Üben Sie gemeinsam", text: "Üben Sie Gespräche mit einem Freund, einem Elternteil oder einem Mitspieler und übernehmen Sie je eine Rolle. Ein Wort oder eine Regel jemand anderem zu erklären, ist einer der sichersten Wege, sie sich zu eigen zu machen." },
+  ],
   programmeLabel: 'Das Programm',
   programmeTitle: 'Alles, was ein Lernender braucht',
   programmeIntro:
@@ -820,6 +933,21 @@ const ZU: LandingStrings = {
   statModules: 'Amamojuli',
   statWords: 'Amagama',
   statFree: 'Mahhala, njalo',
+  statGames: "Imidlalo",
+  statSpeaking: "Ukuzilolonga Kokukhuluma",
+  statReading: "Imibhalo Yokufunda",
+  statGrowing: "futhi kuyanda",
+  tipsLabel: "Kwabafundi",
+  tipsTitle: "Ungayisebenzisa Kanjani Kakhulu i-English for Cricket",
+  tipsIntro: "Imikhuba eyisithupha elula eyenza umehluko wangempela. Akukho neyodwa ethatha isikhathi eside, futhi ndawonye iguqula ukuzilolonga okufushane kube inqubekelaphambili ezinzile.",
+  tips: [
+    { title: "Funda Kancane Nsuku Zonke", text: "Ukuzilolonga okufushane nokuvamile kusebenza kangcono kunesikhathi esisodwa eside. Khetha izinsuku zakho zokufunda kuphrofayela yakho, uzilandele, futhi uvumele uchungechunge lwakho lukhule. Ngisho imizuzu eyishumi nanhlanu ngosuku izokuqhubela phambili." },
+    { title: "Lalela Kuqala, Bese Ukhuluma", text: "Kuso sonke isifundo, lalela izwi ngokucophelela ngaphambi kokuba ukhulume. Bese usho umugqa ngokuzwakalayo ngesivinini esifanayo, futhi uzame ukufanisa umsindo ngangokunokwenzeka." },
+    { title: "Khuluma Ingxenye Yakho Ngokuzwakalayo", text: "Ekuzilolongeni Kokukhuluma, hlala usho imigqa yakho ngokuzwakalayo, ngisho noma kungekho olalelayo. Ukukhuluma ngokuzwakalayo kwakha ukuphimisa, isigqi nokuzethemba ngendlela ukufunda uthule okungeke kwenze ngayo." },
+    { title: "Funda Ngokuzwakalayo ku-Smart Reading", text: "Lapho ufunda indaba noma i-athikili, ifunde ngokuzwakalayo okungenani kanye. Bese uphendula imibuzo ngenkumbulo ngaphambi kokuba ubheke umbhalo futhi." },
+    { title: "Buyekeza Amagama Akho Anzima", text: "Uhlelo lukhumbula amagama nemigqa okwakunzima kuwe futhi lukubuyisele ukuze kubuyekezwe. Vakashela i-Tricky Words yakho njalo; igama elibuyekezwe kathathu alivamile ukukhohlakala." },
+    { title: "Zilolonge Ndawonye", text: "Zilolonga izingxoxo nomngane, umzali noma umdlali weqembu, ngamunye ethathe ingxenye eyodwa. Ukuchazela omunye umuntu igama noma umthetho kungenye yezindlela eziqinisekile zokuwenza ube ngowakho." },
+  ],
   programmeLabel: 'Uhlelo',
   programmeTitle: 'Konke Okudingwa Umfundi',
   programmeIntro:

@@ -136,6 +136,33 @@ export default function LandingPage() {
     })();
   }, []);
 
+  // Live content counts for the hero figures: read from the database on
+  // every visit, so the numbers grow by themselves as new games,
+  // conversations and reading texts are published. The starting values
+  // are the counts at the time of this build and remain as the fallback
+  // if the counts cannot be read.
+  const [liveCounts, setLiveCounts] = useState({ games: 39, speaking: 47, reading: 40 });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const opts = { count: 'exact' as const, head: true };
+        const [g, sp, rd] = await Promise.all([
+          supabase.from('games').select('id', opts).eq('is_published', true),
+          supabase.from('speaking_scenarios').select('id', opts).eq('is_published', true),
+          supabase.from('reading_stories').select('id', opts).eq('is_published', true),
+        ]);
+        setLiveCounts({
+          games: g.count ?? 39,
+          speaking: sp.count ?? 47,
+          reading: rd.count ?? 40,
+        });
+      } catch {
+        // Keep the fallback figures.
+      }
+    })();
+  }, []);
+
   // A signed-in user who lands here — most importantly the Google
   // sign-in return, which Supabase sends back to the site root with the
   // session in the URL — goes straight to their own home instead of
@@ -353,6 +380,27 @@ export default function LandingPage() {
                 </View>
               ))}
             </View>
+
+            {/* Live content figures — counted from the database */}
+            <View className="flex-row flex-wrap gap-x-8 gap-y-4 mt-6">
+              {[
+                { value: String(liveCounts.games), label: t.statGames },
+                { value: String(liveCounts.speaking), label: t.statSpeaking },
+                { value: String(liveCounts.reading), label: t.statReading },
+              ].map((stat) => (
+                <View key={stat.label}>
+                  <Text className="font-display text-2xl font-semibold text-gold">
+                    {stat.value}
+                  </Text>
+                  <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
+                    {stat.label}
+                  </Text>
+                  <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
+                    {t.statGrowing}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* Right Side: Intro Video with Poster Image */}
@@ -464,6 +512,33 @@ export default function LandingPage() {
                 </View>
               ))}
             </View>
+          </View>
+        </View>
+      </View>
+
+      {/* TIPS SECTION — how learners get the best from the programme */}
+      <View className="w-full bg-amber-50">
+        <View className="max-w-7xl w-full mx-auto px-6 py-16 md:py-20">
+          <MicroLabel className="text-center mb-3">{t.tipsLabel}</MicroLabel>
+          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy text-center mb-4" style={lh.h2}>
+            {t.tipsTitle}
+          </Text>
+          <Text className="font-sans text-lg text-slate-500 text-center mb-12 max-w-2xl mx-auto leading-relaxed" style={[justify, lh.bodyLg]}>
+            {t.tipsIntro}
+          </Text>
+          <View className="flex-row flex-wrap justify-center gap-6">
+            {t.tips.map((tip, index) => (
+              <View
+                key={tip.title}
+                className="w-full md:w-[31%] bg-white p-6 rounded-[20px] border border-inkline shadow-sm"
+              >
+                <View className="w-12 h-12 rounded-full bg-navy items-center justify-center mb-4">
+                  <Text className="font-display text-white font-semibold text-lg">{index + 1}</Text>
+                </View>
+                <Text className="font-sans text-lg font-bold text-navy mb-2" style={lh.cardTitle}>{tip.title}</Text>
+                <Text className="font-sans text-slate-500 leading-relaxed" style={[justify, lh.body]}>{tip.text}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>
