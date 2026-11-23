@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -163,6 +163,32 @@ export default function LandingPage() {
     })();
   }, []);
 
+  // The three live figures count up smoothly to their real values when
+  // the database answers, so a visitor can see that they are live.
+  const displayRef = useRef({ games: 39, speaking: 47, reading: 40 });
+  const [displayCounts, setDisplayCounts] = useState({ games: 39, speaking: 47, reading: 40 });
+
+  useEffect(() => {
+    const from = { ...displayRef.current };
+    const to = liveCounts;
+    if (from.games === to.games && from.speaking === to.speaking && from.reading === to.reading) return;
+    const steps = 24;
+    let i = 0;
+    const timer = setInterval(() => {
+      i += 1;
+      const k = 1 - Math.pow(1 - i / steps, 3);
+      const next = {
+        games: Math.round(from.games + (to.games - from.games) * k),
+        speaking: Math.round(from.speaking + (to.speaking - from.speaking) * k),
+        reading: Math.round(from.reading + (to.reading - from.reading) * k),
+      };
+      displayRef.current = next;
+      setDisplayCounts(next);
+      if (i >= steps) clearInterval(timer);
+    }, 28);
+    return () => clearInterval(timer);
+  }, [liveCounts]);
+
   // A signed-in user who lands here — most importantly the Google
   // sign-in return, which Supabase sends back to the site root with the
   // session in the URL — goes straight to their own home instead of
@@ -309,12 +335,12 @@ export default function LandingPage() {
           style={{
             position: 'absolute',
             right: -30,
-            bottom: -40,
-            // Deliberately much taller than the hero video: she stands
-            // behind it, with her head and ears visible above its top
-            // edge instead of disappearing behind the player.
-            height: 820,
-            width: 461,
+            top: 0,
+            // Full height of the blue hero section: she stands behind
+            // the video frame from the very top of the section to its
+            // base, her head and ears above the player.
+            height: '100%',
+            aspectRatio: 540 / 960,
             opacity: 0.16,
           }}
         />
@@ -361,43 +387,42 @@ export default function LandingPage() {
               {t.pinNote}
             </Text>
 
-            {/* Programme figures */}
-            <View className="flex-row flex-wrap gap-x-8 gap-y-4 mt-10">
+            {/* Programme figures — one elegant band. The games, speaking
+                and reading figures are counted live from the database;
+                the rest describe the course itself. */}
+            <View
+              className="flex-row flex-wrap gap-x-7 gap-y-4 mt-10 rounded-[16px] px-5 py-4 self-start"
+              style={{
+                borderWidth: 1,
+                borderColor: 'rgba(212, 175, 55, 0.35)',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+              }}
+            >
               {[
-                { value: '320', label: t.statLessons },
-                { value: '5', label: t.statStages },
-                { value: '40', label: t.statModules },
-                { value: '2,200+', label: t.statWords },
-                { value: '100%', label: t.statFree },
+                { value: '320', label: t.statLessons, growing: false },
+                { value: '5', label: t.statStages, growing: false },
+                { value: '40', label: t.statModules, growing: false },
+                { value: '2,200+', label: t.statWords, growing: false },
+                { value: String(displayCounts.games), label: t.statGames, growing: true },
+                { value: String(displayCounts.speaking), label: t.statSpeaking, growing: true },
+                { value: String(displayCounts.reading), label: t.statReading, growing: true },
+                { value: '100%', label: t.statFree, growing: false },
               ].map((stat) => (
                 <View key={stat.label}>
-                  <Text className="font-display text-2xl font-semibold text-gold">
+                  <Text
+                    className="font-display text-2xl font-semibold text-gold"
+                    style={{ textShadowColor: 'rgba(212, 175, 55, 0.45)', textShadowRadius: 10 }}
+                  >
                     {stat.value}
                   </Text>
                   <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
                     {stat.label}
                   </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Live content figures — counted from the database */}
-            <View className="flex-row flex-wrap gap-x-8 gap-y-4 mt-6">
-              {[
-                { value: String(liveCounts.games), label: t.statGames },
-                { value: String(liveCounts.speaking), label: t.statSpeaking },
-                { value: String(liveCounts.reading), label: t.statReading },
-              ].map((stat) => (
-                <View key={stat.label}>
-                  <Text className="font-display text-2xl font-semibold text-gold">
-                    {stat.value}
-                  </Text>
-                  <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
-                    {stat.label}
-                  </Text>
-                  <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
-                    {t.statGrowing}
-                  </Text>
+                  {stat.growing && (
+                    <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
+                      {t.statGrowing}
+                    </Text>
+                  )}
                 </View>
               ))}
             </View>
