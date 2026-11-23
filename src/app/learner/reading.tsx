@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/ui/Elegant';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
@@ -36,6 +36,8 @@ interface Story {
   level: string;
   order_index: number;
   questions?: StoryQuestion[];
+  image_url?: string | null;
+  image_credit?: string | null;
 }
 
 // Comprehension questions shown on the story-finished screen (Round 39).
@@ -467,7 +469,7 @@ export default function SmartReading() {
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
-        <View className="max-w-3xl w-full mx-auto">
+        <View className={`w-full mx-auto ${!story ? 'max-w-6xl' : 'max-w-3xl'}`}>
           {loading ? (
             <View className="py-16 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
           ) : tableMissing ? (
@@ -491,33 +493,52 @@ export default function SmartReading() {
                 groups.map((g) => (
                   <View key={g.label} className="mb-8">
                     <Text className="font-display text-xl font-semibold text-navy mb-3">{g.label}</Text>
+                    <View className="flex-row flex-wrap gap-4">
                     {g.items.map((s) => {
                       const best = bestByStory[s.id];
                       return (
                         <Pressable
                           key={s.id}
                           onPress={() => openStory(s)}
-                          className="flex-row items-center gap-4 bg-white border border-inkline rounded-[20px] shadow-sm p-4 mb-3"
+                          className="w-full md:w-[48.5%] lg:w-[31.8%] bg-white border border-inkline rounded-[20px] shadow-sm overflow-hidden"
                         >
-                          <Text className="text-4xl">{s.emoji}</Text>
-                          <View className="flex-1">
-                            <Text className="font-display font-semibold text-navy text-lg">{s.title}</Text>
-                            {s.description ? <Text className="font-sans text-slate-500">{s.description}</Text> : null}
-                            <Text className="font-sans text-slate-400 text-sm">
-                              {s.pages.length} page{s.pages.length > 1 ? 's' : ''}{s.level ? ` · ${s.level}` : ''}
-                            </Text>
+                          {/* Cover: the story's picture when it has one,
+                              otherwise a designed navy placeholder with
+                              its emoji, so the shelf always looks
+                              finished. */}
+                          <View className="w-full aspect-[16/10] bg-navy items-center justify-center relative">
+                            {s.image_url ? (
+                              <Image source={{ uri: s.image_url }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
+                            ) : (
+                              <Text className="text-6xl">{s.emoji}</Text>
+                            )}
                           </View>
-                          {best ? (
-                            <View className="items-end">
-                              <Text className="font-sans text-pitch font-bold">✓ Read</Text>
-                              {best.accuracy !== null && best.accuracy !== undefined ? (
-                                <Text className="font-sans text-slate-400 text-sm">Best {best.accuracy}%</Text>
+                          <View className="p-4">
+                            <Text className="font-display font-semibold text-navy text-lg" numberOfLines={2}>{s.title}</Text>
+                            {s.description ? <Text className="font-sans text-slate-500 text-sm" numberOfLines={2}>{s.description}</Text> : null}
+                            <View className="flex-row items-center gap-2 mt-3">
+                              {s.level ? (
+                                <View className="rounded-full bg-gold-light px-2 py-0.5">
+                                  <Text className="font-sans text-xs font-bold text-navy">{s.level}</Text>
+                                </View>
+                              ) : null}
+                              <Text className="font-sans text-slate-400 text-sm">
+                                {s.pages.length} page{s.pages.length > 1 ? 's' : ''}
+                              </Text>
+                              {best ? (
+                                <Text className="font-sans text-pitch font-bold text-sm ml-auto">
+                                  ✓ Read{best.accuracy !== null && best.accuracy !== undefined ? ` · ${best.accuracy}%` : ''}
+                                </Text>
                               ) : null}
                             </View>
-                          ) : null}
+                            {s.image_credit ? (
+                              <Text className="font-sans text-[10px] text-slate-400 mt-2">{s.image_credit}</Text>
+                            ) : null}
+                          </View>
                         </Pressable>
                       );
                     })}
+                    </View>
                   </View>
                 ))
               )}
@@ -549,8 +570,13 @@ export default function SmartReading() {
             </View>
           ) : mode === null ? (
             <View className="items-center py-8">
-              <Text className="text-6xl mb-4">{story.emoji}</Text>
+              {story.image_url ? (
+                <Image source={{ uri: story.image_url }} className="w-full max-w-md aspect-[16/10] rounded-[20px] mb-4" resizeMode="cover" />
+              ) : (
+                <Text className="text-6xl mb-4">{story.emoji}</Text>
+              )}
               <Text className="font-display text-3xl font-semibold text-navy mb-2 text-center">{story.title}</Text>
+              {story.image_credit ? <Text className="font-sans text-[11px] text-slate-400 text-center mb-2">{story.image_credit}</Text> : null}
               {story.description ? <Text className="font-sans text-slate-500 text-center mb-2">{story.description}</Text> : null}
               <Text className="font-sans text-slate-400 mb-8">
                 {story.pages.length} pages · {totalSentences} sentences{story.level ? ` · ${story.level}` : ''}
