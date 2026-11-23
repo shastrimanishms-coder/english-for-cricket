@@ -358,7 +358,8 @@ export default function LandingPage() {
             transform: [{ scaleX: -1 }],
           }}
         />
-        <View className="max-w-7xl w-full mx-auto flex-col md:flex-row items-center px-6 py-16 md:py-24 relative gap-12">
+        <View className="max-w-7xl w-full mx-auto flex-col px-6 py-16 md:py-24 relative">
+          <View className="flex-col md:flex-row items-center gap-12 w-full">
 
           {/* Left Side: Text and Call to Action */}
           <View className="flex-1 w-full">
@@ -387,45 +388,6 @@ export default function LandingPage() {
               {t.pinNote}
             </Text>
 
-            {/* Programme figures — one elegant band. The games, speaking
-                and reading figures are counted live from the database;
-                the rest describe the course itself. */}
-            <View
-              className="flex-row flex-wrap gap-x-7 gap-y-4 mt-10 rounded-[16px] px-5 py-4 self-start"
-              style={{
-                borderWidth: 1,
-                borderColor: 'rgba(212, 175, 55, 0.35)',
-                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-              }}
-            >
-              {[
-                { value: '320', label: t.statLessons, growing: false },
-                { value: '5', label: t.statStages, growing: false },
-                { value: '40', label: t.statModules, growing: false },
-                { value: '2,200+', label: t.statWords, growing: false },
-                { value: String(displayCounts.games), label: t.statGames, growing: true },
-                { value: String(displayCounts.speaking), label: t.statSpeaking, growing: true },
-                { value: String(displayCounts.reading), label: t.statReading, growing: true },
-                { value: '100%', label: t.statFree, growing: false },
-              ].map((stat) => (
-                <View key={stat.label}>
-                  <Text
-                    className="font-display text-2xl font-semibold text-gold"
-                    style={{ textShadowColor: 'rgba(212, 175, 55, 0.45)', textShadowRadius: 10 }}
-                  >
-                    {stat.value}
-                  </Text>
-                  <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
-                    {stat.label}
-                  </Text>
-                  {stat.growing && (
-                    <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
-                      {t.statGrowing}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
           </View>
 
           {/* Right Side: Intro Video with Poster Image */}
@@ -462,7 +424,48 @@ export default function LandingPage() {
               />
             )}
           </View>
+          </View>
 
+          {/* Programme figures — one elegant band across the full width
+              of the hero, so all eight figures sit on a single line.
+              The games, speaking and reading figures are counted live
+              from the database; the rest describe the course itself. */}
+          <View
+            className="flex-row flex-wrap justify-between gap-x-6 gap-y-4 mt-12 w-full rounded-[16px] px-6 py-4"
+            style={{
+              borderWidth: 1,
+              borderColor: 'rgba(212, 175, 55, 0.35)',
+              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+            }}
+          >
+            {[
+              { value: '320', label: t.statLessons, growing: false },
+              { value: '5', label: t.statStages, growing: false },
+              { value: '40', label: t.statModules, growing: false },
+              { value: '2,200+', label: t.statWords, growing: false },
+              { value: String(displayCounts.games), label: t.statGames, growing: true },
+              { value: String(displayCounts.speaking), label: t.statSpeaking, growing: true },
+              { value: String(displayCounts.reading), label: t.statReading, growing: true },
+              { value: '100%', label: t.statFree, growing: false },
+            ].map((stat) => (
+              <View key={stat.label}>
+                <Text
+                  className="font-display text-2xl font-semibold text-gold"
+                  style={{ textShadowColor: 'rgba(212, 175, 55, 0.45)', textShadowRadius: 10 }}
+                >
+                  {stat.value}
+                </Text>
+                <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
+                  {stat.label}
+                </Text>
+                {stat.growing && (
+                  <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
+                    {t.statGrowing}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
         </View>
       </View>
 
