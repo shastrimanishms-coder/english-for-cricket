@@ -262,8 +262,9 @@ export default function SmartReading() {
   // current sentence and lights its words up one by one; moving on is
   // just a state change, and the cleanup stops the old sentence. Rate
   // and mute are deps, so changing them restarts the current sentence
-  // in the new mode. Highlight timing is estimated (some voices never
-  // report progress) — short pages keep it close.
+  // in the new mode. With a recorded voice the highlight follows the
+  // recording's own clock (see onProgress below); with the device
+  // voice it runs on a word-length-weighted estimate.
   useEffect(() => {
     if (!story || mode !== 'listen' || !playing || summary) return;
     const text = sentence;
@@ -271,12 +272,26 @@ export default function SmartReading() {
     let advanced = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const rate = RATES[rateIdx];
-    const words = text.split(/\s+/).filter(Boolean).length;
+    const wordList = text.split(/\s+/).filter(Boolean);
+    const words = wordList.length;
     const est = estimateMs(text, rate);
-    const step = Math.max(120, est / Math.max(1, words));
-    for (let i = 1; i < words; i++) {
-      timers.push(setTimeout(() => setWordIdx(i), step * i));
+    // Word boundaries weighted by word length: longer words hold the
+    // voice longer, so the highlight follows real speech rhythm
+    // instead of stepping evenly. cum[i] is the fraction of the
+    // sentence at which word i begins.
+    const weights = wordList.map((w) => w.length + 1);
+    const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+    const cum: number[] = [];
+    let acc = 0;
+    for (const w of weights) {
+      cum.push(acc / totalWeight);
+      acc += w;
     }
+    const wordTimers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 1; i < words; i++) {
+      wordTimers.push(setTimeout(() => setWordIdx(i), est * cum[i]));
+    }
+    timers.push(...wordTimers);
     const advance = () => {
       if (advanced) return;
       advanced = true;
@@ -296,9 +311,26 @@ export default function SmartReading() {
     const recordingUrl = muted ? null : voiceUrlForText(text);
     if (recordingUrl) {
       // A human recording of this sentence wins over the device
-      // voice; the safety timer below stretches to fit its natural
-      // pace (the estimate assumes device-voice speed).
-      stopRecording = playRecordedLine(recordingUrl, advance);
+      // voice. Its highlight is paced by the recording itself: the
+      // player reports its own position, and the word under the
+      // voice is lit from the real duration — so every voice, fast
+      // or slow, stays in step. The estimate timers above are only
+      // a fallback until the first progress report arrives.
+      let progressLive = false;
+      const onProgress = (currentTime: number, duration: number) => {
+        if (advanced || duration <= 0) return;
+        if (!progressLive) {
+          progressLive = true;
+          wordTimers.forEach(clearTimeout);
+        }
+        const fraction = Math.min(1, currentTime / duration);
+        let idx = 0;
+        for (let i = 0; i < cum.length; i++) {
+          if (fraction >= cum[i]) idx = i;
+        }
+        setWordIdx(idx);
+      };
+      stopRecording = playRecordedLine(recordingUrl, advance, onProgress);
     } else if (!muted) {
       try {
         Speech.speak(text, { language: 'en', rate, onDone: advance, onError: advance });

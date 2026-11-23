@@ -44,7 +44,11 @@ function stopRecordingLine(): void {
  * own safety timer also fires). Returns false when playback could not
  * even be attempted, so the caller can fall back to the device voice.
  */
-function playRecordingLine(url: string, onEnded: () => void): boolean {
+function playRecordingLine(
+  url: string,
+  onEnded: () => void,
+  onProgress?: (currentTimeSec: number, durationSec: number) => void
+): boolean {
   try {
     stopRecordingLine();
     if (!linePlayer) {
@@ -59,6 +63,12 @@ function playRecordingLine(url: string, onEnded: () => void): boolean {
     linePoll = setInterval(() => {
       try {
         if (player.playing || player.currentTime > 0) started = true;
+        // Report the player's own clock: callers that highlight words
+        // pace themselves by the real recording, not by an estimate,
+        // so every voice stays in step.
+        if (onProgress && player.duration > 0) {
+          onProgress(player.currentTime, player.duration);
+        }
         if ((started && !player.playing) || (!started && Date.now() - waited > 2500)) {
           stopRecordingLine();
           onEnded();
@@ -67,7 +77,7 @@ function playRecordingLine(url: string, onEnded: () => void): boolean {
         stopRecordingLine();
         onEnded();
       }
-    }, 200);
+    }, onProgress ? 120 : 200);
     return true;
   } catch (error) {
     console.log('Recorded line playback unavailable:', error);
@@ -102,7 +112,8 @@ export function playDing(): void {
  */
 export function playRecordedLine(
   url: string,
-  onEnded: () => void
+  onEnded: () => void,
+  onProgress?: (currentTimeSec: number, durationSec: number) => void
 ): () => void {
   let ended = false;
   const finish = () => {
@@ -110,7 +121,7 @@ export function playRecordedLine(
     ended = true;
     onEnded();
   };
-  if (!playRecordingLine(url, finish)) {
+  if (!playRecordingLine(url, finish, onProgress)) {
     finish();
     return () => {};
   }

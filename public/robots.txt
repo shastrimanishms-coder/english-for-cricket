@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /studio
+Disallow: /manager
+Disallow: /learner
+
+Sitemap: https://englishforcricket.com/sitemap.xml
