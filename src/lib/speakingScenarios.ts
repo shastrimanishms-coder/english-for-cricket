@@ -24,6 +24,10 @@ export interface SpeakingScenario {
   turns: ScenarioTurn[];
   /** "Belongs to" lesson tag (migration 17), when the admin set one. */
   lessonId?: string | null;
+  /** Cover picture for the card shelf (Round 73), when one is set. */
+  imageUrl?: string | null;
+  /** Curriculum stage the scenario belongs to, when tagged. */
+  stageId?: string | null;
 }
 
 export const SPEAKING_SCENARIOS: SpeakingScenario[] = [

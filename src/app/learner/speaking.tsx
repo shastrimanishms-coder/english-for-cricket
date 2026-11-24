@@ -11,7 +11,7 @@ import {
 import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
 import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
@@ -75,6 +75,16 @@ const FALLBACK_ITEMS: PracticeItem[] = [
 ].map((text) => ({ text, lessonTitle: 'Cricket English' }));
 
 const MAX_ITEMS = 24;
+
+// Stage chip labels for the scenario card shelf (Round 73), keyed by
+// the curriculum stage ids the scenarios are tagged with.
+const STAGE_LABELS: Record<string, string> = {
+  'd3352863-2ae5-4404-b39d-9ade3dac2cbd': 'Stage 1',
+  '0880276e-8c46-4aba-a96d-c7aa0a30c632': 'Stage 2',
+  '6fb44af7-815c-4157-adc5-cf67ad89617c': 'Stage 3',
+  '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
+  '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
+};
 
 // The AudioRecorder class is not a top-level value export of
 // expo-audio - it lives on the native module (AudioRecorder on native,
@@ -211,22 +221,28 @@ export default function SpeakingPractice() {
   useEffect(() => {
     (async () => {
       try {
-        let { data, error } = await supabase
-          .from('speaking_scenarios')
-          .select('id, title, category, emoji, description, other_name, turns, lesson_id')
-          .eq('is_published', true)
-          .order('order_index', { ascending: true })
-          .order('created_at', { ascending: true });
-        if (error && /lesson_id/.test(error.message)) {
-          // Migration 17 not run yet: the tag column does not exist.
-          const retry = await supabase
+        // Newest columns first, with graceful fallbacks so the shelf
+        // keeps working before a migration is run: image_url arrives
+        // in Round 73, stage_id in migration 30, lesson_id in 17.
+        const selectAttempts = [
+          'id, title, category, emoji, description, other_name, turns, lesson_id, stage_id, image_url',
+          'id, title, category, emoji, description, other_name, turns, lesson_id, stage_id',
+          'id, title, category, emoji, description, other_name, turns, lesson_id',
+          'id, title, category, emoji, description, other_name, turns',
+        ];
+        let data: any[] | null = null;
+        let error: any = null;
+        for (const columns of selectAttempts) {
+          const res = await supabase
             .from('speaking_scenarios')
-            .select('id, title, category, emoji, description, other_name, turns')
+            .select(columns)
             .eq('is_published', true)
             .order('order_index', { ascending: true })
             .order('created_at', { ascending: true });
-          data = retry.data as typeof data;
-          error = retry.error;
+          data = res.data as any[] | null;
+          error = res.error;
+          if (!error) break;
+          if (!/image_url|stage_id|lesson_id/.test(error.message || '')) break;
         }
         if (error) throw error;
         const rows: SpeakingScenario[] = (data || [])
@@ -239,6 +255,8 @@ export default function SpeakingPractice() {
             otherName: row.other_name || 'Partner',
             turns: Array.isArray(row.turns) ? row.turns : [],
             lessonId: row.lesson_id ?? null,
+            stageId: row.stage_id ?? null,
+            imageUrl: row.image_url ?? null,
           }))
           .filter((s: SpeakingScenario) => s.turns.length > 0);
         if (rows.length > 0) setDbScenarios(rows);
@@ -750,25 +768,46 @@ export default function SpeakingPractice() {
     })();
   }, [scenarioDone, scenario]);
 
-  const renderScenarioCard = (s: SpeakingScenario) => (
-    <Pressable
-      key={s.id}
-      onPress={() => startScenario(s)}
-      className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 mb-4"
-    >
-      <View className="flex-row items-start gap-4">
-        <Text className="text-4xl">{s.emoji}</Text>
-        <View className="flex-1">
-          <Text className="font-display text-xl font-semibold text-navy">{s.title}</Text>
-          <Text className="font-sans text-slate-500 mt-1">{s.description}</Text>
-          <Text className="font-sans text-xs font-bold text-pitch uppercase tracking-[1.5px] mt-2">
-            {learnerLineCount(s)} lines to speak • with the {s.otherName}
-          </Text>
+  // Card shelf, mirroring Smart Reading (Round 70): cover picture on
+  // top (or the designed navy placeholder with the scenario's emoji),
+  // then title, a one-line description and a meta row with the stage
+  // chip, the line count and the partner. Speaking keeps no stored
+  // per-scenario best score, so — unlike Reading — there is no
+  // best-score marker on these cards.
+  const renderScenarioCard = (s: SpeakingScenario) => {
+    const blurb = s.description || s.turns[0]?.text || '';
+    const stageLabel = s.stageId ? STAGE_LABELS[s.stageId] : undefined;
+    return (
+      <Pressable
+        key={s.id}
+        onPress={() => startScenario(s)}
+        className="w-full md:w-[48.5%] lg:w-[31.8%] bg-white border border-inkline rounded-[20px] shadow-sm overflow-hidden"
+      >
+        <View className="w-full aspect-[16/10] bg-navy items-center justify-center relative">
+          {s.imageUrl ? (
+            <Image source={{ uri: s.imageUrl }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
+          ) : (
+            <Text className="text-6xl">{s.emoji}</Text>
+          )}
         </View>
-        <Text className="text-gold text-2xl">›</Text>
-      </View>
-    </Pressable>
-  );
+        <View className="p-4">
+          <Text className="font-display font-semibold text-navy text-lg" numberOfLines={2}>{s.title}</Text>
+          {blurb ? <Text className="font-sans text-slate-500 text-sm" numberOfLines={2}>{blurb}</Text> : null}
+          <View className="flex-row items-center gap-2 mt-3">
+            {stageLabel ? (
+              <View className="rounded-full bg-gold-light px-2 py-0.5">
+                <Text className="font-sans text-xs font-bold text-navy">{stageLabel}</Text>
+              </View>
+            ) : null}
+            <Text className="font-sans text-slate-400 text-sm">
+              {learnerLineCount(s)} line{learnerLineCount(s) === 1 ? '' : 's'} to speak
+            </Text>
+            <Text className="font-sans text-pitch font-bold text-sm ml-auto">with the {s.otherName}</Text>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
 
   const attemptedScores = Object.values(lineScores);
   const avgScore =
@@ -791,7 +830,7 @@ export default function SpeakingPractice() {
 
       {mode === 'menu' ? (
         <ScrollView contentContainerStyle={{ padding: 24 }}>
-          <View className="max-w-3xl w-full mx-auto">
+          <View className="max-w-6xl w-full mx-auto">
             <Text className="font-sans text-lg text-slate-500 mb-6">
               Choose how you want to practise speaking today.
             </Text>
@@ -809,14 +848,18 @@ export default function SpeakingPractice() {
             </Pressable>
 
             <MicroLabel className="mb-3">🎙️ Interviews</MicroLabel>
-            {scenarios
-              .filter(s => s.category === 'Interview')
-              .map(s => renderScenarioCard(s))}
+            <View className="flex-row flex-wrap gap-4 mb-8">
+              {scenarios
+                .filter(s => s.category === 'Interview')
+                .map(s => renderScenarioCard(s))}
+            </View>
 
-            <MicroLabel className="mb-3 mt-6">💬 Small Talk</MicroLabel>
-            {scenarios
-              .filter(s => s.category === 'Small Talk')
-              .map(s => renderScenarioCard(s))}
+            <MicroLabel className="mb-3">💬 Small Talk</MicroLabel>
+            <View className="flex-row flex-wrap gap-4">
+              {scenarios
+                .filter(s => s.category === 'Small Talk')
+                .map(s => renderScenarioCard(s))}
+            </View>
           </View>
         </ScrollView>
       ) : mode === 'scenario' ? (
@@ -857,6 +900,20 @@ export default function SpeakingPractice() {
         ) : scenarioTurn ? (
           <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
             <View className="max-w-3xl w-full mx-auto flex-1">
+              {/* Cover, as on the card shelf (Round 73): the scenario's
+                  picture, or the navy placeholder with its emoji. */}
+              {scenario.imageUrl ? (
+                <Image
+                  source={{ uri: scenario.imageUrl }}
+                  className="w-full max-w-md mx-auto aspect-[16/10] rounded-[20px] mb-6"
+                  resizeMode="cover"
+                />
+              ) : (
+                <View className="w-full max-w-md mx-auto aspect-[16/10] rounded-[20px] mb-6 bg-navy items-center justify-center">
+                  <Text className="text-6xl">{scenario.emoji}</Text>
+                </View>
+              )}
+
               {/* Progress */}
               <View className="flex-row items-center justify-between mb-2">
                 <Text className="font-sans text-xs font-bold text-slate-500 uppercase tracking-[1.5px]">
