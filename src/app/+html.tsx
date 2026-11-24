@@ -1,4 +1,4 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
+import { ScrollViewStyleReset, useServerDocumentContext } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
 
 // The root HTML for every exported page. Search engines and social
@@ -40,6 +40,13 @@ const STRUCTURED_DATA = {
 };
 
 export default function Root({ children }: PropsWithChildren) {
+  // SDK 58 static rendering: a custom root HTML component MUST render
+  // the generated document nodes, or the exported pages lose them.
+  // headNodes carries the React Native Web stylesheet and the asset
+  // preloads; bodyNodes carries the JavaScript bundles. Round 69
+  // shipped this shell without them, so v69-v71 exported pages with
+  // no CSS and no JS (unstyled, non-interactive). Fixed in Round 72.
+  const { headNodes, bodyNodes } = useServerDocumentContext();
   return (
     <html lang="en">
       <head>
@@ -68,8 +75,12 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="twitter:image" content={OG_IMAGE} />
         <script type="application/ld+json">{JSON.stringify(STRUCTURED_DATA)}</script>
         <ScrollViewStyleReset />
+        {headNodes}
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {bodyNodes}
+      </body>
     </html>
   );
 }
