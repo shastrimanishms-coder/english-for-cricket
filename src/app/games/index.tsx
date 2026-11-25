@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
+import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
@@ -104,7 +105,7 @@ export default function GamesGallery() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
-      <ScreenHeader title="Arcade" onBack={goBack} />
+      <ScreenHeader title="Arcade" onBack={goBack} right={<HelpButton slug="help-games" />} />
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="w-full max-w-7xl mx-auto">
         <View className="mb-8">

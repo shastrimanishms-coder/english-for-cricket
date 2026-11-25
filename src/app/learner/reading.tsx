@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/ui/Elegant';
+import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { downloadPdf, type PdfSection } from '../../lib/downloadPdf';
@@ -652,6 +653,8 @@ export default function SmartReading() {
               <Text className="font-sans text-white/70 font-bold text-sm">
                 Page {pageIdx + 1} of {story.pages.length}
               </Text>
+            ) : !story ? (
+              <HelpButton slug="help-reading" />
             ) : undefined
           }
         />

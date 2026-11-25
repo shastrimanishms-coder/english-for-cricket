@@ -21,6 +21,7 @@ import { useAppLogo } from '../lib/useAppLogo';
 // blended into the navy sections at low opacity rather than as a
 // small foreground pair (which stretched the old hero). Transparent
 // PNGs, 540x960 (aspect 0.5625).
+const LOGO_LOCKUP_WHITE = require('../../assets/images/logo-lockup-white.png');
 const MASCOT_MALE = require('../../assets/images/mascot-male.png');
 const MASCOT_FEMALE = require('../../assets/images/mascot-female.png');
 
@@ -612,6 +613,19 @@ export default function LandingPage() {
                 className="w-full"
               />
             </View>
+          </View>
+          {/* Closing brand signature (Round 78): the full lockup
+              in its white-lettering variant, made for navy
+              surfaces. The page footer below sits on the light
+              canvas and carries no logo, so the lockup closes
+              this navy branding band instead, at a size where
+              the lettering stays legible. */}
+          <View className="items-center mt-14">
+            <Image
+              source={LOGO_LOCKUP_WHITE}
+              resizeMode="contain"
+              style={{ width: 212, height: 159 }}
+            />
           </View>
         </View>
       </View>

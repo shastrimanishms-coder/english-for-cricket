@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GhostButton, GoldButton, ScreenHeader } from '../../components/ui/Elegant';
+import { HelpButton } from '../../components/ui/HelpPopup';
 import { fetchCompletedLessons } from '../../lib/completions';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -238,7 +239,7 @@ export default function LearningPath() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
-      <ScreenHeader title="Learning Path" onBack={() => router.back()} />
+      <ScreenHeader title="Learning Path" onBack={() => router.back()} right={<HelpButton slug="help-learning-path" />} />
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
         <View className="max-w-4xl w-full mx-auto">

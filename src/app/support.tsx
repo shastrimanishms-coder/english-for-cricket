@@ -3,7 +3,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GhostButton, GoldButton, MicroLabel, NavyButton } from '../components/ui/Elegant';
+import { fetchPageTranslation, isRTLLang } from '../lib/pageTranslations';
 import { supabase } from '../lib/supabase';
+
+// The Support page's own static text (Round 78) lives in
+// page_translations under the slug 'support-page', so it can be
+// shown - and edited by the admin - in all eight languages. The
+// body is four short parts separated by a line containing only ---:
+// (1) intro under the title, (2) note above the contact form,
+// (3) "Still stuck?" email note, (4) empty-FAQs note. The English
+// defaults below are the master text; form field labels, the topic
+// list and the FAQ rows themselves stay as they are.
+const SUPPORT_TEXT_EN = {
+  title: 'Help & Support',
+  intro: 'Answers to common questions about learning with English for Cricket.',
+  formIntro: 'Questions, feedback or ideas - write to us here and we will get back to you by email.',
+  emailNote: 'Send us an email and we will get back to you.',
+  emptyNote: 'Help articles are on the way. If you need a hand right now, contact us below.',
+};
 
 interface FAQ {
   id: string;
@@ -35,6 +52,8 @@ const SUPPORT_TOPICS = [
 export default function SupportScreen() {
   const router = useRouter();
   const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const [pageText, setPageText] = useState(SUPPORT_TEXT_EN);
+  const [pageRTL, setPageRTL] = useState(false);
   const [supportEmail, setSupportEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -117,6 +136,21 @@ export default function SupportScreen() {
 
       if (!faqRes.error) setFaqs(faqRes.data || []);
 
+      const translation = await fetchPageTranslation('support-page');
+      if (translation) {
+        const parts = translation.body
+          .split(/\n\s*---\s*\n/)
+          .map((p) => p.trim());
+        setPageText({
+          title: translation.title || SUPPORT_TEXT_EN.title,
+          intro: parts[0] || SUPPORT_TEXT_EN.intro,
+          formIntro: parts[1] || SUPPORT_TEXT_EN.formIntro,
+          emailNote: parts[2] || SUPPORT_TEXT_EN.emailNote,
+          emptyNote: parts[3] || SUPPORT_TEXT_EN.emptyNote,
+        });
+        setPageRTL(isRTLLang(translation.lang));
+      }
+
       if (!settingsRes.error && settingsRes.data) {
         const map: Record<string, string> = {};
         settingsRes.data.forEach((row: { key: string; value: string }) => {
@@ -149,13 +183,16 @@ export default function SupportScreen() {
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="max-w-3xl w-full mx-auto">
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="font-display text-3xl md:text-4xl font-semibold text-navy">Help & Support</Text>
+            <Text className="font-display text-3xl md:text-4xl font-semibold text-navy">{pageText.title}</Text>
             <Pressable onPress={() => router.back()} className="px-4 py-2 bg-white border border-inkline rounded-full">
               <Text className="font-sans font-bold text-navy">← Back</Text>
             </Pressable>
           </View>
-          <Text className="font-sans text-slate-500 text-lg mb-8">
-            Answers to common questions about learning with English for Cricket.
+          <Text
+            className="font-sans text-slate-500 text-lg mb-8"
+            style={pageRTL ? { textAlign: 'right' } : undefined}
+          >
+            {pageText.intro}
           </Text>
 
           {loading ? (
@@ -167,7 +204,7 @@ export default function SupportScreen() {
               <Text className="text-5xl mb-4">❓</Text>
               <Text className="font-sans text-xl font-bold text-navy mb-2">No FAQs Yet</Text>
               <Text className="font-sans text-slate-500 text-center">
-                Help articles are on the way. If you need a hand right now, contact us below.
+                {pageText.emptyNote}
               </Text>
             </View>
           ) : (
@@ -220,8 +257,11 @@ export default function SupportScreen() {
               </View>
             ) : (
               <View>
-                <Text className="font-sans text-slate-500 mb-5">
-                  Questions, feedback or ideas - write to us here and we will get back to you by email.
+                <Text
+                  className="font-sans text-slate-500 mb-5"
+                  style={pageRTL ? { textAlign: 'right' } : undefined}
+                >
+                  {pageText.formIntro}
                 </Text>
 
                 <Text className="font-sans text-sm font-semibold text-slate-500 mb-2">Your name *</Text>
@@ -311,7 +351,7 @@ export default function SupportScreen() {
             <View className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 items-center">
               <Text className="font-display text-2xl font-semibold text-navy mb-2">Still stuck?</Text>
               <Text className="font-sans text-slate-500 text-center mb-4">
-                Send us an email and we will get back to you.
+                {pageText.emailNote}
               </Text>
               <NavyButton
                 label={`✉️ ${supportEmail}`}

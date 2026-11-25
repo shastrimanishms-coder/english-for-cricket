@@ -2,15 +2,28 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MicroLabel } from '../../components/ui/Elegant';
-import MascotPair from '../../components/ui/Mascots';
 import RewardsCard from '../../components/ui/RewardsCard';
 import { evaluateStreakBadges } from '../../lib/badgeAwards';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
+import { useAppLogo } from '../../lib/useAppLogo';
+
+// The header mark (Round 78): the round gold-and-navy KYCO
+// medallion, cropped from the official English for Cricket lockup.
+// The full lockup's wordmark is navy and would vanish on the navy
+// bar, so the header shows the medallion beside the "English For
+// Cricket" text instead. An admin-set logo URL (site_settings, via
+// useAppLogo) still overrides the medallion when one is set.
+const HEADER_MEDALLION = require('../../../assets/images/logo-medallion.png');
+
+// The official mascot artwork (same files as Mascots.tsx), used
+// large and faint as the dashboard watermark (Round 78).
+const MASCOT_MALE = require('../../../assets/images/mascot-male.png');
+const MASCOT_FEMALE = require('../../../assets/images/mascot-female.png');
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -77,6 +90,7 @@ const LEARNING_MODULES: {
 
 export default function LearnerDashboard() {
   const router = useRouter();
+  const { source: logoSource, onError: logoOnError, isCustom: logoIsCustom } = useAppLogo();
   const [studentName, setStudentName] = useState('Champion');
   const [studentId, setStudentId] = useState<string | null>(null);
   const [showPlacementPrompt, setShowPlacementPrompt] = useState(false);
@@ -155,12 +169,25 @@ export default function LearnerDashboard() {
       {/* Top Navigation Bar - slim navy, refined type */}
       <SafeAreaView edges={['top']} className="w-full bg-navy">
         <View className="mx-auto w-full max-w-7xl flex-row items-center justify-between px-4 py-3.5 md:px-6">
-          <View className="flex-row items-center gap-2.5">
-            <Text className="text-2xl">🏏</Text>
-            <Text className="font-display text-lg font-semibold tracking-wide text-white md:text-xl">
-              English For Cricket
-            </Text>
-          </View>
+          {logoIsCustom ? (
+            <Image
+              source={logoSource}
+              onError={logoOnError}
+              style={{ height: 38, width: 160 }}
+              resizeMode="contain"
+            />
+          ) : (
+            <View className="flex-row items-center gap-2.5">
+              <Image
+                source={HEADER_MEDALLION}
+                style={{ height: 38, width: 38 }}
+                resizeMode="contain"
+              />
+              <Text className="font-display text-lg font-semibold tracking-wide text-white md:text-xl">
+                English For Cricket
+              </Text>
+            </View>
+          )}
 
           <Pressable
             onPress={handleLogout}
@@ -174,25 +201,45 @@ export default function LearnerDashboard() {
       </SafeAreaView>
 
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1 }}>
-        <View className="mx-auto w-full max-w-7xl">
-          {/* Welcome Header */}
-          <Animated.View entering={FadeIn.duration(400)} style={{ marginBottom: 28 }}>
-            <View className="flex-row items-start gap-4">
-              <View className="flex-1">
-                <MicroLabel className="mb-2">Your Academy</MicroLabel>
-                <Text className="mb-2 font-display text-3xl font-semibold text-navy md:text-4xl">
-                  Welcome back, {studentName}!
-                </Text>
-                <View className="mb-3 h-[2px] w-16 rounded-full bg-gold" />
-                <Text className="font-sans text-base text-slate-500">
-                  Choose a section below to continue your journey.
-                </Text>
-              </View>
-              <MascotPair height={92} />
-            </View>
-          </Animated.View>
+        <View className="relative mx-auto w-full max-w-7xl">
+          {/* Watermark (Round 78): the mascots no longer stand as
+              small figurines beside the greeting - the official
+              artwork now sits LARGE in the background at low
+              opacity, anchored to the top-right of the content
+              column behind the welcome area and the first cards,
+              like the landing page treatment. The cards are
+              opaque, so all text stays fully readable. */}
+          <View
+            pointerEvents="none"
+            className="absolute right-0 top-0 flex-row items-start"
+          >
+            <Image
+              source={MASCOT_FEMALE}
+              style={{ width: 158, height: 281, opacity: 0.13, marginRight: -34 }}
+              resizeMode="contain"
+            />
+            <Image
+              source={MASCOT_MALE}
+              style={{ width: 169, height: 300, opacity: 0.13 }}
+              resizeMode="contain"
+            />
+          </View>
 
-          <RewardsCard />
+          <View className="relative">
+            {/* Welcome Header */}
+            <Animated.View entering={FadeIn.duration(400)} style={{ marginBottom: 28 }}>
+              <MicroLabel className="mb-2">Your Academy</MicroLabel>
+              <Text className="mb-2 font-display text-3xl font-semibold text-navy md:text-4xl">
+                Welcome back, {studentName}!
+              </Text>
+              <View className="mb-3 h-[2px] w-16 rounded-full bg-gold" />
+              <Text className="font-sans text-base text-slate-500">
+                Choose a section below to continue your journey.
+              </Text>
+            </Animated.View>
+
+            <RewardsCard />
+          </View>
 
           {/* First-login placement prompt (until done or skipped) */}
           {showPlacementPrompt && (

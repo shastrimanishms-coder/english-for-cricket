@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, GoldButton, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
+import { HelpButton } from '../../components/ui/HelpPopup';
 import { awardExtraIfTagged } from '../../lib/extras';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -79,7 +80,7 @@ export default function DownloadsGallery() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
-      <ScreenHeader title="Resources" onBack={goBack} />
+      <ScreenHeader title="Resources" onBack={goBack} right={<HelpButton slug="help-downloads" />} />
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <View className="w-full max-w-5xl mx-auto">
         <View className="mb-8">

@@ -9,6 +9,7 @@ import DownloadsManager from '../../components/admin/DownloadsManager';
 import GamesManager from '../../components/admin/GamesManager';
 import HelpCenterManager from '../../components/admin/HelpCenterManager';
 import PageManager from '../../components/admin/PageManager';
+import PageTranslationsManager from '../../components/admin/PageTranslationsManager';
 import SpeakingManager from '../../components/admin/SpeakingManager';
 import ReadingManager from '../../components/admin/ReadingManager';
 import SlideBuilder from '../../components/admin/SlideBuilder';
@@ -73,6 +74,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
   { id: 'badges', label: 'Gamification & Badges', icon: '🏆' },
   { id: 'organizations', label: 'Users & Organizations', icon: '🏛️' },
   { id: 'pages', label: 'Static Pages & Legal', icon: '📄' },
+  { id: 'page_translations', label: 'Pages & Translations', icon: '🌐' },
   { id: 'support_faqs', label: 'Support & FAQs', icon: '❓' },
   { id: 'settings', label: 'System Settings', icon: '⚙️' },
 ];
@@ -575,6 +577,9 @@ export default function SuperAdminDashboard() {
 
       case 'pages':
         return <PageManager />;
+
+      case 'page_translations':
+        return <PageTranslationsManager />;
 
       case 'support_faqs':
         return <HelpCenterManager />;

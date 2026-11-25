@@ -1,102 +1,11 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { Link, Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard } from '../../components/ui/Elegant';
+import { renderRichText } from '../../components/ui/RichText';
+import { fetchPageTranslation, isRTLLang } from '../../lib/pageTranslations';
 import { supabase } from '../../lib/supabase';
-
-/**
- * Minimal, safe rich-text rendering for CMS page content. The content is
- * parsed into React Native elements - it is never injected as HTML.
- * Supported markup (anything else renders as literal text):
- *  - Paragraphs are split on blank lines; single line breaks inside a
- *    paragraph are preserved.
- *  - Lines starting '# ', '## ' or '### ' are headings.
- *  - Consecutive lines starting '- ' or '* ' form a bullet list.
- *  - **bold** and *italic* spans work inline.
- * Content without any markup renders as the same plain paragraphs it
- * always did.
- */
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-  return parts.map((part, i) => {
-    const key = `${keyPrefix}-${i}`;
-    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-      return (
-        <Text key={key} className="font-bold">
-          {part.slice(2, -2)}
-        </Text>
-      );
-    }
-    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
-      return (
-        <Text key={key} className="italic">
-          {part.slice(1, -1)}
-        </Text>
-      );
-    }
-    return part;
-  });
-}
-
-function renderRichText(content: string): ReactNode {
-  const blocks = content
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter((block) => block.length > 0);
-
-  return blocks.map((block, blockIndex) => {
-    const key = `block-${blockIndex}`;
-    const lines = block.split('\n');
-
-    if (lines.length === 1) {
-      const line = lines[0];
-      if (line.startsWith('### ')) {
-        return (
-          <Text key={key} className="font-display text-lg font-semibold text-navy mt-4 mb-3">
-            {renderInline(line.slice(4), key)}
-          </Text>
-        );
-      }
-      if (line.startsWith('## ')) {
-        return (
-          <Text key={key} className="font-display text-xl font-semibold text-navy mt-5 mb-3">
-            {renderInline(line.slice(3), key)}
-          </Text>
-        );
-      }
-      if (line.startsWith('# ')) {
-        return (
-          <Text key={key} className="font-display text-2xl font-semibold text-navy mt-6 mb-3">
-            {renderInline(line.slice(2), key)}
-          </Text>
-        );
-      }
-    }
-
-    const isBulletList = lines.every((line) => line.startsWith('- ') || line.startsWith('* '));
-    if (isBulletList) {
-      return (
-        <View key={key} className="mb-4">
-          {lines.map((line, lineIndex) => (
-            <View key={`${key}-${lineIndex}`} className="flex-row mb-1.5">
-              <Text className="font-sans text-base text-gold-dark leading-relaxed mr-2">•</Text>
-              <Text className="flex-1 font-sans text-base text-slate-600 leading-relaxed">
-                {renderInline(line.slice(2), `${key}-${lineIndex}`)}
-              </Text>
-            </View>
-          ))}
-        </View>
-      );
-    }
-
-    return (
-      <Text key={key} className="font-sans text-base text-slate-600 leading-relaxed mb-4">
-        {renderInline(block, key)}
-      </Text>
-    );
-  });
-}
 
 export default function StaticPageView() {
   const { slug } = useLocalSearchParams();
@@ -111,9 +20,24 @@ export default function StaticPageView() {
           .select('*')
           .eq('slug', slug)
           .single();
-        
+
         if (error) throw error;
-        setPage(data);
+
+        // Round 78: when a translation of this page exists in the
+        // language the visitor chose on the home page, it replaces
+        // the English master from the pages table. English content
+        // stays the fallback for every other case.
+        let resolved = data;
+        const translation = await fetchPageTranslation(String(slug));
+        if (translation) {
+          resolved = {
+            ...data,
+            title: translation.title || data.title,
+            content: translation.body || data.content,
+            lang: translation.lang,
+          };
+        }
+        setPage(resolved);
       } catch (error) {
         console.error(error);
       } finally {
@@ -140,14 +64,31 @@ export default function StaticPageView() {
     );
   }
 
+  const rtl = isRTLLang(typeof page.lang === 'string' ? page.lang : 'en');
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
     <ScrollView className="flex-1">
       <Stack.Screen options={{ title: page.title }} />
       <View className="max-w-3xl w-full mx-auto p-4 md:p-8">
+        {/* Same "Back to Home" link as the login/register screens.
+            Buttons stay in English in every language (Shastri's
+            standing rule), even when the page body is translated. */}
+        <Link href="/" asChild>
+          <Pressable className="self-start mb-4 py-2 pr-3">
+            <Text className="font-sans text-navy font-semibold text-base">← Back to Home</Text>
+          </Pressable>
+        </Link>
         <ElegantCard className="p-6 md:p-10">
-          <Text className="font-display text-3xl md:text-4xl font-semibold text-navy mb-8">{page.title}</Text>
-          <View>{renderRichText(typeof page.content === 'string' ? page.content : '')}</View>
+          <Text
+            className="font-display text-3xl md:text-4xl font-semibold text-navy mb-8"
+            style={rtl ? { textAlign: 'right' } : undefined}
+          >
+            {page.title}
+          </Text>
+          <View style={rtl ? ({ direction: 'rtl' } as object) : undefined}>
+            {renderRichText(typeof page.content === 'string' ? page.content : '')}
+          </View>
         </ElegantCard>
       </View>
     </ScrollView>

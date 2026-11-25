@@ -12,13 +12,38 @@ import { showAlert } from '../../lib/showAlert';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import {
-  CATEGORY_LABELS,
   VOICE_CATEGORIES,
   getRecordingPublicUrl,
   setVoicePref,
   type VoiceCategory,
   type VoiceOption,
 } from '../../lib/voiceStudio';
+
+// What each voice category is FOR (Round 78): the old headings only
+// named the kind of speaker ("Adult man"), which did not tell the
+// student what the choice controls. These follow the actual casting:
+// lesson adults and Speaking Practice partners are cast by role
+// (Coach M1, Reporter/Shopkeeper F1, Friend/Teammate B1), Ken and
+// Mira are the learner characters, and Smart Reading stories are
+// narrated by a man's or a woman's voice.
+const CATEGORY_PURPOSES: Record<VoiceCategory, { heading: string; blurb: string }> = {
+  M1: {
+    heading: "Men's voices",
+    blurb: 'The men you hear in lessons and conversations — teachers, coaches, captains and reporters — and stories read aloud by a man.',
+  },
+  F1: {
+    heading: "Women's voices",
+    blurb: 'The women you hear in lessons and conversations — teachers, reporters and shopkeepers — and stories read aloud by a woman.',
+  },
+  B1: {
+    heading: "Boy's voice — Ken",
+    blurb: 'Ken, the boy learner in your lessons, and boy partners such as friends and teammates in Speaking Practice.',
+  },
+  G1: {
+    heading: "Girl's voice — Mira",
+    blurb: 'Mira, the girl learner in your lessons and conversations.',
+  },
+};
 
 interface EarnedBadge {
   title: string;
@@ -476,8 +501,11 @@ export default function StudentProfile() {
               if (choices.length === 0) return null;
               return (
                 <View key={category} className="mb-4">
-                  <Text className="font-sans text-sm font-bold text-slate-700 mb-2">
-                    {CATEGORY_LABELS[category]}
+                  <Text className="font-sans text-base font-bold text-navy">
+                    {CATEGORY_PURPOSES[category].heading}
+                  </Text>
+                  <Text className="font-sans text-sm text-slate-500 mt-0.5 mb-2">
+                    {CATEGORY_PURPOSES[category].blurb}
                   </Text>
                   <View className="gap-2">
                     {choices.map((voice) => {

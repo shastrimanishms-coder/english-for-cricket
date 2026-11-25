@@ -15,6 +15,7 @@ import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
 import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
+import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { downloadPdf } from '../../lib/downloadPdf';
@@ -954,6 +955,7 @@ export default function SpeakingPractice() {
         <ScreenHeader
           title="Speaking Practice"
           onBack={mode !== 'menu' ? backToMenu : goBack}
+          right={mode === 'menu' ? <HelpButton slug="help-speaking" /> : undefined}
         />
       </SafeAreaView>
 
