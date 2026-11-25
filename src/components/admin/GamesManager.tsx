@@ -479,6 +479,16 @@ export default function GamesManager() {
           itemNoun="games"
           searchPlaceholder="Search games by title…"
           emptyMessage={games.length === 0 ? 'No games added yet.' : 'No games match these filters.'}
+          bulkAssign={{
+            onAssign: async (ids, categoryId) => {
+              const { error } = await supabase
+                .from('games')
+                .update({ category_id: categoryId })
+                .in('id', ids);
+              if (error) throw error;
+              await fetchData();
+            },
+          }}
           renderItem={(game, isLast) => {
             const catName = categories.find(c => c.id === game.category_id)?.name || 'No category';
             const tagLine = [stageName(game.stage_id), moduleName(game.module_id)].filter(Boolean).join(' · ');

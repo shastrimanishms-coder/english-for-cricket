@@ -494,6 +494,16 @@ export default function SpeakingManager() {
           searchPlaceholder="Search scenarios by title…"
           emptyMessage="No scenarios yet."
           framed={false}
+          bulkAssign={{
+            onAssign: async (ids, categoryId) => {
+              const { error } = await supabase
+                .from('speaking_scenarios')
+                .update({ category_id: categoryId })
+                .in('id', ids);
+              if (error) throw error;
+              await fetchData();
+            },
+          }}
           renderItem={(row) => (
             <View key={row.id} className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm">
               <View className="flex-row items-start justify-between gap-4 flex-wrap">

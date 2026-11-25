@@ -7,6 +7,7 @@ import { ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import { fetchStageNameMap, STAGE_NAME_FALLBACKS } from '../../lib/curriculumTaxonomy';
 import { downloadPdf, type PdfSection } from '../../lib/downloadPdf';
 import { awardExtraIfTagged } from '../../lib/extras';
 import {
@@ -204,6 +205,12 @@ export default function SmartReading() {
   // Stage/category quick-jump filter for the shelf (Round 76):
   // 'all', 'stage:<id>' or 'cat:<id>'.
   const [shelfFilter, setShelfFilter] = useState('all');
+  // Stage filter chips show the stage NAME only (Round 78) - the
+  // names come from curriculum_stages, with built-in fallbacks.
+  const [stageNames, setStageNames] = useState<Record<string, string>>(STAGE_NAME_FALLBACKS);
+  useEffect(() => {
+    (async () => setStageNames(await fetchStageNameMap()))();
+  }, []);
 
   const [story, setStory] = useState<Story | null>(null);
   const [mode, setMode] = useState<'listen' | 'aloud' | null>(null);
@@ -614,7 +621,7 @@ export default function SmartReading() {
       { key: 'all', label: 'All' },
       ...STAGE_ORDER.filter((sid) => stories.some((s) => s.stage_id === sid)).map((sid) => ({
         key: `stage:${sid}`,
-        label: STAGE_LABELS[sid],
+        label: stageNames[sid] || STAGE_LABELS[sid],
       })),
       ...categories
         .filter((c) => stories.some((s) => s.category_id === c.id))
@@ -622,7 +629,7 @@ export default function SmartReading() {
     ],
     // categoryLabel reads the same categories list the memo deps on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stories, categories],
+    [stories, categories, stageNames],
   );
 
   // What the shelf actually shows: the full category groups under
@@ -632,7 +639,7 @@ export default function SmartReading() {
     if (shelfFilter.startsWith('stage:')) {
       const sid = shelfFilter.slice(6);
       const items = stories.filter((s) => s.stage_id === sid);
-      return items.length ? [{ label: STAGE_LABELS[sid] || 'Stage', items }] : [];
+      return items.length ? [{ label: stageNames[sid] || STAGE_LABELS[sid] || 'Stage', items }] : [];
     }
     const cid = shelfFilter.slice(4);
     const items = stories.filter((s) => s.category_id === cid);
@@ -640,7 +647,7 @@ export default function SmartReading() {
     return items.length ? [{ label: cat ? categoryLabel(cat) : 'Category', items }] : [];
     // categoryLabel reads the same categories list the memo deps on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shelfFilter, groups, stories, categories]);
+  }, [shelfFilter, groups, stories, categories, stageNames]);
 
   return (
     <View className="flex-1 bg-canvas">

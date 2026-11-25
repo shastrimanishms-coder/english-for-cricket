@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import AdminDropdown from './AdminDropdown';
 
 // Round 76: shared list organiser for the admin content managers
 // (Games, Smart Reading, Speaking Practice, Downloads, Videos).
@@ -48,6 +49,21 @@ interface GroupedContentListProps<T> {
    * for sections whose items are cards of their own (Speaking).
    */
   framed?: boolean;
+  /**
+   * Round 78: bulk category assignment. When provided, every row
+   * gains a checkbox and a selection toolbar appears ("N selected",
+   * a category dropdown over the same `categories` list, Select all
+   * visible, Clear, Assign). The selection lives in this component
+   * keyed by item id, so it survives expanding/collapsing groups
+   * and search filtering. The manager performs the actual update
+   * (one .in('id', ids) update on its table) and refreshes its
+   * items; it must throw on error so the toolbar can report it and
+   * keep the selection. Permissions are the manager's own: whoever
+   * can open the manager and edit an item can bulk-assign it.
+   */
+  bulkAssign?: {
+    onAssign: (ids: string[], categoryId: string) => Promise<void>;
+  };
 }
 
 interface CatGroup<T> {
@@ -80,9 +96,31 @@ export default function GroupedContentList<T>({
   searchPlaceholder = 'Search by title…',
   emptyMessage = 'Nothing here yet.',
   framed = true,
+  bulkAssign,
 }: GroupedContentListProps<T>) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Bulk-assign selection (Round 78): a Set of item ids, untouched
+  // by group expand/collapse or by the search filter.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const toggleSelected = (id: string) => {
+    setFeedback(null);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setFeedback(null);
+  };
 
   const toggle = (key: string) =>
     setOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -192,6 +230,82 @@ export default function GroupedContentList<T>({
 
   const collapseAll = () => setOpen({});
 
+  // Ids of the rows currently on screen: the search matches while
+  // searching, otherwise the items inside expanded groups.
+  const visibleIds = useMemo(() => {
+    if (!bulkAssign) return [];
+    if (searching) return matches.map((item) => idOf(item));
+    const ids: string[] = [];
+    for (const g of groups) {
+      if (!open[g.key]) continue;
+      for (const c of g.cats) {
+        if (!open[c.key]) continue;
+        for (const item of c.items) ids.push(idOf(item));
+      }
+    }
+    return ids;
+  }, [bulkAssign, searching, matches, groups, open, idOf]);
+
+  const selectAllVisible = () => {
+    setFeedback(null);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of visibleIds) next.add(id);
+      return next;
+    });
+  };
+
+  const runBulkAssign = async () => {
+    if (!bulkAssign || !bulkCategoryId || selectedIds.size === 0 || assigning) return;
+    const ids = [...selectedIds];
+    setAssigning(true);
+    setFeedback(null);
+    try {
+      await bulkAssign.onAssign(ids, bulkCategoryId);
+      setFeedback({
+        ok: true,
+        text: `Category assigned to ${ids.length} ${itemNoun}.`,
+      });
+      setSelectedIds(new Set());
+      setBulkCategoryId('');
+    } catch (e: any) {
+      setFeedback({
+        ok: false,
+        text: `Could not assign the category: ${e?.message || 'unknown error'}`,
+      });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  // Row renderer: with bulk assignment on, each row is wrapped in a
+  // flex row with a checkbox cell on the left; otherwise the
+  // manager's row renders exactly as before.
+  const renderRow = (item: T, isLast: boolean) => {
+    if (!bulkAssign) return renderItem(item, isLast);
+    const id = idOf(item);
+    const checked = selectedIds.has(id);
+    return (
+      <View key={id} className="flex-row">
+        <Pressable
+          onPress={() => toggleSelected(id)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked }}
+          className="pl-4 pr-1 items-center justify-center"
+        >
+          <View
+            className={`w-6 h-6 rounded-md border-2 items-center justify-center ${
+              checked ? 'bg-gold border-gold-dark' : 'bg-white border-slate-300'
+            }`}
+          >
+            {checked ? <Text className="text-navy font-bold text-sm">✓</Text> : null}
+          </View>
+        </Pressable>
+        <View className="flex-1">{renderItem(item, isLast)}</View>
+      </View>
+    );
+  };
+
   const renderStageHeader = (group: StageGroup<T>, expanded: boolean) => (
     <Pressable
       onPress={() => toggle(group.key)}
@@ -274,6 +388,64 @@ export default function GroupedContentList<T>({
         ) : null}
       </View>
 
+      {/* Bulk category assignment (Round 78) */}
+      {bulkAssign ? (
+        selectedIds.size === 0 && !feedback ? (
+          <Text className="text-sm text-slate-400">
+            Tick items to assign a category to many at once.
+          </Text>
+        ) : (
+          <View className="bg-white border border-gold/60 rounded-2xl p-4 gap-3 shadow-sm">
+            <View className="flex-row items-center justify-between gap-3 flex-wrap">
+              <Text className="font-sans font-bold text-navy">
+                {selectedIds.size} selected
+              </Text>
+              {feedback ? (
+                <Text className={`font-sans text-sm font-semibold ${feedback.ok ? 'text-green-700' : 'text-red-600'}`}>
+                  {feedback.ok ? '✓ ' : ''}{feedback.text}
+                </Text>
+              ) : null}
+            </View>
+            <View className="flex-col lg:flex-row gap-3 lg:items-start">
+              <View className="flex-1 min-w-[220px]">
+                <AdminDropdown
+                  value={bulkCategoryId}
+                  onChange={setBulkCategoryId}
+                  options={categories.map((c) => ({ id: c.id, label: c.name }))}
+                  placeholder="Choose a category…"
+                  noneLabel="Choose a category…"
+                />
+              </View>
+              <View className="flex-row gap-2 flex-wrap">
+                <Pressable
+                  onPress={selectAllVisible}
+                  className="px-4 py-3 bg-white rounded-full border border-inkline"
+                >
+                  <Text className="text-navy text-sm font-semibold">Select all visible</Text>
+                </Pressable>
+                <Pressable
+                  onPress={clearSelection}
+                  className="px-4 py-3 bg-white rounded-full border border-inkline"
+                >
+                  <Text className="text-navy text-sm font-semibold">Clear</Text>
+                </Pressable>
+                <Pressable
+                  onPress={runBulkAssign}
+                  disabled={!bulkCategoryId || selectedIds.size === 0 || assigning}
+                  className={`px-5 py-3 rounded-full border-b-4 border-gold-dark bg-gold ${
+                    !bulkCategoryId || selectedIds.size === 0 || assigning ? 'opacity-50' : ''
+                  }`}
+                >
+                  <Text className="text-navy text-sm font-bold">
+                    {assigning ? 'Assigning…' : 'Assign'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )
+      ) : null}
+
       {searching ? (
         <>
           <Text className="text-sm text-slate-500">
@@ -294,7 +466,7 @@ export default function GroupedContentList<T>({
                       {stageLabelOf(item)} · {categoryLabelOf(item)}
                     </Text>
                   </View>
-                  {renderItem(item, i === matches.length - 1)}
+                  {renderRow(item, i === matches.length - 1)}
                 </View>
               ))}
             </View>
@@ -305,7 +477,7 @@ export default function GroupedContentList<T>({
                   <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     {stageLabelOf(item)} · {categoryLabelOf(item)}
                   </Text>
-                  {renderItem(item, true)}
+                  {renderRow(item, true)}
                 </View>
               ))}
             </View>
@@ -326,7 +498,7 @@ export default function GroupedContentList<T>({
                     {renderCategoryHeader(cat, catOpen)}
                     {catOpen
                       ? cat.items.map((item, i) =>
-                          renderItem(item, i === cat.items.length - 1),
+                          renderRow(item, i === cat.items.length - 1),
                         )
                       : null}
                   </View>

@@ -481,6 +481,16 @@ export default function VideosManager() {
           itemNoun="videos"
           searchPlaceholder="Search videos by title…"
           emptyMessage="No videos added yet."
+          bulkAssign={{
+            onAssign: async (ids, categoryId) => {
+              const { error } = await supabase
+                .from('videos')
+                .update({ category_id: categoryId })
+                .in('id', ids);
+              if (error) throw error;
+              await fetchData();
+            },
+          }}
           renderItem={(vid, isLast) => {
             const catName = categories.find(c => c.id === vid.category_id)?.name || 'Unknown Category';
             return (

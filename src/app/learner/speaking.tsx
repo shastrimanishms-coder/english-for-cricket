@@ -18,6 +18,7 @@ import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import { fetchStageNameMap, STAGE_NAME_FALLBACKS } from '../../lib/curriculumTaxonomy';
 import { downloadPdf } from '../../lib/downloadPdf';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import {
@@ -324,6 +325,12 @@ export default function SpeakingPractice() {
   // appears only when at least one scenario carries it, so the bar
   // grows by itself as categories get assigned.
   const [shelfFilter, setShelfFilter] = useState('all');
+  // Stage filter chips show the stage NAME only (Round 78) - the
+  // names come from curriculum_stages, with built-in fallbacks.
+  const [stageNames, setStageNames] = useState<Record<string, string>>(STAGE_NAME_FALLBACKS);
+  useEffect(() => {
+    (async () => setStageNames(await fetchStageNameMap()))();
+  }, []);
   const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
     (async () => {
@@ -344,7 +351,7 @@ export default function SpeakingPractice() {
     { key: 'all', label: 'All' },
     ...STAGE_ORDER.filter((sid) => scenarios.some((s) => s.stageId === sid)).map((sid) => ({
       key: `stage:${sid}`,
-      label: STAGE_LABELS[sid],
+      label: stageNames[sid] || STAGE_LABELS[sid],
     })),
     ...speakingCats
       .filter((c) => scenarios.some((s) => s.categoryId === c.id))
@@ -359,7 +366,7 @@ export default function SpeakingPractice() {
         : scenarios.filter((s) => s.categoryId === shelfFilter.slice(4));
   const filteredLabel =
     shelfFilter.startsWith('stage:')
-      ? STAGE_LABELS[shelfFilter.slice(6)] || 'Stage'
+      ? stageNames[shelfFilter.slice(6)] || STAGE_LABELS[shelfFilter.slice(6)] || 'Stage'
       : speakingCats.find((c) => c.id === shelfFilter.slice(4))?.name || 'Category';
 
   // The voice must never talk over the next line.

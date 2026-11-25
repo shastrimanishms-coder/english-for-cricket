@@ -458,6 +458,16 @@ export default function ReadingManager() {
           itemNoun="stories"
           searchPlaceholder="Search stories by title…"
           emptyMessage="No stories yet. Add your first one above."
+          bulkAssign={{
+            onAssign: async (ids, categoryId) => {
+              const { error } = await supabase
+                .from('reading_stories')
+                .update({ category_id: categoryId })
+                .in('id', ids);
+              if (error) throw error;
+              await fetchData();
+            },
+          }}
           renderItem={(row, isLast) => (
             <View
               key={row.id}

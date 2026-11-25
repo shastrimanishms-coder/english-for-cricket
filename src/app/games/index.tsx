@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
+import { fetchStageNameMap, STAGE_NAME_FALLBACKS } from '../../lib/curriculumTaxonomy';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -37,6 +38,13 @@ export default function GamesGallery() {
   // Stage/category quick-jump filter (Round 76): 'all', 'stage:<id>'
   // or 'cat:<id>'.
   const [filter, setFilter] = useState('all');
+  // Stage filter chips show the stage NAME only (Round 78) - the
+  // names come from curriculum_stages, with built-in fallbacks.
+  const [stageNames, setStageNames] = useState<Record<string, string>>(STAGE_NAME_FALLBACKS);
+
+  useEffect(() => {
+    (async () => setStageNames(await fetchStageNameMap()))();
+  }, []);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -85,7 +93,7 @@ export default function GamesGallery() {
     { key: 'all', label: 'All' },
     ...STAGE_ORDER.filter((sid) => games.some((g) => g.stage_id === sid)).map((sid) => ({
       key: `stage:${sid}`,
-      label: STAGE_LABELS[sid],
+      label: stageNames[sid] || STAGE_LABELS[sid],
     })),
     ...Array.from(
       new Map(

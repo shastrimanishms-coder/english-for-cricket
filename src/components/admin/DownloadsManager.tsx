@@ -366,6 +366,16 @@ export default function DownloadsManager() {
           itemNoun="documents"
           searchPlaceholder="Search documents by title…"
           emptyMessage="No documents uploaded yet."
+          bulkAssign={{
+            onAssign: async (ids, categoryId) => {
+              const { error } = await supabase
+                .from('downloads')
+                .update({ category_id: categoryId })
+                .in('id', ids);
+              if (error) throw error;
+              await fetchData();
+            },
+          }}
           renderItem={(dl, isLast) => {
             const catName = categories.find(c => c.id === dl.category_id)?.name || 'Unknown Category';
             return (
