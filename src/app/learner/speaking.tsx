@@ -11,11 +11,12 @@ import {
 import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
 import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import { downloadPdf } from '../../lib/downloadPdf';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import {
   cancelSpeechCue,
@@ -85,6 +86,34 @@ const STAGE_LABELS: Record<string, string> = {
   '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
   '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
 };
+
+// "Download PDF" for a conversation (Round 74): the complete
+// dialogue script with speaker labels, as one printable document.
+// Web only — the button that calls this is not rendered on native.
+function downloadScenarioPdf(scenario: SpeakingScenario) {
+  const stageLabel = scenario.stageId ? STAGE_LABELS[scenario.stageId] : undefined;
+  downloadPdf({
+    title: scenario.title,
+    meta: [
+      `Speaking Practice · ${scenario.category}${stageLabel ? ` · ${stageLabel}` : ''}`,
+      `Your partner: ${scenario.otherName}`,
+      ...(scenario.description ? [scenario.description] : []),
+    ],
+    sections: [
+      {
+        blocks: [
+          {
+            kind: 'dialogue',
+            lines: scenario.turns.map((t) => ({
+              speaker: t.speaker === 'other' ? scenario.otherName : 'You',
+              text: t.text,
+            })),
+          },
+        ],
+      },
+    ],
+  });
+}
 
 // The AudioRecorder class is not a top-level value export of
 // expo-audio - it lives on the native module (AudioRecorder on native,
@@ -773,7 +802,9 @@ export default function SpeakingPractice() {
   // then title, a one-line description and a meta row with the stage
   // chip, the line count and the partner. Speaking keeps no stored
   // per-scenario best score, so — unlike Reading — there is no
-  // best-score marker on these cards.
+  // best-score marker on these cards. Round 74: the whole picture
+  // fits inside the frame (contain on white, as the Round 44 game
+  // pictures) — covers are never cropped.
   const renderScenarioCard = (s: SpeakingScenario) => {
     const blurb = s.description || s.turns[0]?.text || '';
     const stageLabel = s.stageId ? STAGE_LABELS[s.stageId] : undefined;
@@ -785,7 +816,7 @@ export default function SpeakingPractice() {
       >
         <View className="w-full aspect-[16/10] bg-navy items-center justify-center relative">
           {s.imageUrl ? (
-            <Image source={{ uri: s.imageUrl }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
+            <Image source={{ uri: s.imageUrl }} className="absolute inset-0 w-full h-full" style={{ backgroundColor: '#FFFFFF' }} resizeMode="contain" />
           ) : (
             <Text className="text-6xl">{s.emoji}</Text>
           )}
@@ -906,7 +937,8 @@ export default function SpeakingPractice() {
                 <Image
                   source={{ uri: scenario.imageUrl }}
                   className="w-full max-w-md mx-auto aspect-[16/10] rounded-[20px] mb-6"
-                  resizeMode="cover"
+                  style={{ backgroundColor: '#FFFFFF' }}
+                  resizeMode="contain"
                 />
               ) : (
                 <View className="w-full max-w-md mx-auto aspect-[16/10] rounded-[20px] mb-6 bg-navy items-center justify-center">
@@ -1140,6 +1172,17 @@ export default function SpeakingPractice() {
                   </>
                 )}
               </View>
+
+              {Platform.OS === 'web' ? (
+                <View className="items-center mt-6">
+                  <Pressable
+                    onPress={() => downloadScenarioPdf(scenario)}
+                    className="px-6 py-3 bg-white border border-inkline rounded-full"
+                  >
+                    <Text className="font-sans text-slate-600 font-bold text-base">📄 Download PDF</Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           </ScrollView>
         ) : null

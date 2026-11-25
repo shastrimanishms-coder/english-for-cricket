@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/ui/Elegant';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import { downloadPdf, type PdfSection } from '../../lib/downloadPdf';
 import { awardExtraIfTagged } from '../../lib/extras';
 import {
   fetchVoicePrefs,
@@ -115,6 +116,46 @@ const RATES = [0.8, 1, 1.2] as const;
 
 function splitSentences(text: string): string[] {
   return (text.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g) || [text]).map((s) => s.trim()).filter(Boolean);
+}
+
+const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// "Download PDF" for a story (Round 74): the complete text as one
+// document, then the comprehension questions, with the answers kept
+// apart in their own section at the end. Web only — the button that
+// calls this is not rendered on native.
+function downloadStoryPdf(story: Story) {
+  const paragraphs = story.pages.flatMap((p) => p.split(/\n+/).map((s) => s.trim()).filter(Boolean));
+  const sections: PdfSection[] = [
+    { blocks: [{ kind: 'paragraphs', texts: paragraphs }] },
+  ];
+  if (story.questions && story.questions.length > 0) {
+    sections.push({
+      heading: 'Questions',
+      blocks: [{ kind: 'questions', items: story.questions }],
+    });
+    sections.push({
+      heading: 'Answers',
+      blocks: [
+        {
+          kind: 'answers',
+          items: story.questions.map((q) => {
+            const letter = ANSWER_LETTERS[q.answer] || `${q.answer + 1}`;
+            return `${letter} — ${q.options[q.answer] || ''}`;
+          }),
+        },
+      ],
+    });
+  }
+  downloadPdf({
+    title: story.title,
+    meta: [
+      story.level ? `Smart Reading · ${story.level}` : 'Smart Reading',
+      ...(story.description ? [story.description] : []),
+      ...(story.image_credit ? [`Cover: ${story.image_credit}`] : []),
+    ],
+    sections,
+  });
 }
 
 /** Estimated narration time for a sentence at the given rate (ms). */
@@ -505,10 +546,14 @@ export default function SmartReading() {
                           {/* Cover: the story's picture when it has one,
                               otherwise a designed navy placeholder with
                               its emoji, so the shelf always looks
-                              finished. */}
+                              finished. Round 74: the whole picture fits
+                              inside the frame (contain on white, as the
+                              Round 44 game pictures) — covers, and
+                              especially the Legends' photographs, are
+                              never cropped. */}
                           <View className="w-full aspect-[16/10] bg-navy items-center justify-center relative">
                             {s.image_url ? (
-                              <Image source={{ uri: s.image_url }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
+                              <Image source={{ uri: s.image_url }} className="absolute inset-0 w-full h-full" style={{ backgroundColor: '#FFFFFF' }} resizeMode="contain" />
                             ) : (
                               <Text className="text-6xl">{s.emoji}</Text>
                             )}
@@ -571,7 +616,7 @@ export default function SmartReading() {
           ) : mode === null ? (
             <View className="items-center py-8">
               {story.image_url ? (
-                <Image source={{ uri: story.image_url }} className="w-full max-w-md aspect-[16/10] rounded-[20px] mb-4" resizeMode="cover" />
+                <Image source={{ uri: story.image_url }} className="w-full max-w-md aspect-[16/10] rounded-[20px] mb-4" style={{ backgroundColor: '#FFFFFF' }} resizeMode="contain" />
               ) : (
                 <Text className="text-6xl mb-4">{story.emoji}</Text>
               )}
@@ -596,6 +641,14 @@ export default function SmartReading() {
               >
                 <Text className="font-sans text-navy font-bold text-base">🎤 Read Aloud &amp; Get Scored</Text>
               </Pressable>
+              {Platform.OS === 'web' ? (
+                <Pressable
+                  onPress={() => downloadStoryPdf(story)}
+                  className="w-full max-w-sm px-6 py-4 bg-white border border-inkline rounded-full items-center mt-3"
+                >
+                  <Text className="font-sans text-slate-600 font-bold text-base">📄 Download PDF</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
             <View>
