@@ -12,13 +12,15 @@ import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useAppLogo } from '../../lib/useAppLogo';
 
-// The header mark (Round 78): the round gold-and-navy KYCO
-// medallion, cropped from the official English for Cricket lockup.
-// The full lockup's wordmark is navy and would vanish on the navy
-// bar, so the header shows the medallion beside the "English For
-// Cricket" text instead. An admin-set logo URL (site_settings, via
-// useAppLogo) still overrides the medallion when one is set.
-const HEADER_MEDALLION = require('../../../assets/images/logo-medallion.png');
+// The header mark (Round 80): the full English for Cricket lockup
+// in its white-lettering variant, made for navy surfaces, shown as
+// a single image in place of the old medallion + text pair (the
+// medallion alone read as the KYCO crest rather than the English
+// for Cricket logo). The asset is the supplied white variant
+// trimmed tightly to its artwork (900x676). An admin-set logo URL
+// (site_settings app_logo_url, via useAppLogo) still overrides
+// this bundled lockup when one is set.
+const HEADER_LOCKUP = require('../../../assets/images/logo-lockup-white.png');
 
 // The official mascot artwork (same files as Mascots.tsx), used
 // large and faint as the dashboard watermark (Round 78).
@@ -168,7 +170,7 @@ export default function LearnerDashboard() {
     <View className="flex-1 bg-canvas">
       {/* Top Navigation Bar - slim navy, refined type */}
       <SafeAreaView edges={['top']} className="w-full bg-navy">
-        <View className="mx-auto w-full max-w-7xl flex-row items-center justify-between px-4 py-3.5 md:px-6">
+        <View className="mx-auto w-full max-w-7xl flex-row items-center justify-between px-4 py-2 md:px-6">
           {logoIsCustom ? (
             <Image
               source={logoSource}
@@ -177,16 +179,11 @@ export default function LearnerDashboard() {
               resizeMode="contain"
             />
           ) : (
-            <View className="flex-row items-center gap-2.5">
-              <Image
-                source={HEADER_MEDALLION}
-                style={{ height: 38, width: 38 }}
-                resizeMode="contain"
-              />
-              <Text className="font-display text-lg font-semibold tracking-wide text-white md:text-xl">
-                English For Cricket
-              </Text>
-            </View>
+            <Image
+              source={HEADER_LOCKUP}
+              style={{ height: 50, width: 67 }}
+              resizeMode="contain"
+            />
           )}
 
           <Pressable
