@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { toSpeechText } from './speechCue';
 import {
@@ -368,5 +369,50 @@ export async function fetchVoicePrefs(
     return data as VoicePrefs;
   } catch {
     return {};
+  }
+}
+
+// ------------------------------------------------------- narrator pref
+
+/**
+ * The student's separate Smart Reading narrator choice (Round 80):
+ * stories can be narrated by the men's (M1) or women's (F1) voices
+ * even when the student's lesson voice picks say otherwise. Unlike
+ * the named-voice picks above (server-side voice_prefs), this is a
+ * simple device-local switch, stored per student in AsyncStorage —
+ * the same pattern as the placement keys — under
+ * `efc_narrator_category:<studentId>` with value 'M1' or 'F1'.
+ * Absent means no preference: narration then follows the lesson
+ * picks, as it did before this setting existed.
+ */
+export type NarratorCategory = Extract<VoiceCategory, 'M1' | 'F1'>;
+
+const narratorStorageKey = (identity: StudentIdentity): string =>
+  `efc_narrator_category:${identity.studentId}`;
+
+export async function fetchNarratorCategory(
+  identity: StudentIdentity
+): Promise<NarratorCategory | null> {
+  try {
+    const value = await AsyncStorage.getItem(narratorStorageKey(identity));
+    return value === 'M1' || value === 'F1' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveNarratorCategory(
+  identity: StudentIdentity,
+  category: NarratorCategory | null
+): Promise<boolean> {
+  try {
+    if (category) {
+      await AsyncStorage.setItem(narratorStorageKey(identity), category);
+    } else {
+      await AsyncStorage.removeItem(narratorStorageKey(identity));
+    }
+    return true;
+  } catch {
+    return false;
   }
 }

@@ -358,7 +358,7 @@ export async function setVoicePref(
   studentId: string,
   studentKind: StudentKind,
   category: VoiceCategory,
-  voiceId: string
+  voiceId: string | null
 ): Promise<boolean> {
   try {
     const { data, error } = await supabase.rpc('set_voice_pref', {

@@ -8,6 +8,11 @@ import AnimatedButton from '../../components/ui/AnimatedButton';
 import { ElegantCard, ScreenHeader } from '../../components/ui/Elegant';
 import RewardsCard from '../../components/ui/RewardsCard';
 import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
+import {
+  fetchNarratorCategory,
+  saveNarratorCategory,
+  type NarratorCategory,
+} from '../../lib/lessonVoices';
 import { showAlert } from '../../lib/showAlert';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -114,22 +119,31 @@ export default function StudentProfile() {
   // voices exist (or the migration is run) the card shows its
   // "coming soon" line.
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
-  const [voicePrefOverrides, setVoicePrefOverrides] = useState<Record<string, string>>({});
+  // Overrides hold a voice id, or null for "cleared on this screen"
+  // (Round 80): a null override must REMOVE the loaded choice, not
+  // just sit on top of it.
+  const [voicePrefOverrides, setVoicePrefOverrides] = useState<Record<string, string | null>>({});
   const [savingVoiceCat, setSavingVoiceCat] = useState<VoiceCategory | null>(null);
 
   // The student's current choices ride along on the profile row this
   // screen already loads (voice_prefs jsonb on both student tables);
-  // choices made on this screen override them immediately.
+  // choices made on this screen override them immediately. A stored
+  // null (a category cleared before migration 33 removed the key
+  // outright) counts as no choice, exactly like a missing key.
   const loadedVoicePrefs: Record<string, string> = (() => {
     const prefs = profile?.voice_prefs;
     return prefs && typeof prefs === 'object' && !Array.isArray(prefs)
       ? (prefs as Record<string, string>)
       : {};
   })();
-  const voicePrefs: Record<string, string> = {
-    ...loadedVoicePrefs,
-    ...voicePrefOverrides,
-  };
+  const voicePrefs: Record<string, string> = {};
+  for (const [cat, id] of Object.entries(loadedVoicePrefs)) {
+    if (id) voicePrefs[cat] = id;
+  }
+  for (const [cat, id] of Object.entries(voicePrefOverrides)) {
+    if (id) voicePrefs[cat] = id;
+    else delete voicePrefs[cat];
+  }
 
   useEffect(() => {
     (async () => {
@@ -146,8 +160,50 @@ export default function StudentProfile() {
     })();
   }, []);
 
+  // Story narrator (Round 80): a separate Smart Reading switch —
+  // stories narrated by men's or women's voices, independent of the
+  // lesson voice picks above. Device-local per student; null is
+  // "no preference", where narration follows the lesson picks.
+  const [narratorCat, setNarratorCat] = useState<NarratorCategory | null>(null);
+  const [savingNarrator, setSavingNarrator] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const identity = await getStudentIdentity();
+      if (identity) setNarratorCat(await fetchNarratorCategory(identity));
+    })();
+  }, []);
+
+  const handlePickNarrator = async (category: NarratorCategory) => {
+    if (savingNarrator) return;
+    // Tapping the current choice again clears back to no preference.
+    const next = narratorCat === category ? null : category;
+    setSavingNarrator(true);
+    try {
+      const identity = await getStudentIdentity();
+      if (!identity) {
+        throw new Error('We could not find your sign-in. Please log in again.');
+      }
+      const ok = await saveNarratorCategory(identity, next);
+      if (!ok) {
+        throw new Error('Your choice could not be saved yet. Please try again later.');
+      }
+      setNarratorCat(next);
+    } catch (error: any) {
+      showAlert('Could not save', error.message || 'Please try again.');
+    } finally {
+      setSavingNarrator(false);
+    }
+  };
+
   const handlePickVoice = async (category: VoiceCategory, voiceId: string) => {
-    if (savingVoiceCat || voicePrefs[category] === voiceId) return;
+    if (savingVoiceCat) return;
+    // Tapping the currently chosen voice again CLEARS the category
+    // back to no selection (Round 80) — the student is never trapped
+    // with a pick they no longer want. An unset category behaves
+    // exactly as it did before this picker existed: the app uses
+    // its default voice for the category.
+    const clearing = voicePrefs[category] === voiceId;
     setSavingVoiceCat(category);
     try {
       const identity = await getStudentIdentity();
@@ -158,12 +214,12 @@ export default function StudentProfile() {
         identity.studentId,
         identity.studentKind,
         category,
-        voiceId
+        clearing ? null : voiceId
       );
       if (!ok) {
         throw new Error('Your voice choice could not be saved yet. Please try again later.');
       }
-      setVoicePrefOverrides((prev) => ({ ...prev, [category]: voiceId }));
+      setVoicePrefOverrides((prev) => ({ ...prev, [category]: clearing ? null : voiceId }));
     } catch (error: any) {
       showAlert('Could not save', error.message || 'Please try again.');
     } finally {
@@ -489,7 +545,7 @@ export default function StudentProfile() {
         <ElegantCard className="p-6">
           <Text className="font-display text-xl font-semibold text-navy mb-2">My Voices 🎙️</Text>
           <Text className="font-sans text-slate-500 mb-4">
-            Real people are recording the voices for your lessons. For each kind of speaker, pick the voice you like best — tap “Hear sample” to listen to them say hello.
+            Real people are recording the voices for your lessons. For each kind of speaker, pick the voice you like best — tap “Hear sample” to listen to them say hello. Tap a voice you have chosen again to clear it and go back to no preference.
           </Text>
           {voiceOptions.length === 0 ? (
             <Text className="font-sans text-slate-500">
@@ -532,7 +588,7 @@ export default function StudentProfile() {
                             </Text>
                             <Text className="font-sans text-xs text-slate-500">
                               {selected
-                                ? 'Your voice for these lines'
+                                ? 'Your voice for these lines — tap again to clear'
                                 : savingVoiceCat === category
                                   ? 'Saving…'
                                   : 'Tap to choose this voice'}
@@ -555,6 +611,60 @@ export default function StudentProfile() {
               );
             })
           )}
+
+          {/* Story narrator (Round 80): a separate switch for Smart
+              Reading only, independent of the lesson voice picks
+              above. Tapping the chosen option again clears it back
+              to no preference. */}
+          <View className="mt-6 border-t border-inkline pt-5">
+            <Text className="font-sans text-base font-bold text-navy">
+              Story narrator — Smart Reading
+            </Text>
+            <Text className="font-sans text-sm text-slate-500 mt-0.5 mb-2">
+              Choose who reads your stories aloud in Smart Reading: a man or a woman. This is only for stories, and it is separate from your lesson voices above.
+            </Text>
+            <View className="gap-2">
+              {(
+                [
+                  ['M1', 'Male voices'],
+                  ['F1', 'Female voices'],
+                ] as [NarratorCategory, string][]
+              ).map(([category, label]) => {
+                const selected = narratorCat === category;
+                return (
+                  <Pressable
+                    key={category}
+                    onPress={() => handlePickNarrator(category)}
+                    disabled={savingNarrator}
+                    className={`flex-row items-center justify-between rounded-xl border p-3 ${
+                      selected
+                        ? 'border-gold bg-gold-light/50'
+                        : 'border-inkline bg-white'
+                    }`}
+                  >
+                    <View className="flex-1 pr-3">
+                      <Text className="font-sans text-base font-bold text-navy">
+                        {label}
+                        {selected ? '  ✓' : ''}
+                      </Text>
+                      <Text className="font-sans text-xs text-slate-500">
+                        {selected
+                          ? 'Your choice for stories — tap again for no preference'
+                          : savingNarrator
+                            ? 'Saving…'
+                            : 'Tap to choose this narrator'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {narratorCat === null ? (
+              <Text className="font-sans text-xs text-slate-400 mt-2">
+                No preference — stories follow your lesson voice choices above.
+              </Text>
+            ) : null}
+          </View>
         </ElegantCard>
 
         {/* Study Days (migration 16) */}

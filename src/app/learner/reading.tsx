@@ -12,6 +12,7 @@ import { awardExtraIfTagged } from '../../lib/extras';
 import {
   beginActiveVoiceResolution,
   clearActiveVoiceResolution,
+  fetchNarratorCategory,
   fetchVoicePrefs,
   runActiveVoiceResolution,
   voiceGatePendingFor,
@@ -362,6 +363,12 @@ export default function SmartReading() {
             ),
           ])
         : {};
+      // The student's separate story-narrator switch (Profile →
+      // My Voices → Story narrator): a device-local read, so it
+      // never needs the race above.
+      const narratorPref = identity
+        ? await fetchNarratorCategory(identity)
+        : null;
       if (cancelled) return;
       setVoicesPending(true);
       setVoicesSettled(false);
@@ -370,14 +377,17 @@ export default function SmartReading() {
       // single narration category, and resolution is exclusive to
       // it — a sentence whose recording in that category is still
       // missing keeps the device voice instead of switching to the
-      // other gender's recorded voice mid-story. The category is
-      // the student's own choice when they have picked a voice in
-      // exactly one of the two narration categories; otherwise the
-      // men's category, which is what the shelf has always used by
-      // default. Within the category the RPC still prefers the
-      // student's chosen named voice.
+      // other gender's recorded voice mid-story. The category is,
+      // in order: the student's explicit Story narrator choice
+      // from their Profile when they have set one (it wins over
+      // the lesson voice picks); otherwise their own choice when
+      // they have picked a voice in exactly one of the two
+      // narration categories; otherwise the men's category, which
+      // is what the shelf has always used by default. Within the
+      // category the RPC still prefers the student's chosen named
+      // voice.
       const narrationCategory: VoiceCategory =
-        prefs.F1 && !prefs.M1 ? 'F1' : 'M1';
+        narratorPref ?? (prefs.F1 && !prefs.M1 ? 'F1' : 'M1');
       const res = runActiveVoiceResolution(
         seq,
         texts,
