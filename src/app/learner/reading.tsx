@@ -9,9 +9,11 @@ import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { downloadPdf, type PdfSection } from '../../lib/downloadPdf';
 import { awardExtraIfTagged } from '../../lib/extras';
 import {
+  beginActiveVoiceResolution,
+  clearActiveVoiceResolution,
   fetchVoicePrefs,
-  resolveVoicesForTexts,
-  setActiveVoiceMap,
+  runActiveVoiceResolution,
+  voiceGatePendingFor,
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import { awardPoints, POINTS } from '../../lib/points';
@@ -133,6 +135,18 @@ function splitSentences(text: string): string[] {
 
 const ANSWER_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
+// The narration run currently sounding (Round 77), module-level
+// like the shared speech players: keyed by story/page/sentence/
+// rate/mute, so a voice-resolution phase landing mid-sentence
+// never restarts it, while a real change of sentence or setting
+// still does.
+let narrationRun: { key: string; stop: (() => void) | null } | null = null;
+
+function stopNarrationRun(): void {
+  narrationRun?.stop?.();
+  narrationRun = null;
+}
+
 // "Download PDF" for a story (Round 74): the complete text as one
 // document, then the comprehension questions, with the answers kept
 // apart in their own section at the end. Web only — the button that
@@ -197,6 +211,13 @@ export default function SmartReading() {
   const [playing, setPlaying] = useState(false);
   const [rateIdx, setRateIdx] = useState(1);
   const [muted, setMuted] = useState(false);
+  // Voice-resolution gate (Round 77): mirrors the tracked
+  // resolution in lessonVoices so the narration effect re-runs
+  // when each phase lands. voicesPending covers the opening
+  // sentences; voicesSettled the whole story. The authoritative
+  // per-sentence check is voiceGatePendingFor.
+  const [voicesPending, setVoicesPending] = useState(false);
+  const [voicesSettled, setVoicesSettled] = useState(true);
   const [aloudResults, setAloudResults] = useState<{ accuracy: number; wpm: number }[]>([]);
   const [currentScore, setCurrentScore] = useState<{ score: SpeechScore; transcript: string } | null>(null);
   const [summary, setSummary] = useState<{ accuracy: number | null; wpm: number | null } | null>(null);
@@ -257,6 +278,7 @@ export default function SmartReading() {
 
   const stopNarration = useCallback(() => {
     setPlaying(false);
+    stopNarrationRun();
     try {
       Speech.stop();
     } catch {
@@ -266,6 +288,7 @@ export default function SmartReading() {
 
   useEffect(
     () => () => {
+      stopNarrationRun();
       try {
         Speech.stop();
       } catch {
@@ -317,6 +340,51 @@ export default function SmartReading() {
     [story, stopNarration, totalSentences, fetchData]
   );
 
+  // Human voices: when a story opens, resolve its sentences
+  // against the Voice Studio's approved recordings — tracked and
+  // two-phase (Round 77): the opening sentences resolve first and
+  // publish their map, then the rest, so narration waits for the
+  // first line's lookup instead of starting in the device voice
+  // and switching voices mid-story. Sentences with a recording
+  // are narrated by the real voice; the rest keep the device
+  // voice, but only once their lookup has genuinely completed.
+  // (Stories are admin-written, so a sentence joins the studio
+  // script when its story is added there.) Declared before the
+  // narration engine so the gate is already pending in the commit
+  // where a story opens.
+  useEffect(() => {
+    if (!story) return;
+    let cancelled = false;
+    const seq = beginActiveVoiceResolution();
+    (async () => {
+      const identity = await getStudentIdentity();
+      // The prefs lookup must never stall the gate: race it
+      // against a few seconds and proceed with no preferences.
+      const prefs = identity
+        ? await Promise.race([
+            fetchVoicePrefs(identity),
+            new Promise<Awaited<ReturnType<typeof fetchVoicePrefs>>>((resolve) =>
+              setTimeout(() => resolve({}), 4000)
+            ),
+          ])
+        : {};
+      if (cancelled) return;
+      setVoicesPending(true);
+      setVoicesSettled(false);
+      const texts = story.pages.flatMap((p) => splitSentences(p));
+      const res = runActiveVoiceResolution(seq, texts, prefs, []);
+      void res.firstReady.then(() => {
+        if (!cancelled) setVoicesPending(false);
+      });
+      void res.settled.then(() => {
+        if (!cancelled) setVoicesSettled(true);
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [story]);
+
   // Listen & Read engine. While playing, this effect narrates the
   // current sentence and lights its words up one by one; moving on is
   // just a state change, and the cleanup stops the old sentence. Rate
@@ -328,6 +396,20 @@ export default function SmartReading() {
     if (!story || mode !== 'listen' || !playing || summary) return;
     const text = sentence;
     if (!text) return;
+    // Round 77 gate: never start a sentence while its recording
+    // lookup may still be running — that race is how the opening
+    // sentence used to come out in the device voice. The effect
+    // re-runs when a resolution phase lands (voicesPending /
+    // voicesSettled below) and starts the sentence with whatever
+    // the completed lookup found. Muted mode plays no audio at
+    // all, so it never waits. A phase landing mid-sentence also
+    // re-runs this effect; the narration key makes that a no-op
+    // so the sentence is never restarted from the top.
+    const narrationKey = `${story.id}|${pageIdx}|${sentIdx}|${rateIdx}|${muted ? 1 : 0}`;
+    if (narrationRun?.key === narrationKey) return;
+    if (!muted && voiceGatePendingFor(text)) return;
+    narrationRun?.stop?.();
+    narrationRun = { key: narrationKey, stop: null };
     let advanced = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const rate = RATES[rateIdx];
@@ -400,41 +482,29 @@ export default function SmartReading() {
     // Safety net: some voices never report onDone (and mute mode has no
     // voice at all).
     timers.push(setTimeout(advance, (recordingUrl ? Math.max(est, words * 650) : est) + 1800));
-    return () => {
-      advanced = true;
-      timers.forEach(clearTimeout);
-      if (stopRecording) stopRecording();
-      try {
-        Speech.stop();
-      } catch {
-        // Nothing speaking: fine.
-      }
+    // The run's stop handle lives on narrationRun (not in an
+    // effect cleanup) so gate-phase re-runs leave it untouched;
+    // a real change of sentence/setting — or Pause via
+    // stopNarration — invokes it.
+    narrationRun = {
+      key: narrationKey,
+      stop: () => {
+        advanced = true;
+        timers.forEach(clearTimeout);
+        if (stopRecording) stopRecording();
+        try {
+          Speech.stop();
+        } catch {
+          // Nothing speaking: fine.
+        }
+      },
     };
-  }, [story, mode, playing, summary, sentence, pageIdx, sentIdx, rateIdx, muted, finishStory]);
+  }, [story, mode, playing, summary, sentence, pageIdx, sentIdx, rateIdx, muted, finishStory, voicesPending, voicesSettled]);
 
-  // Human voices: when a story opens, resolve its sentences against
-  // the Voice Studio's approved recordings. Sentences with a
-  // recording are narrated by the real voice; the rest keep the
-  // device voice. (Stories are admin-written, so a sentence joins
-  // the studio script when its story is added there.)
+  // Leaving the screen abandons the voice resolution and clears
+  // the active voice map.
   useEffect(() => {
-    if (!story) return;
-    let cancelled = false;
-    (async () => {
-      const identity = await getStudentIdentity();
-      const prefs = identity ? await fetchVoicePrefs(identity) : {};
-      const texts = story.pages.flatMap((p) => splitSentences(p));
-      const map = await resolveVoicesForTexts(texts, prefs, []);
-      if (!cancelled) setActiveVoiceMap(map);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [story]);
-
-  // Leaving the screen clears the active voice map.
-  useEffect(() => {
-    return () => setActiveVoiceMap(null);
+    return () => clearActiveVoiceResolution();
   }, []);
 
   const startListen = (fromPage: number, fromSent: number) => {
@@ -690,9 +760,17 @@ export default function SmartReading() {
                   setMode('listen');
                   startListen(0, 0);
                 }}
-                className="w-full max-w-sm px-6 py-4 bg-navy border-b-4 border-navy-deep rounded-full items-center mb-3"
+                disabled={voicesPending}
+                className={`w-full max-w-sm px-6 py-4 bg-navy border-b-4 border-navy-deep rounded-full items-center mb-3 ${voicesPending ? 'opacity-70' : ''}`}
               >
-                <Text className="font-sans text-white font-bold text-base">🔊 Listen &amp; Read</Text>
+                {voicesPending ? (
+                  <View className="flex-row items-center gap-2">
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text className="font-sans text-white font-bold text-base">Loading voice…</Text>
+                  </View>
+                ) : (
+                  <Text className="font-sans text-white font-bold text-base">🔊 Listen &amp; Read</Text>
+                )}
               </Pressable>
               <Pressable
                 onPress={() => setMode('aloud')}
@@ -760,6 +838,12 @@ export default function SmartReading() {
                       <Text className="font-sans font-bold text-slate-700">🐢 Speed {RATES[rateIdx]}×</Text>
                     </Pressable>
                   </View>
+                  {playing && !muted && voiceGatePendingFor(sentence) ? (
+                    <View className="flex-row items-center justify-center gap-2">
+                      <ActivityIndicator size="small" color="#0A192F" />
+                      <Text className="font-sans text-slate-400 text-sm">Loading voice…</Text>
+                    </View>
+                  ) : null}
                   <Text className="text-center font-sans text-slate-400 text-sm">
                     The words light up as they are read. Sound off still guides you word by word.
                   </Text>

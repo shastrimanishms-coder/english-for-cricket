@@ -186,6 +186,149 @@ export function voiceUrlForText(text: string | null | undefined): string | null 
   return activeVoiceMap.get(toSpeechText(text)) ?? null;
 }
 
+// ------------------------------------------------------- resolution gate
+//
+// Screens that start speaking the moment they open (Smart Reading's
+// narration, Speaking Practice's conversation) must not mistake
+// "the lookup is still running" for "no recording exists": the
+// synchronous voiceUrlForText returns null in both cases, so the
+// first line came out in the device voice while later lines — read
+// after the map had landed — used the recording. A tracked
+// resolution closes that race. Beginning one flips the gate to
+// pending SYNCHRONOUSLY (before any await), the opening lines
+// resolve first and publish their map, then the full set follows.
+// The gate for a text stays closed until its lookup has genuinely
+// completed — the first batch settling covers the opening lines,
+// the full settle covers the remainder — and only then may a
+// screen fall back to the device voice for that text. Safety
+// timers open the gate even if the network stalls outright (8s
+// for the opening lines, 20s for the rest): a genuinely dead
+// lookup must not freeze a screen, and the real resolution still
+// publishes its map when it lands, so later lines pick the
+// recordings up.
+
+/** How many opening lines resolve (and publish) before the rest. */
+export const FIRST_VOICE_BATCH = 6;
+
+let gateSeq = 0;
+let gateFirstSettled = true;
+let gateAllSettled = true;
+let gateFirstResolve: (() => void) | null = null;
+let gateAllResolve: (() => void) | null = null;
+let gateFirstPromise: Promise<void> = Promise.resolve();
+let gateAllPromise: Promise<void> = Promise.resolve();
+let gateFirstTimer: ReturnType<typeof setTimeout> | null = null;
+let gateAllTimer: ReturnType<typeof setTimeout> | null = null;
+
+export interface ActiveVoiceResolution {
+  /** Resolves when the opening lines' lookups have completed. */
+  firstReady: Promise<void>;
+  /** Resolves when every line's lookup has completed. */
+  settled: Promise<void>;
+}
+
+function flipGate(seq: number, first: boolean): void {
+  if (seq !== gateSeq) return;
+  if (!gateFirstSettled) {
+    gateFirstSettled = true;
+    gateFirstResolve?.();
+  }
+  if (!first && !gateAllSettled) {
+    gateAllSettled = true;
+    gateAllResolve?.();
+  }
+}
+
+function clearGateTimers(): void {
+  if (gateFirstTimer) clearTimeout(gateFirstTimer);
+  if (gateAllTimer) clearTimeout(gateAllTimer);
+  gateFirstTimer = null;
+  gateAllTimer = null;
+}
+
+/**
+ * Begin a tracked resolution for the screen now opening. The gate
+ * flips to pending synchronously, so a playback effect running
+ * later in the same commit already sees it closed. Returns the
+ * sequence token runActiveVoiceResolution expects.
+ */
+export function beginActiveVoiceResolution(): number {
+  const seq = ++gateSeq;
+  gateFirstSettled = false;
+  gateAllSettled = false;
+  gateFirstPromise = new Promise((resolve) => {
+    gateFirstResolve = resolve;
+  });
+  gateAllPromise = new Promise((resolve) => {
+    gateAllResolve = resolve;
+  });
+  clearGateTimers();
+  gateFirstTimer = setTimeout(() => flipGate(seq, true), 8000);
+  gateAllTimer = setTimeout(() => flipGate(seq, false), 20000);
+  return seq;
+}
+
+/**
+ * Run the two-phase resolution begun by beginActiveVoiceResolution:
+ * the first FIRST_VOICE_BATCH texts resolve and publish first,
+ * then the full set (whose per-line lookups reuse the session
+ * caches, so the opening lines cost nothing twice).
+ */
+export function runActiveVoiceResolution(
+  seq: number,
+  texts: (string | null | undefined)[],
+  prefs: VoicePrefs,
+  preferred: VoiceCategory[] = []
+): ActiveVoiceResolution {
+  void resolveVoicesForTexts(texts.slice(0, FIRST_VOICE_BATCH), prefs, preferred)
+    .then((map) => {
+      if (seq === gateSeq) setActiveVoiceMap(map);
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (gateFirstTimer) clearTimeout(gateFirstTimer);
+      gateFirstTimer = null;
+      flipGate(seq, true);
+    });
+  void resolveVoicesForTexts(texts, prefs, preferred)
+    .then((map) => {
+      if (seq === gateSeq) setActiveVoiceMap(map);
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (gateAllTimer) clearTimeout(gateAllTimer);
+      gateAllTimer = null;
+      flipGate(seq, false);
+    });
+  return { firstReady: gateFirstPromise, settled: gateAllPromise };
+}
+
+/**
+ * True while the lookup for this text has not genuinely completed:
+ * the opening batch is still running, or this text has no recording
+ * in the published map yet while the full resolution is still
+ * running (its recording may simply not have landed yet). Playback
+ * must wait rather than fall back to the device voice.
+ */
+export function voiceGatePendingFor(text: string | null | undefined): boolean {
+  if (!gateFirstSettled) return true;
+  if (gateAllSettled) return false;
+  return voiceUrlForText(text) == null;
+}
+
+/** Abandon any tracked resolution and clear the active map (screen exit). */
+export function clearActiveVoiceResolution(): void {
+  gateSeq++;
+  clearGateTimers();
+  gateFirstSettled = true;
+  gateAllSettled = true;
+  gateFirstResolve?.();
+  gateAllResolve?.();
+  gateFirstResolve = null;
+  gateAllResolve = null;
+  setActiveVoiceMap(null);
+}
+
 // ---------------------------------------------------------------- prefs
 
 /**

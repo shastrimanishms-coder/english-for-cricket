@@ -24,7 +24,6 @@ import {
   playDing,
   probeVoicesAvailable,
   speakWithCallback,
-  toSpeechText,
   waitUntilSafeToListen,
 } from '../../lib/speechCue';
 import {
@@ -35,9 +34,11 @@ import {
 import { awardExtraIfTagged } from '../../lib/extras';
 import { awardPoints, POINTS } from '../../lib/points';
 import {
+  beginActiveVoiceResolution,
+  clearActiveVoiceResolution,
   fetchVoicePrefs,
-  resolveVoicesForTexts,
-  setActiveVoiceMap,
+  runActiveVoiceResolution,
+  voiceGatePendingFor,
 } from '../../lib/lessonVoices';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -151,12 +152,28 @@ export default function SpeakingPractice() {
   // their answer colour-coded (green / orange / red per word).
   const [scenarioWordScores, setScenarioWordScores] = useState<Record<number, SpeechScore>>({});
   const wordScoresRef = useRef<Record<number, SpeechScore>>({});
+  // Voice-resolution gate (Round 77): mirrors the tracked
+  // resolution in lessonVoices so the cue effects re-run when
+  // each phase lands. voicesPending covers the opening lines;
+  // voicesSettled all of them. The authoritative per-line check
+  // is voiceGatePendingFor.
+  const [voicesPending, setVoicesPending] = useState(false);
+  const [voicesSettled, setVoicesSettled] = useState(true);
   // Scenario flow is automatic now (no "Your Turn" button): the
   // partner's line ending advances the conversation, and a passed
   // line advances after a short pause. scenarioNext is defined
   // further down; the speech callbacks reach it through this ref.
   const scenarioNextRef = useRef<(() => Promise<void>) | null>(null);
   const passTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The cue currently sounding (Round 77): keyed by mode + line/
+  // turn, so a voice-resolution phase landing mid-line never
+  // restarts it, while a real change of line or turn still does.
+  // The cue effects share it; stopCue silences whatever is live.
+  const cueRef = useRef<{ key: string; cleanup: (() => void) | null } | null>(null);
+  const stopCue = useCallback(() => {
+    cueRef.current?.cleanup?.();
+    cueRef.current = null;
+  }, []);
 
   // The learner's own name, shown in the conversation instead of a
   // generic "You" wherever we know it (PIN students carry their name
@@ -364,6 +381,7 @@ export default function SpeakingPractice() {
   // Release audio objects when leaving the screen.
   useEffect(() => {
     return () => {
+      stopCue();
       try {
         Speech.stop();
       } catch {
@@ -384,7 +402,7 @@ export default function SpeakingPractice() {
       playbackRef.current?.release();
       playbackRef.current = null;
     };
-  }, []);
+  }, [stopCue]);
 
   const current: PracticeItem | undefined = items[index];
 
@@ -469,14 +487,12 @@ export default function SpeakingPractice() {
     void speech.start();
   }, [speech]);
 
+  // Manual Listen goes through the shared speaker so a resolved
+  // Voice Studio recording wins over the device voice (Round 77);
+  // the device voice remains the fallback when there is none.
   const listen = useCallback(() => {
     if (!current) return;
-    try {
-      Speech.stop();
-      Speech.speak(toSpeechText(current.text), { language: 'en' });
-    } catch (error) {
-      console.log('Speech error:', error);
-    }
+    speakWithCallback(current.text);
   }, [current]);
 
   // ---- Hands-free speaking flow -------------------------------------
@@ -530,11 +546,82 @@ export default function SpeakingPractice() {
     };
   }, []);
 
+  // Human voices: resolve the lines this mode will speak against
+  // the Voice Studio's approved recordings — tracked and
+  // two-phase (Round 77): the opening lines resolve first and
+  // publish their map, then the rest, so the cue effects below
+  // wait for a line's lookup instead of speaking it in the
+  // device voice and switching voices mid-conversation. Scenario
+  // partners speak in their own voice category (the same casting
+  // as the script: Reporter/Shopkeeper F1, Coach M1, Friend/
+  // Teammate B1); every turn's text is resolved, so the learner's
+  // model lines use their recordings too. Lines without a
+  // recording keep the device voice, but only once their lookup
+  // has genuinely completed. Declared before the cue effects so
+  // the gate is already pending in the commit where a mode opens.
+  useEffect(() => {
+    if (mode === 'menu') return;
+    if (mode === 'scenario' && !scenario) return;
+    if (mode === 'lines' && items.length === 0) return;
+    let cancelled = false;
+    const seq = beginActiveVoiceResolution();
+    (async () => {
+      const identity = await getStudentIdentity();
+      // The prefs lookup must never stall the gate: race it
+      // against a few seconds and proceed with no preferences.
+      const prefs = identity
+        ? await Promise.race([
+            fetchVoicePrefs(identity),
+            new Promise<Awaited<ReturnType<typeof fetchVoicePrefs>>>((resolve) =>
+              setTimeout(() => resolve({}), 4000)
+            ),
+          ])
+        : {};
+      if (cancelled) return;
+      setVoicesPending(true);
+      setVoicesSettled(false);
+      let texts: string[] = [];
+      let preferred: VoiceCategory[] = [];
+      if (mode === 'scenario' && scenario) {
+        const partnerCategory: Record<string, VoiceCategory> = {
+          Reporter: 'F1',
+          Shopkeeper: 'F1',
+          Coach: 'M1',
+          Friend: 'B1',
+          Teammate: 'B1',
+        };
+        const cat = partnerCategory[scenario.otherName];
+        preferred = cat ? [cat] : [];
+        texts = scenario.turns.map((t) => t.text);
+      } else if (mode === 'lines') {
+        texts = items.map((i) => i.text);
+      }
+      if (texts.length === 0) return;
+      const res = runActiveVoiceResolution(seq, texts, prefs, preferred);
+      void res.firstReady.then(() => {
+        if (!cancelled) setVoicesPending(false);
+      });
+      void res.settled.then(() => {
+        if (!cancelled) setVoicesSettled(true);
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, scenario, items]);
+
   // Lesson lines: cue each line as it arrives.
   useEffect(() => {
     if (mode !== 'lines' || loading || finished || !current) return;
-    return cueLearnerTurn(current.text);
-  }, [mode, index, finished, loading, items, current, cueLearnerTurn]);
+    const key = `ln:${index}`;
+    if (cueRef.current && cueRef.current.key !== key) stopCue();
+    if (cueRef.current?.key === key) return;
+    // Round 77: wait for this line's recording lookup to
+    // genuinely complete before the model speaks, or the first
+    // line comes out in the device voice.
+    if (voiceGatePendingFor(current.text)) return;
+    cueRef.current = { key, cleanup: cueLearnerTurn(current.text) };
+  }, [mode, index, finished, loading, items, current, cueLearnerTurn, voicesPending, voicesSettled, stopCue]);
 
   // Scenarios: the other person's lines are spoken as their turn
   // arrives and the conversation then moves on BY ITSELF - there is
@@ -544,67 +631,33 @@ export default function SpeakingPractice() {
     if (mode !== 'scenario' || !scenario || scenarioDone) return;
     const turn = scenario.turns[turnIndex];
     if (!turn) return;
+    const key = `sc:${scenario.id}:${turnIndex}`;
+    if (cueRef.current && cueRef.current.key !== key) stopCue();
+    if (cueRef.current?.key === key) return;
+    // Round 77: wait for this turn's recording lookup to
+    // genuinely complete before anyone speaks, or the partner's
+    // first line comes out in the device voice.
+    if (voiceGatePendingFor(turn.text)) return;
     if (turn.speaker === 'other') {
       speakWithCallback(turn.text, () => {
         void scenarioNextRef.current?.();
       });
-      return () => cancelSpeechCue();
+      cueRef.current = { key, cleanup: () => cancelSpeechCue() };
+      return;
     }
-    return cueLearnerTurn(turn.text);
-  }, [mode, scenario, turnIndex, scenarioDone, cueLearnerTurn]);
+    cueRef.current = { key, cleanup: cueLearnerTurn(turn.text) };
+  }, [mode, scenario, turnIndex, scenarioDone, cueLearnerTurn, voicesPending, voicesSettled, stopCue]);
 
-  // Human voices: resolve the lines this mode will speak against the
-  // Voice Studio's approved recordings. Scenario partners speak in
-  // their own voice category (the same casting as the script:
-  // Reporter/Shopkeeper F1, Coach M1, Friend/Teammate B1); lesson
-  // lines take whichever category recorded them. Lines without a
-  // recording keep the device voice via speakWithCallback's fallback.
+  // Leaving a flow (back to the menu, lines finished, conversation
+  // done) silences any cue still sounding.
   useEffect(() => {
-    if (mode === 'scenario') {
-      if (!scenario) return;
-      let cancelled = false;
-      (async () => {
-        const identity = await getStudentIdentity();
-        const prefs = identity ? await fetchVoicePrefs(identity) : {};
-        const partnerCategory: Record<string, VoiceCategory> = {
-          Reporter: 'F1',
-          Shopkeeper: 'F1',
-          Coach: 'M1',
-          Friend: 'B1',
-          Teammate: 'B1',
-        };
-        const cat = partnerCategory[scenario.otherName];
-        const texts = scenario.turns
-          .filter((t) => t.speaker === 'other')
-          .map((t) => t.text);
-        const map = await resolveVoicesForTexts(texts, prefs, cat ? [cat] : []);
-        if (!cancelled) setActiveVoiceMap(map);
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }
-    if (mode === 'lines' && items.length > 0) {
-      let cancelled = false;
-      (async () => {
-        const identity = await getStudentIdentity();
-        const prefs = identity ? await fetchVoicePrefs(identity) : {};
-        const map = await resolveVoicesForTexts(
-          items.map((i) => i.text),
-          prefs,
-          []
-        );
-        if (!cancelled) setActiveVoiceMap(map);
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }
-  }, [mode, scenario, items]);
+    if (mode === 'menu' || scenarioDone || finished) stopCue();
+  }, [mode, scenarioDone, finished, stopCue]);
 
-  // Leaving the screen clears the active voice map.
+  // Leaving the screen abandons the voice resolution and clears
+  // the active voice map.
   useEffect(() => {
-    return () => setActiveVoiceMap(null);
+    return () => clearActiveVoiceResolution();
   }, []);
 
   // Whether this browser has any voice at all: with none installed
@@ -752,13 +805,10 @@ export default function SpeakingPractice() {
     setCheckError(null);
   }, [stopPlayback]);
 
+  // As with Listen above: the shared speaker prefers a resolved
+  // recording and falls back to the device voice (Round 77).
   const listenText = useCallback((text: string) => {
-    try {
-      Speech.stop();
-      Speech.speak(toSpeechText(text), { language: 'en' });
-    } catch (error) {
-      console.log('Speech error:', error);
-    }
+    speakWithCallback(text);
   }, []);
 
   const startScenario = useCallback(
@@ -1082,6 +1132,13 @@ export default function SpeakingPractice() {
                 </Text>
               </View>
 
+              {voiceGatePendingFor(scenarioTurn.text) ? (
+                <View className="flex-row items-center justify-center gap-2 mb-6">
+                  <ActivityIndicator size="small" color="#0A192F" />
+                  <Text className="font-sans text-slate-400 text-sm">Loading voice…</Text>
+                </View>
+              ) : null}
+
               <View className="items-center gap-3">
                 <Pressable
                   onPress={() => listenText(scenarioTurn.text)}
@@ -1319,6 +1376,13 @@ export default function SpeakingPractice() {
                 {current.text}
               </Text>
             </View>
+
+            {voiceGatePendingFor(current.text) ? (
+              <View className="flex-row items-center justify-center gap-2 mb-6">
+                <ActivityIndicator size="small" color="#0A192F" />
+                <Text className="font-sans text-slate-400 text-sm">Loading voice…</Text>
+              </View>
+            ) : null}
 
             {/* Actions */}
             <View className="items-center gap-3">
