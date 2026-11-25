@@ -22,6 +22,7 @@ import { playDing, playRecordedLine } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
+import type { VoiceCategory } from '../../lib/voiceStudio';
 
 interface StoryQuestion {
   q: string;
@@ -348,6 +349,9 @@ export default function SmartReading() {
   // and switching voices mid-story. Sentences with a recording
   // are narrated by the real voice; the rest keep the device
   // voice, but only once their lookup has genuinely completed.
+  // The story's narration stays in ONE voice category throughout
+  // (see narrationCategory below): the resolver never crosses to
+  // the other gender's recordings for a missing sentence.
   // (Stories are admin-written, so a sentence joins the studio
   // script when its story is added there.) Declared before the
   // narration engine so the gate is already pending in the commit
@@ -372,7 +376,25 @@ export default function SmartReading() {
       setVoicesPending(true);
       setVoicesSettled(false);
       const texts = story.pages.flatMap((p) => splitSentences(p));
-      const res = runActiveVoiceResolution(seq, texts, prefs, []);
+      // One story, one narrator: the whole story is voiced in a
+      // single narration category, and resolution is exclusive to
+      // it — a sentence whose recording in that category is still
+      // missing keeps the device voice instead of switching to the
+      // other gender's recorded voice mid-story. The category is
+      // the student's own choice when they have picked a voice in
+      // exactly one of the two narration categories; otherwise the
+      // men's category, which is what the shelf has always used by
+      // default. Within the category the RPC still prefers the
+      // student's chosen named voice.
+      const narrationCategory: VoiceCategory =
+        prefs.F1 && !prefs.M1 ? 'F1' : 'M1';
+      const res = runActiveVoiceResolution(
+        seq,
+        texts,
+        prefs,
+        [narrationCategory],
+        true
+      );
       void res.firstReady.then(() => {
         if (!cancelled) setVoicesPending(false);
       });

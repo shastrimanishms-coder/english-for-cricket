@@ -125,11 +125,21 @@ async function recordingUrlFor(
  * recording; texts without one are simply absent (device voice).
  * `preferred` lists the categories to try first for this context (for
  * a lesson, its model and "you" voices by module parity).
+ *
+ * With `exclusive` set, ONLY the preferred categories are tried: a
+ * text with no recording in them stays absent instead of crossing
+ * into another category. Smart Reading narration uses this — a
+ * story is voiced by one narration category from start to finish,
+ * so a sentence whose recording in that category is still missing
+ * (for example while a new batch is being registered) keeps the
+ * device voice rather than switching to the other gender's recorded
+ * voice mid-story.
  */
 export async function resolveVoicesForTexts(
   texts: (string | null | undefined)[],
   prefs: VoicePrefs,
-  preferred: VoiceCategory[] = []
+  preferred: VoiceCategory[] = [],
+  exclusive: boolean = false
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   try {
@@ -143,12 +153,15 @@ export async function resolveVoicesForTexts(
       seen.add(key);
       const entries = lineIndex.get(key);
       if (!entries || entries.length === 0) continue;
-      const ordered = [
-        ...preferred
-          .map((cat) => entries.find((e) => e.category === cat))
-          .filter((e): e is LineEntry => !!e),
-        ...entries.filter((e) => !preferred.includes(e.category)),
-      ];
+      const preferredEntries = preferred
+        .map((cat) => entries.find((e) => e.category === cat))
+        .filter((e): e is LineEntry => !!e);
+      const ordered = exclusive
+        ? preferredEntries
+        : [
+            ...preferredEntries,
+            ...entries.filter((e) => !preferred.includes(e.category)),
+          ];
       jobs.push(
         (async () => {
           for (const entry of ordered) {
@@ -278,9 +291,15 @@ export function runActiveVoiceResolution(
   seq: number,
   texts: (string | null | undefined)[],
   prefs: VoicePrefs,
-  preferred: VoiceCategory[] = []
+  preferred: VoiceCategory[] = [],
+  exclusive: boolean = false
 ): ActiveVoiceResolution {
-  void resolveVoicesForTexts(texts.slice(0, FIRST_VOICE_BATCH), prefs, preferred)
+  void resolveVoicesForTexts(
+    texts.slice(0, FIRST_VOICE_BATCH),
+    prefs,
+    preferred,
+    exclusive
+  )
     .then((map) => {
       if (seq === gateSeq) setActiveVoiceMap(map);
     })
@@ -290,7 +309,7 @@ export function runActiveVoiceResolution(
       gateFirstTimer = null;
       flipGate(seq, true);
     });
-  void resolveVoicesForTexts(texts, prefs, preferred)
+  void resolveVoicesForTexts(texts, prefs, preferred, exclusive)
     .then((map) => {
       if (seq === gateSeq) setActiveVoiceMap(map);
     })
