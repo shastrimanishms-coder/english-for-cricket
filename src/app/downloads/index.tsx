@@ -87,6 +87,14 @@ export default function DownloadsGallery() {
           <Text className="font-sans text-lg text-slate-500">Download worksheets, guides, and study materials.</Text>
         </View>
 
+        {/* Standing notice: more downloads are always on the way. */}
+        <View className="flex-row items-center gap-3 bg-navy rounded-2xl px-5 py-4 mb-6">
+          <Ionicons name="time-outline" size={22} color="#D4AF37" />
+          <Text className="flex-1 font-sans text-sm text-white">
+            We are working on more downloads — new ones will be available soon. Thank you for waiting!
+          </Text>
+        </View>
+
         {loading ? (
           <View className="py-20 items-center justify-center">
             <ActivityIndicator size="large" color="#0A192F" />
@@ -96,8 +104,10 @@ export default function DownloadsGallery() {
             <View className="w-20 h-20 rounded-full bg-navy items-center justify-center mb-4">
               <Ionicons name="document-text-outline" size={36} color="#D4AF37" />
             </View>
-            <Text className="font-display text-xl font-semibold text-navy mb-2">No Files Yet</Text>
-            <Text className="font-sans text-slate-500">Check back soon for new resources!</Text>
+            <Text className="font-display text-xl font-semibold text-navy mb-2 text-center">Sorry, downloads are not ready yet</Text>
+            <Text className="font-sans text-slate-500 text-center">
+              We are working hard on them, and they will be here soon. Thank you for waiting — please come back and check again!
+            </Text>
           </ElegantCard>
         ) : (
           <View className="flex-col gap-4">

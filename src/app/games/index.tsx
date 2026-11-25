@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
+import ListFilterChips from '../../components/ui/ListFilterChips';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -13,31 +14,60 @@ interface Game {
   description: string;
   thumbnail_url: string;
   category: string;
+  category_id?: string | null;
+  stage_id?: string | null;
 }
+
+// Stage chip labels, keyed by the curriculum stage ids the games
+// are tagged with (same map as the Speaking Practice shelf).
+const STAGE_LABELS: Record<string, string> = {
+  'd3352863-2ae5-4404-b39d-9ade3dac2cbd': 'Stage 1',
+  '0880276e-8c46-4aba-a96d-c7aa0a30c632': 'Stage 2',
+  '6fb44af7-815c-4157-adc5-cf67ad89617c': 'Stage 3',
+  '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
+  '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
+};
+const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
 export default function GamesGallery() {
   const goBack = useSafeBack();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
+  // Stage/category quick-jump filter (Round 76): 'all', 'stage:<id>'
+  // or 'cat:<id>'.
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     const fetchGames = async () => {
       try {
-        const { data, error } = await supabase
+        // stage_id / category_id arrive in migration 30; fall back to
+        // the older column set if they are somehow missing so the
+        // arcade never empties over a column.
+        let { data, error } = await supabase
           .from('games')
-          .select('id, title, description, thumbnail_url, categories(name)')
+          .select('id, title, description, thumbnail_url, category_id, stage_id, categories(name)')
           .eq('is_published', true)
           .order('created_at', { ascending: false });
 
+        if (error && /stage_id|category_id/.test(error.message || '')) {
+          const retry = await supabase
+            .from('games')
+            .select('id, title, description, thumbnail_url, categories(name)')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false });
+          data = retry.data as typeof data;
+          error = retry.error;
+        }
+
         if (error) throw error;
-        
+
         // Map the joined category name for the UI
         const formattedData = data?.map(item => ({
           ...item,
           category: item.categories ? (item.categories as any).name : 'Uncategorized'
         }));
-        
-        setGames(formattedData || []);
+
+        setGames((formattedData || []) as Game[]);
       } catch (error) {
         console.error('Error fetching games:', error);
       } finally {
@@ -48,6 +78,30 @@ export default function GamesGallery() {
     fetchGames();
   }, []);
 
+  // Chips: "All", one per stage that has games, one per category
+  // that has games. Empty stages/categories never appear.
+  const chips = [
+    { key: 'all', label: 'All' },
+    ...STAGE_ORDER.filter((sid) => games.some((g) => g.stage_id === sid)).map((sid) => ({
+      key: `stage:${sid}`,
+      label: STAGE_LABELS[sid],
+    })),
+    ...Array.from(
+      new Map(
+        games
+          .filter((g) => g.category_id)
+          .map((g) => [g.category_id as string, g.category] as const),
+      ).entries(),
+    ).map(([cid, name]) => ({ key: `cat:${cid}`, label: name })),
+  ];
+
+  const visibleGames =
+    filter === 'all'
+      ? games
+      : filter.startsWith('stage:')
+        ? games.filter((g) => g.stage_id === filter.slice(6))
+        : games.filter((g) => g.category_id === filter.slice(4));
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
       <ScreenHeader title="Arcade" onBack={goBack} />
@@ -57,6 +111,10 @@ export default function GamesGallery() {
           <MicroLabel className="mb-2">Games</MicroLabel>
           <Text className="font-sans text-lg text-slate-500">Play and practice your English vocabulary.</Text>
         </View>
+
+        {!loading && games.length > 0 ? (
+          <ListFilterChips chips={chips} selectedKey={filter} onChange={setFilter} />
+        ) : null}
 
         {loading ? (
           <View className="py-20 items-center justify-center">
@@ -72,7 +130,7 @@ export default function GamesGallery() {
           </ElegantCard>
         ) : (
           <View className="flex-row flex-wrap gap-6">
-            {games.map((game) => (
+            {visibleGames.map((game) => (
               <Link key={game.id} href={`/games/${game.id}`} asChild>
                 <Pressable className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] bg-white rounded-[20px] border border-inkline shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                   {game.thumbnail_url ? (
@@ -85,11 +143,22 @@ export default function GamesGallery() {
                     </View>
                   )}
                   <View className="p-5">
-                    {game.category && (
-                      <Text className="font-sans text-[11px] font-bold text-gold-dark uppercase tracking-[2px] mb-1">
-                        {game.category}
-                      </Text>
-                    )}
+                    <View className="flex-row items-center justify-between gap-2 mb-1">
+                      {game.category ? (
+                        <Text className="font-sans text-[11px] font-bold text-gold-dark uppercase tracking-[2px]">
+                          {game.category}
+                        </Text>
+                      ) : (
+                        <View />
+                      )}
+                      {game.stage_id && STAGE_LABELS[game.stage_id] ? (
+                        <View className="rounded-full bg-gold-light px-2 py-0.5">
+                          <Text className="font-sans text-xs font-bold text-navy">
+                            {STAGE_LABELS[game.stage_id]}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text className="font-display text-xl font-semibold text-navy mb-2" numberOfLines={1}>
                       {game.title}
                     </Text>

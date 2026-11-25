@@ -15,6 +15,7 @@ import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Celebration from '../../components/ui/Celebration';
 import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
+import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { downloadPdf } from '../../lib/downloadPdf';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
@@ -86,6 +87,7 @@ const STAGE_LABELS: Record<string, string> = {
   '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
   '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
 };
+const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
 // "Download PDF" for a conversation (Round 74): the complete
 // dialogue script with speaker labels, as one printable document.
@@ -254,6 +256,7 @@ export default function SpeakingPractice() {
         // keeps working before a migration is run: image_url arrives
         // in Round 73, stage_id in migration 30, lesson_id in 17.
         const selectAttempts = [
+          'id, title, category, emoji, description, other_name, turns, lesson_id, stage_id, category_id, image_url',
           'id, title, category, emoji, description, other_name, turns, lesson_id, stage_id, image_url',
           'id, title, category, emoji, description, other_name, turns, lesson_id, stage_id',
           'id, title, category, emoji, description, other_name, turns, lesson_id',
@@ -271,7 +274,7 @@ export default function SpeakingPractice() {
           data = res.data as any[] | null;
           error = res.error;
           if (!error) break;
-          if (!/image_url|stage_id|lesson_id/.test(error.message || '')) break;
+          if (!/image_url|stage_id|lesson_id|category_id/.test(error.message || '')) break;
         }
         if (error) throw error;
         const rows: SpeakingScenario[] = (data || [])
@@ -285,6 +288,7 @@ export default function SpeakingPractice() {
             turns: Array.isArray(row.turns) ? row.turns : [],
             lessonId: row.lesson_id ?? null,
             stageId: row.stage_id ?? null,
+            categoryId: row.category_id ?? null,
             imageUrl: row.image_url ?? null,
           }))
           .filter((s: SpeakingScenario) => s.turns.length > 0);
@@ -295,6 +299,50 @@ export default function SpeakingPractice() {
     })();
   }, []);
   const scenarios = dbScenarios ?? SPEAKING_SCENARIOS;
+
+  // Stage/category quick-jump filter for the scenario shelf
+  // (Round 76): 'all', 'stage:<id>' or 'cat:<id>'. Category chips
+  // come from the admin shelf categories (type 'speaking'); a chip
+  // appears only when at least one scenario carries it, so the bar
+  // grows by itself as categories get assigned.
+  const [shelfFilter, setShelfFilter] = useState('all');
+  const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('categories')
+          .select('id, name')
+          .eq('type', 'speaking')
+          .order('name');
+        setSpeakingCats((data || []) as { id: string; name: string }[]);
+      } catch {
+        // No category chips without the list; stages still filter.
+      }
+    })();
+  }, []);
+
+  const shelfChips = [
+    { key: 'all', label: 'All' },
+    ...STAGE_ORDER.filter((sid) => scenarios.some((s) => s.stageId === sid)).map((sid) => ({
+      key: `stage:${sid}`,
+      label: STAGE_LABELS[sid],
+    })),
+    ...speakingCats
+      .filter((c) => scenarios.some((s) => s.categoryId === c.id))
+      .map((c) => ({ key: `cat:${c.id}`, label: c.name })),
+  ];
+
+  const filteredScenarios =
+    shelfFilter === 'all'
+      ? null
+      : shelfFilter.startsWith('stage:')
+        ? scenarios.filter((s) => s.stageId === shelfFilter.slice(6))
+        : scenarios.filter((s) => s.categoryId === shelfFilter.slice(4));
+  const filteredLabel =
+    shelfFilter.startsWith('stage:')
+      ? STAGE_LABELS[shelfFilter.slice(6)] || 'Stage'
+      : speakingCats.find((c) => c.id === shelfFilter.slice(4))?.name || 'Category';
 
   // The voice must never talk over the next line.
   useEffect(() => {
@@ -878,19 +926,32 @@ export default function SpeakingPractice() {
               <Text className="font-sans text-sm font-bold uppercase tracking-[2px] text-gold-dark mt-3">Start →</Text>
             </Pressable>
 
-            <MicroLabel className="mb-3">🎙️ Interviews</MicroLabel>
-            <View className="flex-row flex-wrap gap-4 mb-8">
-              {scenarios
-                .filter(s => s.category === 'Interview')
-                .map(s => renderScenarioCard(s))}
-            </View>
+            <ListFilterChips chips={shelfChips} selectedKey={shelfFilter} onChange={setShelfFilter} />
 
-            <MicroLabel className="mb-3">💬 Small Talk</MicroLabel>
-            <View className="flex-row flex-wrap gap-4">
-              {scenarios
-                .filter(s => s.category === 'Small Talk')
-                .map(s => renderScenarioCard(s))}
-            </View>
+            {filteredScenarios ? (
+              <>
+                <MicroLabel className="mb-3">{filteredLabel}</MicroLabel>
+                <View className="flex-row flex-wrap gap-4">
+                  {filteredScenarios.map(s => renderScenarioCard(s))}
+                </View>
+              </>
+            ) : (
+              <>
+                <MicroLabel className="mb-3">🎙️ Interviews</MicroLabel>
+                <View className="flex-row flex-wrap gap-4 mb-8">
+                  {scenarios
+                    .filter(s => s.category === 'Interview')
+                    .map(s => renderScenarioCard(s))}
+                </View>
+
+                <MicroLabel className="mb-3">💬 Small Talk</MicroLabel>
+                <View className="flex-row flex-wrap gap-4">
+                  {scenarios
+                    .filter(s => s.category === 'Small Talk')
+                    .map(s => renderScenarioCard(s))}
+                </View>
+              </>
+            )}
           </View>
         </ScrollView>
       ) : mode === 'scenario' ? (

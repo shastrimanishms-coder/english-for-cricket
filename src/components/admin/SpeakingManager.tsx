@@ -8,11 +8,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 import AdminDropdown from './AdminDropdown';
 import ContentTagging from './ContentTagging';
+import GroupedContentList from './GroupedContentList';
 import SentenceVoices from './SentenceVoices';
 
 // Admin manager for the standalone Speaking Practice area ONLY
@@ -74,6 +76,8 @@ export default function SpeakingManager() {
   const [stageTagging, setStageTagging] = useState(false);
   const [categoryId, setCategoryId] = useState<string>('');
   const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
+  // Stage names for the grouped list (Round 76).
+  const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
   const taggingAvailable = useLessonTagging('speaking_scenarios');
 
   const fetchData = useCallback(async () => {
@@ -107,6 +111,7 @@ export default function SpeakingManager() {
       setSpeakingCats((data || []) as { id: string; name: string }[]);
       const { error: stageErr } = await supabase.from('speaking_scenarios').select('stage_id').limit(1);
       setStageTagging(!stageErr);
+      setTaxonomy(await fetchTaxonomy());
     })();
   }, [fetchData]);
 
@@ -476,8 +481,20 @@ export default function SpeakingManager() {
           </Text>
         </View>
       ) : (
-        <View className="gap-4">
-          {scenarios.map(row => (
+        <GroupedContentList
+          items={scenarios}
+          stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
+          categories={speakingCats}
+          idOf={(row) => row.id}
+          stageIdOf={(row) => row.stage_id ?? null}
+          categoryIdOf={(row) => row.category_id ?? null}
+          titleOf={(row) => row.title}
+          descriptionOf={(row) => row.description}
+          itemNoun="scenarios"
+          searchPlaceholder="Search scenarios by title…"
+          emptyMessage="No scenarios yet."
+          framed={false}
+          renderItem={(row) => (
             <View key={row.id} className="bg-white p-5 rounded-[20px] border border-inkline shadow-sm">
               <View className="flex-row items-start justify-between gap-4 flex-wrap">
                 <View className="flex-row items-start gap-3 flex-1 min-w-[240px]">
@@ -527,8 +544,8 @@ export default function SpeakingManager() {
                 </View>
               </View>
             </View>
-          ))}
-        </View>
+          )}
+        />
       )}
     </View>
   );

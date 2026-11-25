@@ -8,10 +8,12 @@ import {
   View,
 } from 'react-native';
 import { countCoveredSentences } from '../../lib/adminVoiceUploads';
+import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 import ContentTagging from './ContentTagging';
+import GroupedContentList from './GroupedContentList';
 import SentenceVoices from './SentenceVoices';
 
 // The same sentence split the learner app narrates with, so the
@@ -61,6 +63,8 @@ export default function ReadingManager() {
   const [stageId, setStageId] = useState<string | null>(null);
   const [moduleId, setModuleId] = useState<string | null>(null);
   const [stageTagging, setStageTagging] = useState(false);
+  // Stage names for the grouped list (Round 76).
+  const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
   const [pages, setPages] = useState<string[]>(['']);
   // Comprehension questions (Round 39), edited as one line per question:
   // Question :: Option 1 :: Option 2 :: Option 3 :: <correct option number>
@@ -76,6 +80,7 @@ export default function ReadingManager() {
     (async () => {
       const { error } = await supabase.from('reading_stories').select('stage_id').limit(1);
       setStageTagging(!error);
+      setTaxonomy(await fetchTaxonomy());
     })();
   }, []);
 
@@ -435,18 +440,28 @@ export default function ReadingManager() {
         </View>
       ) : null}
 
-      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
-        {loading ? (
-          <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-        ) : stories.length === 0 ? (
-          <View className="p-8 items-center">
-            <Text className="text-slate-500">No stories yet. Add your first one above.</Text>
-          </View>
-        ) : (
-          stories.map((row, index) => (
+      {/* List: search + Stage -> Category collapsible groups (Round 76) */}
+      {loading ? (
+        <View className="bg-white rounded-2xl border border-inkline shadow-sm p-8 items-center">
+          <ActivityIndicator size="large" color="#0A192F" />
+        </View>
+      ) : (
+        <GroupedContentList
+          items={stories}
+          stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
+          categories={categories}
+          idOf={(row) => row.id}
+          stageIdOf={(row) => row.stage_id ?? null}
+          categoryIdOf={(row) => row.category_id ?? null}
+          titleOf={(row) => row.title}
+          descriptionOf={(row) => row.description}
+          itemNoun="stories"
+          searchPlaceholder="Search stories by title…"
+          emptyMessage="No stories yet. Add your first one above."
+          renderItem={(row, isLast) => (
             <View
               key={row.id}
-              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-3 ${index !== stories.length - 1 ? 'border-b border-inkline' : ''}`}
+              className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-3 ${isLast ? '' : 'border-b border-inkline'}`}
             >
               <View className="flex-row items-center gap-3 flex-1">
                 <Text className="text-2xl">{row.emoji}</Text>
@@ -477,9 +492,9 @@ export default function ReadingManager() {
                 </Pressable>
               </View>
             </View>
-          ))
-        )}
-      </View>
+          )}
+        />
+      )}
     </View>
   );
 }

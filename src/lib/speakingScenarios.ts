@@ -28,6 +28,8 @@ export interface SpeakingScenario {
   imageUrl?: string | null;
   /** Curriculum stage the scenario belongs to, when tagged. */
   stageId?: string | null;
+  /** Admin shelf category (categories table), when assigned. */
+  categoryId?: string | null;
 }
 
 export const SPEAKING_SCENARIOS: SpeakingScenario[] = [

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { contentTypeForFileName } from '../../lib/fileTypes';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import BelongsToPicker from './BelongsToPicker';
+import GroupedContentList from './GroupedContentList';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 
 interface Category {
@@ -28,6 +30,23 @@ export default function VideosManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Taxonomy for the grouped list (Round 76): videos have no stage
+  // column of their own, so a video's stage is the stage of the
+  // lesson it belongs to (untagged videos are Untagged).
+  const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setTaxonomy(await fetchTaxonomy());
+    })();
+  }, []);
+
+  const stageIdForVideo = (vid: Video): string | null => {
+    if (!vid.lesson_id || !taxonomy) return null;
+    const lesson = taxonomy.lessons.find((l) => l.id === vid.lesson_id);
+    const mod = lesson ? taxonomy.modules.find((m) => m.id === lesson.module_id) : undefined;
+    return mod?.stage_id ?? null;
+  };
   
   // Form State
   const [editId, setEditId] = useState<string | null>(null);
@@ -444,21 +463,30 @@ export default function VideosManager() {
         </View>
       </View>
 
-      {/* List */}
-      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
-        {loading ? (
-          <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-        ) : videos.length === 0 ? (
-          <View className="p-8 items-center">
-            <Text className="text-slate-500">No videos added yet.</Text>
-          </View>
-        ) : (
-          videos.map((vid, index) => {
+      {/* List: search + Stage -> Category collapsible groups (Round 76) */}
+      {loading ? (
+        <View className="bg-white rounded-2xl border border-inkline shadow-sm p-8 items-center">
+          <ActivityIndicator size="large" color="#0A192F" />
+        </View>
+      ) : (
+        <GroupedContentList
+          items={videos}
+          stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
+          categories={categories}
+          idOf={(vid) => vid.id}
+          stageIdOf={stageIdForVideo}
+          categoryIdOf={(vid) => vid.category_id ?? null}
+          titleOf={(vid) => vid.title}
+          descriptionOf={(vid) => vid.description}
+          itemNoun="videos"
+          searchPlaceholder="Search videos by title…"
+          emptyMessage="No videos added yet."
+          renderItem={(vid, isLast) => {
             const catName = categories.find(c => c.id === vid.category_id)?.name || 'Unknown Category';
             return (
-              <View 
-                key={vid.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== videos.length - 1 ? 'border-b border-inkline' : ''}`}
+              <View
+                key={vid.id}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${isLast ? '' : 'border-b border-inkline'}`}
               >
                 <View className="flex-row items-center gap-4 flex-1">
                   {vid.thumbnail_url ? (
@@ -499,9 +527,9 @@ export default function VideosManager() {
                 </View>
               </View>
             );
-          })
-        )}
-      </View>
+          }}
+        />
+      )}
     </View>
   );
 }

@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import AdminDropdown from './AdminDropdown';
 import ContentTagging from './ContentTagging';
+import GroupedContentList from './GroupedContentList';
 import BuiltinGame from '../games/BuiltinGame';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { useLessonTagging } from '../../lib/useLessonTagging';
@@ -460,22 +461,31 @@ export default function GamesManager() {
         </View>
       </View>
 
-      {/* List */}
-      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
-        {loading ? (
-          <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-        ) : visibleGames.length === 0 ? (
-          <View className="p-8 items-center">
-            <Text className="text-slate-500">{games.length === 0 ? 'No games added yet.' : 'No games match these filters.'}</Text>
-          </View>
-        ) : (
-          visibleGames.map((game, index) => {
+      {/* List: search + Stage -> Category collapsible groups (Round 76) */}
+      {loading ? (
+        <View className="bg-white rounded-2xl border border-inkline shadow-sm p-8 items-center">
+          <ActivityIndicator size="large" color="#0A192F" />
+        </View>
+      ) : (
+        <GroupedContentList
+          items={visibleGames}
+          stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
+          categories={categories}
+          idOf={(g) => g.id}
+          stageIdOf={(g) => g.stage_id ?? null}
+          categoryIdOf={(g) => g.category_id ?? null}
+          titleOf={(g) => g.title}
+          descriptionOf={(g) => g.description}
+          itemNoun="games"
+          searchPlaceholder="Search games by title…"
+          emptyMessage={games.length === 0 ? 'No games added yet.' : 'No games match these filters.'}
+          renderItem={(game, isLast) => {
             const catName = categories.find(c => c.id === game.category_id)?.name || 'No category';
             const tagLine = [stageName(game.stage_id), moduleName(game.module_id)].filter(Boolean).join(' · ');
             return (
               <View
                 key={game.id}
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== visibleGames.length - 1 ? 'border-b border-inkline' : ''}`}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${isLast ? '' : 'border-b border-inkline'}`}
               >
                 <View className="flex-row items-center gap-4 flex-1">
                   {game.thumbnail_url ? (
@@ -515,9 +525,9 @@ export default function GamesManager() {
                 </View>
               </View>
             );
-          })
-        )}
-      </View>
+          }}
+        />
+      )}
     </View>
   );
 }

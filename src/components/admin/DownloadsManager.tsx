@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { contentTypeForFileName } from '../../lib/fileTypes';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import BelongsToPicker from './BelongsToPicker';
+import GroupedContentList from './GroupedContentList';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 
 interface Category {
@@ -27,6 +29,23 @@ export default function DownloadsManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Taxonomy for the grouped list (Round 76): downloads have no
+  // stage column of their own, so a download's stage is the stage
+  // of the lesson it belongs to (untagged downloads are Untagged).
+  const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      setTaxonomy(await fetchTaxonomy());
+    })();
+  }, []);
+
+  const stageIdForDownload = (dl: Download): string | null => {
+    if (!dl.lesson_id || !taxonomy) return null;
+    const lesson = taxonomy.lessons.find((l) => l.id === dl.lesson_id);
+    const mod = lesson ? taxonomy.modules.find((m) => m.id === lesson.module_id) : undefined;
+    return mod?.stage_id ?? null;
+  };
   
   // Form State
   const [editId, setEditId] = useState<string | null>(null);
@@ -329,21 +348,30 @@ export default function DownloadsManager() {
         </View>
       </View>
 
-      {/* List */}
-      <View className="bg-white rounded-2xl border border-inkline shadow-sm overflow-hidden">
-        {loading ? (
-          <View className="p-8 items-center"><ActivityIndicator size="large" color="#0A192F" /></View>
-        ) : downloads.length === 0 ? (
-          <View className="p-8 items-center">
-            <Text className="text-slate-500">No documents uploaded yet.</Text>
-          </View>
-        ) : (
-          downloads.map((dl, index) => {
+      {/* List: search + Stage -> Category collapsible groups (Round 76) */}
+      {loading ? (
+        <View className="bg-white rounded-2xl border border-inkline shadow-sm p-8 items-center">
+          <ActivityIndicator size="large" color="#0A192F" />
+        </View>
+      ) : (
+        <GroupedContentList
+          items={downloads}
+          stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
+          categories={categories}
+          idOf={(dl) => dl.id}
+          stageIdOf={stageIdForDownload}
+          categoryIdOf={(dl) => dl.category_id ?? null}
+          titleOf={(dl) => dl.title}
+          descriptionOf={(dl) => dl.description}
+          itemNoun="documents"
+          searchPlaceholder="Search documents by title…"
+          emptyMessage="No documents uploaded yet."
+          renderItem={(dl, isLast) => {
             const catName = categories.find(c => c.id === dl.category_id)?.name || 'Unknown Category';
             return (
-              <View 
-                key={dl.id} 
-                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${index !== downloads.length - 1 ? 'border-b border-inkline' : ''}`}
+              <View
+                key={dl.id}
+                className={`flex-col md:flex-row justify-between items-start md:items-center p-4 gap-4 md:gap-0 ${isLast ? '' : 'border-b border-inkline'}`}
               >
                 <View className="flex-1">
                   <Text className="font-bold text-text-primary text-base">{dl.title}</Text>
@@ -366,9 +394,9 @@ export default function DownloadsManager() {
                 </View>
               </View>
             );
-          })
-        )}
-      </View>
+          }}
+        />
+      )}
     </View>
   );
 }

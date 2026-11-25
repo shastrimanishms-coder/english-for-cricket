@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../../components/ui/Elegant';
+import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
 import { downloadPdf, type PdfSection } from '../../lib/downloadPdf';
 import { awardExtraIfTagged } from '../../lib/extras';
@@ -33,6 +34,7 @@ interface Story {
   emoji: string;
   category_id: string | null;
   lesson_id: string | null;
+  stage_id?: string | null;
   pages: string[];
   level: string;
   order_index: number;
@@ -40,6 +42,17 @@ interface Story {
   image_url?: string | null;
   image_credit?: string | null;
 }
+
+// Stage chip labels, keyed by the curriculum stage ids the stories
+// are tagged with (same map as the Speaking Practice shelf).
+const STAGE_LABELS: Record<string, string> = {
+  'd3352863-2ae5-4404-b39d-9ade3dac2cbd': 'Stage 1',
+  '0880276e-8c46-4aba-a96d-c7aa0a30c632': 'Stage 2',
+  '6fb44af7-815c-4157-adc5-cf67ad89617c': 'Stage 3',
+  '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
+  '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
+};
+const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
 // Comprehension questions shown on the story-finished screen (Round 39).
 // One question at a time; a wrong tap can be retried, and the score
@@ -172,6 +185,9 @@ export default function SmartReading() {
   const [stories, setStories] = useState<Story[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [bestByStory, setBestByStory] = useState<Record<string, BestRecord>>({});
+  // Stage/category quick-jump filter for the shelf (Round 76):
+  // 'all', 'stage:<id>' or 'cat:<id>'.
+  const [shelfFilter, setShelfFilter] = useState('all');
 
   const [story, setStory] = useState<Story | null>(null);
   const [mode, setMode] = useState<'listen' | 'aloud' | null>(null);
@@ -472,11 +488,12 @@ export default function SmartReading() {
     }
   };
 
+  const categoryLabel = (c: Category): string => {
+    const parent = c.parent_id ? categories.find((p) => p.id === c.parent_id) : null;
+    return parent ? `${parent.name} › ${c.name}` : c.name;
+  };
+
   const groups = useMemo(() => {
-    const labelOf = (c: Category): string => {
-      const parent = c.parent_id ? categories.find((p) => p.id === c.parent_id) : null;
-      return parent ? `${parent.name} › ${c.name}` : c.name;
-    };
     const byCat = new Map<string, Story[]>();
     for (const s of stories) {
       const key = s.category_id || 'none';
@@ -486,12 +503,51 @@ export default function SmartReading() {
     const out: { label: string; items: Story[] }[] = [];
     for (const c of categories) {
       const items = byCat.get(c.id);
-      if (items?.length) out.push({ label: labelOf(c), items });
+      if (items?.length) out.push({ label: categoryLabel(c), items });
     }
     const rest = byCat.get('none');
     if (rest?.length) out.push({ label: out.length ? 'More Stories' : 'Stories', items: rest });
     return out;
+    // categoryLabel reads the same categories list the memo deps on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stories, categories]);
+
+  // Chips for the quick-jump bar: "All", one per stage that has
+  // stories, one per category that has stories. Empty stages and
+  // categories never appear, so the bar grows by itself as the
+  // admin assigns categories.
+  const shelfChips = useMemo(
+    () => [
+      { key: 'all', label: 'All' },
+      ...STAGE_ORDER.filter((sid) => stories.some((s) => s.stage_id === sid)).map((sid) => ({
+        key: `stage:${sid}`,
+        label: STAGE_LABELS[sid],
+      })),
+      ...categories
+        .filter((c) => stories.some((s) => s.category_id === c.id))
+        .map((c) => ({ key: `cat:${c.id}`, label: categoryLabel(c) })),
+    ],
+    // categoryLabel reads the same categories list the memo deps on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stories, categories],
+  );
+
+  // What the shelf actually shows: the full category groups under
+  // "All"; a single group under a stage or category chip.
+  const shelfGroups = useMemo(() => {
+    if (shelfFilter === 'all') return groups;
+    if (shelfFilter.startsWith('stage:')) {
+      const sid = shelfFilter.slice(6);
+      const items = stories.filter((s) => s.stage_id === sid);
+      return items.length ? [{ label: STAGE_LABELS[sid] || 'Stage', items }] : [];
+    }
+    const cid = shelfFilter.slice(4);
+    const items = stories.filter((s) => s.category_id === cid);
+    const cat = categories.find((c) => c.id === cid);
+    return items.length ? [{ label: cat ? categoryLabel(cat) : 'Category', items }] : [];
+    // categoryLabel reads the same categories list the memo deps on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shelfFilter, groups, stories, categories]);
 
   return (
     <View className="flex-1 bg-canvas">
@@ -524,14 +580,17 @@ export default function SmartReading() {
               <Text className="font-sans text-slate-500 text-lg mb-6">
                 Pick a story. Listen while the words light up, or read aloud and get a score for every sentence.
               </Text>
-              {groups.length === 0 ? (
+              {stories.length > 0 ? (
+                <ListFilterChips chips={shelfChips} selectedKey={shelfFilter} onChange={setShelfFilter} />
+              ) : null}
+              {shelfGroups.length === 0 ? (
                 <View className="items-center py-16">
                   <Text className="text-5xl mb-4">📚</Text>
                   <Text className="font-display text-xl font-semibold text-navy text-center">No stories yet</Text>
                   <Text className="font-sans text-slate-500 text-center">Your teacher has not added any stories yet.</Text>
                 </View>
               ) : (
-                groups.map((g) => (
+                shelfGroups.map((g) => (
                   <View key={g.label} className="mb-8">
                     <Text className="font-display text-xl font-semibold text-navy mb-3">{g.label}</Text>
                     <View className="flex-row flex-wrap gap-4">
