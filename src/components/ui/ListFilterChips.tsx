@@ -11,13 +11,15 @@ interface ListFilterChipsProps {
   onChange: (key: string) => void;
 }
 
-// Round 76: the stage/category quick-jump bar on the learner list
+// Round 76: the category quick-jump bar on the learner list
 // screens (Games, Speaking Practice, Smart Reading). One horizontal
-// scrollable row of chips - "All", then a chip per stage and per
-// category that actually has items on the page - so students can
-// jump straight to what they want instead of scrolling the whole
-// shelf. Single-select; the parent owns the filter state. Renders
-// nothing when there is only "All" to show.
+// scrollable row of chips - "All", then a chip per category (from
+// the Categories manager) that actually has items on the page - so
+// students can jump straight to what they want instead of scrolling
+// the whole shelf. Single-select; the parent owns the filter state.
+// Renders nothing when there is only "All" to show. (Stage chips
+// were dropped in Round 79 - the categories are named after the
+// stages, so they duplicated the category names.)
 export default function ListFilterChips({ chips, selectedKey, onChange }: ListFilterChipsProps) {
   if (chips.length <= 1) return null;
   return (

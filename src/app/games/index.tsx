@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
-import { fetchStageNameMap, STAGE_NAME_FALLBACKS } from '../../lib/curriculumTaxonomy';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -20,8 +19,9 @@ interface Game {
   stage_id?: string | null;
 }
 
-// Stage chip labels, keyed by the curriculum stage ids the games
-// are tagged with (same map as the Speaking Practice shelf).
+// Stage labels for the card pill, keyed by the curriculum stage
+// ids the games are tagged with (same map as the Speaking
+// Practice shelf).
 const STAGE_LABELS: Record<string, string> = {
   'd3352863-2ae5-4404-b39d-9ade3dac2cbd': 'Stage 1',
   '0880276e-8c46-4aba-a96d-c7aa0a30c632': 'Stage 2',
@@ -29,22 +29,14 @@ const STAGE_LABELS: Record<string, string> = {
   '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
   '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
 };
-const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
 export default function GamesGallery() {
   const goBack = useSafeBack();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
-  // Stage/category quick-jump filter (Round 76): 'all', 'stage:<id>'
-  // or 'cat:<id>'.
+  // Category quick-jump filter (Round 76, categories only since
+  // Round 79): 'all' or 'cat:<id>'.
   const [filter, setFilter] = useState('all');
-  // Stage filter chips show the stage NAME only (Round 78) - the
-  // names come from curriculum_stages, with built-in fallbacks.
-  const [stageNames, setStageNames] = useState<Record<string, string>>(STAGE_NAME_FALLBACKS);
-
-  useEffect(() => {
-    (async () => setStageNames(await fetchStageNameMap()))();
-  }, []);
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -87,14 +79,13 @@ export default function GamesGallery() {
     fetchGames();
   }, []);
 
-  // Chips: "All", one per stage that has games, one per category
-  // that has games. Empty stages/categories never appear.
+  // Chips: "All" plus one per category (from the Categories
+  // manager, via the joined category name) that has games. Empty
+  // categories never appear. Stage chips were removed in Round 79:
+  // the categories are named after the stages, so stage chips
+  // duplicated the category names.
   const chips = [
     { key: 'all', label: 'All' },
-    ...STAGE_ORDER.filter((sid) => games.some((g) => g.stage_id === sid)).map((sid) => ({
-      key: `stage:${sid}`,
-      label: stageNames[sid] || STAGE_LABELS[sid],
-    })),
     ...Array.from(
       new Map(
         games
@@ -105,11 +96,7 @@ export default function GamesGallery() {
   ];
 
   const visibleGames =
-    filter === 'all'
-      ? games
-      : filter.startsWith('stage:')
-        ? games.filter((g) => g.stage_id === filter.slice(6))
-        : games.filter((g) => g.category_id === filter.slice(4));
+    filter === 'all' ? games : games.filter((g) => g.category_id === filter.slice(4));
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">

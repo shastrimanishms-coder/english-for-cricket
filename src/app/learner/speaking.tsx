@@ -18,7 +18,6 @@ import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
-import { fetchStageNameMap, STAGE_NAME_FALLBACKS } from '../../lib/curriculumTaxonomy';
 import { downloadPdf } from '../../lib/downloadPdf';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import {
@@ -81,7 +80,7 @@ const FALLBACK_ITEMS: PracticeItem[] = [
 
 const MAX_ITEMS = 24;
 
-// Stage chip labels for the scenario card shelf (Round 73), keyed by
+// Stage labels for the scenario cards and PDF (Round 73), keyed by
 // the curriculum stage ids the scenarios are tagged with.
 const STAGE_LABELS: Record<string, string> = {
   'd3352863-2ae5-4404-b39d-9ade3dac2cbd': 'Stage 1',
@@ -90,7 +89,6 @@ const STAGE_LABELS: Record<string, string> = {
   '99de5623-0254-4d9a-b355-2febe00efcf5': 'Stage 4',
   '1d102515-cffd-4df0-b530-99c67ca1a6f1': 'Stage 5',
 };
-const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
 // "Download PDF" for a conversation (Round 74): the complete
 // dialogue script with speaker labels, as one printable document.
@@ -319,18 +317,15 @@ export default function SpeakingPractice() {
   }, []);
   const scenarios = dbScenarios ?? SPEAKING_SCENARIOS;
 
-  // Stage/category quick-jump filter for the scenario shelf
-  // (Round 76): 'all', 'stage:<id>' or 'cat:<id>'. Category chips
-  // come from the admin shelf categories (type 'speaking'); a chip
-  // appears only when at least one scenario carries it, so the bar
-  // grows by itself as categories get assigned.
+  // Category quick-jump filter for the scenario shelf (Round 76,
+  // categories only since Round 79): 'all' or 'cat:<id>'. Category
+  // chips come from the admin shelf categories (type 'speaking');
+  // a chip appears only when at least one scenario carries it, so
+  // the bar grows by itself as categories get assigned. Stage
+  // chips were removed in Round 79: the categories are named
+  // after the stages, so stage chips duplicated the category
+  // names.
   const [shelfFilter, setShelfFilter] = useState('all');
-  // Stage filter chips show the stage NAME only (Round 78) - the
-  // names come from curriculum_stages, with built-in fallbacks.
-  const [stageNames, setStageNames] = useState<Record<string, string>>(STAGE_NAME_FALLBACKS);
-  useEffect(() => {
-    (async () => setStageNames(await fetchStageNameMap()))();
-  }, []);
   const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
     (async () => {
@@ -342,17 +337,13 @@ export default function SpeakingPractice() {
           .order('name');
         setSpeakingCats((data || []) as { id: string; name: string }[]);
       } catch {
-        // No category chips without the list; stages still filter.
+        // No category chips without the list.
       }
     })();
   }, []);
 
   const shelfChips = [
     { key: 'all', label: 'All' },
-    ...STAGE_ORDER.filter((sid) => scenarios.some((s) => s.stageId === sid)).map((sid) => ({
-      key: `stage:${sid}`,
-      label: stageNames[sid] || STAGE_LABELS[sid],
-    })),
     ...speakingCats
       .filter((c) => scenarios.some((s) => s.categoryId === c.id))
       .map((c) => ({ key: `cat:${c.id}`, label: c.name })),
@@ -361,13 +352,9 @@ export default function SpeakingPractice() {
   const filteredScenarios =
     shelfFilter === 'all'
       ? null
-      : shelfFilter.startsWith('stage:')
-        ? scenarios.filter((s) => s.stageId === shelfFilter.slice(6))
-        : scenarios.filter((s) => s.categoryId === shelfFilter.slice(4));
+      : scenarios.filter((s) => s.categoryId === shelfFilter.slice(4));
   const filteredLabel =
-    shelfFilter.startsWith('stage:')
-      ? stageNames[shelfFilter.slice(6)] || STAGE_LABELS[shelfFilter.slice(6)] || 'Stage'
-      : speakingCats.find((c) => c.id === shelfFilter.slice(4))?.name || 'Category';
+    speakingCats.find((c) => c.id === shelfFilter.slice(4))?.name || 'Category';
 
   // The voice must never talk over the next line.
   useEffect(() => {
