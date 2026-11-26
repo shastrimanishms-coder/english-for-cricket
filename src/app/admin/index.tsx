@@ -119,7 +119,8 @@ const CONTENT_CARDS = [
   { key: 'lessons', label: 'Lessons', icon: '📖', table: 'curriculum_lessons', tab: 'curriculum' },
   { key: 'videos', label: 'Videos', icon: '📺', table: 'video_lectures', tab: 'videos' },
   { key: 'downloads', label: 'Downloads', icon: '📥', table: 'downloads', tab: 'downloads' },
-  { key: 'games', label: 'Games', icon: '🎮', table: 'games', tab: 'games' },
+  { key: 'games', label: 'Games', icon: '🎮', table: 'games', tab: 'games', filter: 'games' },
+  { key: 'workbooks', label: 'Workbooks', icon: '📘', table: 'games', tab: 'workbooks', filter: 'workbooks' },
   { key: 'speaking', label: 'Speaking', icon: '🎙️', table: 'speaking_scenarios', tab: 'speaking' },
   { key: 'reading', label: 'Smart Reading', icon: '📖', table: 'reading_stories', tab: 'reading' },
   { key: 'badges', label: 'Badges', icon: '🏆', table: 'badges', tab: 'badges' },
@@ -259,9 +260,19 @@ export default function SuperAdminDashboard() {
     await Promise.all(
       CONTENT_CARDS.map(async card => {
         try {
-          const { count, error } = await supabase
+          let query = supabase
             .from(card.table)
             .select('id', { count: 'exact', head: true });
+          // The games table holds both arcade games and workbook
+          // games: the Games card counts only the arcade side (the
+          // same published, non-workbook set its tab lists) and the
+          // Workbooks card only the workbook side.
+          if ('filter' in card && card.filter === 'games') {
+            query = query.eq('is_published', true).neq('engine', 'workbook');
+          } else if ('filter' in card && card.filter === 'workbooks') {
+            query = query.eq('is_published', true).eq('engine', 'workbook');
+          }
+          const { count, error } = await query;
           extra.content[card.key] = error ? null : (count ?? null);
         } catch {
           extra.content[card.key] = null;
