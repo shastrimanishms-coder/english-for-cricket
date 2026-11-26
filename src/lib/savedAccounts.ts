@@ -14,12 +14,50 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * are NEVER written to this list or anywhere else in storage; the
  * credential is typed fresh at every switch and goes only to the
  * existing login calls.
+ *
+ * Round 89: an auth entry also remembers HOW the account signs in
+ * (its auth provider). Google-only accounts have no password, so the
+ * switch screen must offer "Continue with Google" for them instead of
+ * a password box they can never fill (Shastri's report). The provider
+ * is not a credential — it is captured from the session's own
+ * metadata at login time. Entries saved before Round 89 have no
+ * provider; the switch screen treats those as "unknown" and offers
+ * every sign-in method.
  */
+export type AuthProvider = 'google' | 'password';
+
 export interface SavedAccount {
   kind: 'auth' | 'sub_account';
   displayName: string;
   /** Email (auth) or username (sub_account), stored lower-cased. */
   identifier: string;
+  /** Auth accounts only: how this account signs in, when known. */
+  provider?: AuthProvider;
+}
+
+/**
+ * Derive the sign-in provider from a Supabase user object: the
+ * identities list is authoritative (a Google-only account has a
+ * 'google' identity and no 'email' identity); app_metadata.provider
+ * is the fallback for user objects without an identities list.
+ */
+export function providerFromUser(user: {
+  app_metadata?: Record<string, unknown> | null;
+  identities?: { provider?: string }[] | null;
+} | null | undefined): AuthProvider | undefined {
+  if (!user) return undefined;
+  const providers = new Set<string>();
+  for (const identity of user.identities || []) {
+    if (identity?.provider) providers.add(identity.provider);
+  }
+  if (providers.size === 0) {
+    const meta = user.app_metadata?.provider;
+    if (typeof meta === 'string' && meta) providers.add(meta);
+  }
+  if (providers.has('google') && !providers.has('email')) return 'google';
+  if (providers.has('email')) return 'password';
+  if (providers.has('google')) return 'google';
+  return undefined;
 }
 
 const SAVED_ACCOUNTS_KEY = 'efc_saved_accounts';
@@ -33,6 +71,9 @@ function normalise(raw: unknown): SavedAccount | null {
     kind: r.kind,
     displayName: typeof r.displayName === 'string' && r.displayName.trim() ? r.displayName : r.identifier,
     identifier: r.identifier.trim().toLowerCase(),
+    ...(r.kind === 'auth' && (r.provider === 'google' || r.provider === 'password')
+      ? { provider: r.provider as AuthProvider }
+      : {}),
   };
 }
 

@@ -459,14 +459,17 @@ export default function LandingPage() {
           </View>
           </View>
 
-          {/* Programme figures — one elegant band across the full width
-              of the hero. Eleven figures now, so the band wraps to two
-              rows where the width requires it. The games, speaking,
-              reading, videos, downloads and digital workbooks figures
-              are counted live from the database; the rest describe
-              the course itself. */}
+          {/* Programme figures — one elegant gold-edged band across
+              the full width of the hero, in TWO deliberate rows
+              (Round 89, Part D): the first row describes the course
+              itself (lessons, stages, modules, words, and the 100%
+              free promise closing the row), the second row is the
+              library — games, speaking, reading, videos, downloads
+              and digital workbooks, every one counted live from the
+              database on each visit with its "and growing" label.
+              On narrow screens each row wraps and stacks cleanly. */}
           <View
-            className="flex-row flex-wrap justify-between gap-x-6 gap-y-4 mt-12 w-full rounded-[16px] px-6 py-4"
+            className="mt-12 w-full rounded-[16px] px-6 py-4"
             style={{
               borderWidth: 1,
               borderColor: 'rgba(212, 175, 55, 0.35)',
@@ -474,33 +477,54 @@ export default function LandingPage() {
             }}
           >
             {[
-              { value: '320', label: t.statLessons, growing: false },
-              { value: '5', label: t.statStages, growing: false },
-              { value: '40', label: t.statModules, growing: false },
-              { value: '2,200+', label: t.statWords, growing: false },
-              { value: String(displayCounts.games), label: t.statGames, growing: true },
-              { value: String(displayCounts.speaking), label: t.statSpeaking, growing: true },
-              { value: String(displayCounts.reading), label: t.statReading, growing: true },
-              { value: String(displayCounts.videos), label: t.statVideos, growing: true },
-              { value: String(displayCounts.downloads), label: t.statDownloads, growing: true },
-              { value: String(displayCounts.workbooks), label: t.statWorkbooks, growing: true },
-              { value: '100%', label: t.statFree, growing: false },
-            ].map((stat) => (
-              <View key={stat.label}>
-                <Text
-                  className="font-display text-2xl font-semibold text-gold"
-                  style={{ textShadowColor: 'rgba(212, 175, 55, 0.45)', textShadowRadius: 10 }}
-                >
-                  {stat.value}
-                </Text>
-                <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
-                  {stat.label}
-                </Text>
-                {stat.growing && (
-                  <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
-                    {t.statGrowing}
-                  </Text>
-                )}
+              [
+                { value: '320', label: t.statLessons, growing: false },
+                { value: '5', label: t.statStages, growing: false },
+                { value: '40', label: t.statModules, growing: false },
+                { value: '2,200+', label: t.statWords, growing: false },
+                { value: '100%', label: t.statFree, growing: false },
+              ],
+              [
+                { value: String(displayCounts.games), label: t.statGames, growing: true },
+                { value: String(displayCounts.speaking), label: t.statSpeaking, growing: true },
+                { value: String(displayCounts.reading), label: t.statReading, growing: true },
+                { value: String(displayCounts.videos), label: t.statVideos, growing: true },
+                { value: String(displayCounts.downloads), label: t.statDownloads, growing: true },
+                { value: String(displayCounts.workbooks), label: t.statWorkbooks, growing: true },
+              ],
+            ].map((row, rowIndex) => (
+              <View
+                key={rowIndex}
+                className="flex-row flex-wrap justify-between gap-x-6 gap-y-4"
+                style={
+                  rowIndex > 0
+                    ? {
+                        marginTop: 16,
+                        paddingTop: 16,
+                        borderTopWidth: 1,
+                        borderTopColor: 'rgba(212, 175, 55, 0.18)',
+                      }
+                    : undefined
+                }
+              >
+                {row.map((stat) => (
+                  <View key={stat.label}>
+                    <Text
+                      className="font-display text-2xl font-semibold text-gold"
+                      style={{ textShadowColor: 'rgba(212, 175, 55, 0.45)', textShadowRadius: 10 }}
+                    >
+                      {stat.value}
+                    </Text>
+                    <Text className="font-sans text-xs text-slate-400 uppercase tracking-wider" style={lh.micro}>
+                      {stat.label}
+                    </Text>
+                    {stat.growing && (
+                      <Text className="font-sans text-[11px] text-gold-light" style={lh.micro}>
+                        {t.statGrowing}
+                      </Text>
+                    )}
+                  </View>
+                ))}
               </View>
             ))}
           </View>

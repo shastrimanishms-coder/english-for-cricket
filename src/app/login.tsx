@@ -100,6 +100,7 @@ export default function LoginScreen() {
               email.trim().split('@')[0] ||
               email.trim(),
             identifier: email.trim().toLowerCase(),
+            provider: 'password',
           });
         }
         if (userRole === 'super_admin' || userRole === 'content_manager') {

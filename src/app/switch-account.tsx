@@ -31,9 +31,11 @@ import { supabase } from '../lib/supabase';
  * here: a list of the accounts that have logged in on this device
  * before (saved automatically at login — names and login identifiers
  * ONLY, never passwords or PINs; see src/lib/savedAccounts.ts).
- * Picking a name asks for just that account's password or PIN and
- * then signs in through the very same calls the login screen uses —
- * there is no separate switch authentication path.
+ * Picking a name asks for just that account's own sign-in — its
+ * password, its PIN, or (Round 89) its Google sign-in for accounts
+ * that registered with Google and have no password — and then signs
+ * in through the very same calls the login screen uses: there is no
+ * separate switch authentication path.
  */
 export default function SwitchAccountScreen() {
   const router = useRouter();
@@ -127,6 +129,7 @@ export default function SwitchAccountScreen() {
           account.identifier.split('@')[0] ||
           account.identifier,
         identifier: account.identifier,
+        provider: 'password',
       });
       // The previous student's resolved voices must not carry over.
       resetVoiceSessionCaches();
@@ -177,10 +180,57 @@ export default function SwitchAccountScreen() {
     }
   };
 
+  // Google account (Round 89): there is no password to type — the
+  // switch goes through the app's ordinary Google sign-in, exactly
+  // like the login screen's button. Supabase returns the browser to
+  // the site root with the new session, and the landing page's
+  // routeSignedInUser finishes the switch (profile routing + the
+  // saved entry refreshed with provider 'google'). Signing in with a
+  // different Google account than the one picked simply switches to
+  // that account instead — the pick is a shortcut, not a lock.
+  const submitGoogle = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // Mirror the email flow: a Google sign-in supersedes any PIN
+      // session left on this device.
+      await AsyncStorage.removeItem('student_session');
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: Platform.OS === 'web' ? window.location.origin : 'englishforcricket://',
+        },
+      });
+      if (oauthError) throw oauthError;
+      // On web the browser is now navigating to Google; on native the
+      // deep link returns to the app root. Either way this screen is
+      // done — the busy state stays up for the handover.
+    } catch (err: any) {
+      setBusy(false);
+      setError(err?.message || 'Could not connect to Google.');
+    }
+  };
+
   const submit = () => {
     if (!selected || busy) return;
     void (selected.kind === 'auth' ? submitAuth(selected) : submitPin(selected));
   };
+
+  // Which credential step fits the picked account: PIN students get
+  // the PIN pad; Google accounts get the Google button (NO password
+  // box — they have no password, Round 89); password accounts get
+  // the password box; entries saved before the provider was recorded
+  // get every choice.
+  const mode = !selected
+    ? null
+    : selected.kind === 'sub_account'
+      ? 'pin'
+      : selected.provider === 'google'
+        ? 'google'
+        : selected.provider === 'password'
+          ? 'password'
+          : 'choice';
 
   return (
     <KeyboardAvoidingView
@@ -219,22 +269,7 @@ export default function SwitchAccountScreen() {
                     </Text>
                   </View>
 
-                  {selected.kind === 'auth' ? (
-                    <View>
-                      <Text className="font-sans text-sm font-bold text-slate-500 mb-2 ml-1">Password</Text>
-                      <TextInput
-                        className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
-                        placeholder="Your password"
-                        placeholderTextColor="#94A3B8"
-                        value={credential}
-                        onChangeText={setCredential}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        autoFocus
-                        onSubmitEditing={submit}
-                      />
-                    </View>
-                  ) : (
+                  {mode === 'pin' ? (
                     <View>
                       <Text className="font-sans text-sm font-bold text-slate-500 mb-2 ml-1">Secret PIN</Text>
                       <TextInput
@@ -250,18 +285,65 @@ export default function SwitchAccountScreen() {
                         onSubmitEditing={submit}
                       />
                     </View>
-                  )}
+                  ) : null}
+
+                  {mode === 'google' || mode === 'choice' ? (
+                    <View className="gap-3">
+                      {mode === 'google' ? (
+                        <Text className="font-sans text-slate-500 text-base text-center">
+                          This account signs in with Google, so there is no password to type.
+                        </Text>
+                      ) : null}
+                      <Pressable
+                        onPress={() => void submitGoogle()}
+                        disabled={busy}
+                        className="w-full bg-white flex-row items-center justify-center p-4 rounded-xl border border-inkline shadow-sm"
+                      >
+                        <Text className="text-xl mr-3">🇬</Text>
+                        <Text className="font-sans font-bold text-slate-700 text-lg">
+                          {busy ? 'Opening Google...' : 'Continue with Google'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  {mode === 'choice' ? (
+                    <View className="flex-row items-center">
+                      <View className="flex-1 h-[1px] bg-inkline" />
+                      <Text className="mx-4 text-slate-400 font-sans font-bold">OR</Text>
+                      <View className="flex-1 h-[1px] bg-inkline" />
+                    </View>
+                  ) : null}
+
+                  {mode === 'password' || mode === 'choice' ? (
+                    <View>
+                      <Text className="font-sans text-sm font-bold text-slate-500 mb-2 ml-1">Password</Text>
+                      <TextInput
+                        className="w-full bg-white p-4 rounded-xl border border-inkline text-navy font-sans text-lg"
+                        placeholder="Your password"
+                        placeholderTextColor="#94A3B8"
+                        value={credential}
+                        onChangeText={setCredential}
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoFocus={mode === 'password'}
+                        onSubmitEditing={submit}
+                      />
+                    </View>
+                  ) : null}
 
                   {error ? (
                     <Text className="font-sans text-red-600 text-base text-center">{error}</Text>
                   ) : null}
 
-                  <GoldButton
-                    label={busy ? 'Checking...' : "Let's Go! 🚀"}
-                    onPress={submit}
-                    disabled={busy}
-                    className="w-full"
-                  />
+                  {mode !== 'google' ? (
+                    <GoldButton
+                      label={busy ? 'Checking...' : "Let's Go! 🚀"}
+                      onPress={submit}
+                      disabled={busy}
+                      className="w-full"
+                    />
+                  ) : null}
                   <Pressable onPress={backToList} disabled={busy} className="py-2 items-center">
                     <Text className="font-sans font-bold text-slate-500 text-base">← Choose a different account</Text>
                   </Pressable>
@@ -291,7 +373,11 @@ export default function SwitchAccountScreen() {
                           <View className="flex-1">
                             <Text className="font-sans font-bold text-navy text-lg">{account.displayName}</Text>
                             <Text className="font-sans text-slate-500 text-sm">
-                              {account.kind === 'auth' ? account.identifier : `Username: ${account.identifier}`}
+                              {account.kind === 'auth'
+                                ? account.provider === 'google'
+                                  ? `${account.identifier} · Google account`
+                                  : account.identifier
+                                : `Username: ${account.identifier}`}
                             </Text>
                           </View>
                           <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -337,8 +423,8 @@ export default function SwitchAccountScreen() {
                     />
                   </View>
                   <Text className="font-sans text-xs text-slate-400 text-center mt-2">
-                    Only names and usernames are saved on this device — passwords and PINs are never saved, and
-                    are asked for every time.
+                    Only names, usernames and sign-in methods are saved on this device — passwords and PINs are
+                    never saved, and are asked for every time.
                   </Text>
                 </View>
               )}

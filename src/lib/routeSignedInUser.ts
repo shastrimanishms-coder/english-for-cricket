@@ -1,4 +1,4 @@
-import { rememberSavedAccount } from './savedAccounts';
+import { providerFromUser, rememberSavedAccount } from './savedAccounts';
 import { supabase } from './supabase';
 
 /**
@@ -32,7 +32,10 @@ export async function routeSignedInUser(
 
     // Switch Account (Round 81): a Google sign-in lands back here
     // rather than in the login form, so remember learner accounts on
-    // this path too — identifier only, never a credential.
+    // this path too — identifier only, never a credential. Round 89:
+    // also record HOW the account signs in, from the session itself,
+    // so the switch screen can offer Google to Google accounts
+    // instead of a password they do not have.
     if (profile?.role === 'individual_learner' && session.user.email) {
       await rememberSavedAccount({
         kind: 'auth',
@@ -41,6 +44,7 @@ export async function routeSignedInUser(
           session.user.email.split('@')[0] ||
           session.user.email,
         identifier: session.user.email.toLowerCase(),
+        provider: providerFromUser(session.user),
       });
     }
 

@@ -5,6 +5,14 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
+import ListFilterChips from '../../components/ui/ListFilterChips';
+import {
+  buildShelfChips,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  matchesShelfChip,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -12,6 +20,14 @@ import { useSafeBack } from '../../lib/useSafeBack';
 // organised Stage → Module → Lesson. The games themselves are
 // ordinary `games` rows with engine 'workbook', tagged with stage /
 // module / lesson ids; this page is just the tidy shelf for them.
+//
+// Round 89: the listings are CARDS now — the same card view as the
+// Arcade games shelf (cover image, title, subtitle, stage pill) —
+// still grouped in the collapsible Stage → Module accordions, and a
+// category filter (Round 85 chips over the 'workbooks' category
+// tree, Round 88) sits on top: picking a category shows a flat grid
+// of that category's workbooks across all stages. The chips hide
+// until workbook categories actually hold memberships.
 
 const STAGE_ORDER: Record<string, number> = {
   'd3352863-2ae5-4404-b39d-9ade3dac2cbd': 1,
@@ -31,10 +47,32 @@ const STAGE_NAMES: Record<number, string> = {
 interface WbGame {
   id: string;
   title: string;
+  description: string | null;
   thumbnail_url: string | null;
+  category_id: string | null;
   stage_id: string | null;
   module_id: string | null;
   lesson_id: string | null;
+  data: any;
+}
+
+/** The card's cover: the row thumbnail, else the payload's scene
+ *  picture, else the first pictured word in the workbook pages. */
+function cardImage(g: WbGame): string | null {
+  if (g.thumbnail_url) return g.thumbnail_url;
+  if (g.data && typeof g.data.scene === 'string' && g.data.scene) return g.data.scene;
+  const pages = Array.isArray(g.data?.pages) ? g.data.pages : [];
+  for (const page of pages) {
+    for (const act of page?.activities || []) {
+      for (const w of act?.words || []) {
+        if (w && typeof w.image === 'string' && w.image) return w.image;
+      }
+      for (const p of act?.pairs || []) {
+        if (p && typeof p.image === 'string' && p.image) return p.image;
+      }
+    }
+  }
+  return null;
 }
 
 export default function WorkbookPractice() {
@@ -48,18 +86,28 @@ export default function WorkbookPractice() {
   // too (Shastri's ask) — stages start open as before, modules start
   // closed so a stage's eight modules stay a tidy list.
   const [openModules, setOpenModules] = useState<Set<string>>(new Set());
+  // Round 89: category filter over the workbooks tree.
+  const [wbCats, setWbCats] = useState<CategoryNode[]>([]);
+  const [wbMemberships, setWbMemberships] = useState<Map<string, string[]>>(new Map());
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     (async () => {
       try {
         const { data, error } = await supabase
           .from('games')
-          .select('id, title, thumbnail_url, stage_id, module_id, lesson_id')
+          .select('id, title, description, thumbnail_url, category_id, stage_id, module_id, lesson_id, data')
           .eq('engine', 'workbook')
           .eq('is_published', true);
         if (error) throw error;
-        const rows = (data || []) as WbGame[];
+        const rows = ((data || []) as WbGame[]).filter((g) => g.stage_id);
         setGames(rows);
+
+        // Workbooks categories + memberships (fail-soft: no tree or
+        // no memberships yet → no chips, the accordions carry on).
+        const cats = await fetchCategoriesForType('workbooks');
+        setWbCats(cats);
+        setWbMemberships(await fetchMembershipMap('workbooks', rows, cats));
 
         const moduleIds = Array.from(new Set(rows.map((r) => r.module_id).filter(Boolean))) as string[];
         const lessonIds = Array.from(new Set(rows.map((r) => r.lesson_id).filter(Boolean))) as string[];
@@ -117,6 +165,76 @@ export default function WorkbookPractice() {
       }));
   }, [games, moduleTitles, lessonMeta]);
 
+  const chips = useMemo(
+    () => buildShelfChips(wbCats, wbMemberships, games.map((g) => g.id)),
+    [wbCats, wbMemberships, games],
+  );
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return null;
+    return games
+      .filter((g) => matchesShelfChip(wbCats, wbMemberships, g.id, filter))
+      .sort((a, b) => {
+        const sa = (a.stage_id && STAGE_ORDER[a.stage_id]) || 0;
+        const sb = (b.stage_id && STAGE_ORDER[b.stage_id]) || 0;
+        if (sa !== sb) return sa - sb;
+        return (lessonMeta.get(a.lesson_id || '')?.order ?? 0) - (lessonMeta.get(b.lesson_id || '')?.order ?? 0);
+      });
+  }, [filter, games, wbCats, wbMemberships, lessonMeta]);
+
+  const catName = (g: WbGame): string | null => {
+    const primary = (wbMemberships.get(g.id) || [])[0];
+    if (!primary) return null;
+    return wbCats.find((c) => c.id === primary)?.name || null;
+  };
+
+  const renderCard = (g: WbGame) => {
+    const stageNo = g.stage_id ? STAGE_ORDER[g.stage_id] : undefined;
+    const meta = g.lesson_id ? lessonMeta.get(g.lesson_id) : undefined;
+    const lessonNo = (meta?.order ?? (typeof g.data?.lesson === 'number' ? g.data.lesson - 1 : 0)) + 1;
+    const title = `Lesson ${lessonNo} — ${meta?.title || g.data?.lessonTitle || g.title.replace(/^Workbook — /, '')}`;
+    const pages = Array.isArray(g.data?.pages) ? g.data.pages.length : 3;
+    const image = cardImage(g);
+    const category = catName(g);
+    return (
+      <Link key={g.id} href={`/games/${g.id}`} asChild>
+        <Pressable className="w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] bg-white rounded-[20px] border border-inkline shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+          {image ? (
+            <Image source={{ uri: image }} className="w-full h-48 bg-pitch-light" resizeMode="cover" />
+          ) : (
+            <View className="w-full h-48 bg-pitch-light items-center justify-center">
+              <View className="w-16 h-16 rounded-full bg-navy items-center justify-center">
+                <Ionicons name="book-outline" size={30} color="#D4AF37" />
+              </View>
+            </View>
+          )}
+          <View className="p-5">
+            <View className="flex-row items-center justify-between gap-2 mb-1">
+              {category ? (
+                <Text className="font-sans text-[11px] font-bold text-gold-dark uppercase tracking-[2px]">
+                  {category}
+                </Text>
+              ) : (
+                <View />
+              )}
+              {stageNo ? (
+                <View className="rounded-full bg-gold-light px-2 py-0.5">
+                  <Text className="font-sans text-xs font-bold text-navy">Stage {stageNo}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text className="font-display text-xl font-semibold text-navy mb-2" numberOfLines={1}>
+              {title}
+            </Text>
+            <Text className="font-sans text-slate-500 text-sm" numberOfLines={2}>
+              {g.description || `Workbook · ${pages} pages`}
+            </Text>
+          </View>
+        </Pressable>
+      </Link>
+    );
+  };
+
   const toggleStage = (stageNo: number) =>
     setOpenStages((prev) => {
       const next = new Set(prev);
@@ -145,6 +263,10 @@ export default function WorkbookPractice() {
             </Text>
           </View>
 
+          {!loading && games.length > 0 && chips.length > 1 ? (
+            <ListFilterChips chips={chips} selectedKey={filter} onChange={setFilter} />
+          ) : null}
+
           {loading ? (
             <View className="py-20 items-center justify-center">
               <ActivityIndicator size="large" color="#0A192F" />
@@ -157,6 +279,15 @@ export default function WorkbookPractice() {
               <Text className="font-display text-xl font-semibold text-navy mb-2">No Workbook Games Yet</Text>
               <Text className="font-sans text-slate-500 text-center">The playable workbooks will appear here soon.</Text>
             </ElegantCard>
+          ) : filtered ? (
+            filtered.length === 0 ? (
+              <ElegantCard className="py-16 items-center justify-center px-6">
+                <Text className="font-display text-xl font-semibold text-navy mb-2">Nothing in this category yet</Text>
+                <Text className="font-sans text-slate-500 text-center">Try another category, or tap All to browse by stage.</Text>
+              </ElegantCard>
+            ) : (
+              <View className="flex-row flex-wrap gap-6">{filtered.map(renderCard)}</View>
+            )
           ) : (
             stages.map(({ stageNo, modules }) => (
               <View key={stageNo} className="mb-6">
@@ -185,28 +316,7 @@ export default function WorkbookPractice() {
                           </View>
                         </Pressable>
                         {openModules.has(moduleId) ? (
-                        <View className="gap-2">
-                          {moduleGames.map((g, gi) => (
-                            <Link key={g.id} href={`/games/${g.id}`} asChild>
-                              <Pressable className="flex-row items-center gap-3 bg-white border border-inkline rounded-[16px] px-3 py-2.5 shadow-sm">
-                                {g.thumbnail_url ? (
-                                  <Image source={{ uri: g.thumbnail_url }} className="w-16 h-12 rounded-[10px] bg-pitch-light" resizeMode="cover" />
-                                ) : (
-                                  <View className="w-16 h-12 rounded-[10px] bg-pitch-light items-center justify-center">
-                                    <Text className="text-xl">📘</Text>
-                                  </View>
-                                )}
-                                <View className="flex-1">
-                                  <Text className="font-sans font-bold text-navy" numberOfLines={1}>
-                                    Lesson {(lessonMeta.get(g.lesson_id || '')?.order ?? gi) + 1} — {lessonMeta.get(g.lesson_id || '')?.title || g.title.replace(/^Workbook — /, '')}
-                                  </Text>
-                                  <Text className="text-slate-400 text-xs">Workbook · 3 pages</Text>
-                                </View>
-                                <Text className="text-gold-dark font-bold">Play ›</Text>
-                              </Pressable>
-                            </Link>
-                          ))}
-                        </View>
+                          <View className="flex-row flex-wrap gap-6">{moduleGames.map(renderCard)}</View>
                         ) : null}
                       </View>
                     ))

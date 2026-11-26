@@ -44,6 +44,22 @@ interface GroupedContentListProps<T> {
    * categoryIdOf stays as the legacy primary fallback.
    */
   categoryIdsOf?: (item: T) => string[] | null | undefined;
+  /**
+   * Round 89 (Part E): optional SECOND-level grouping override. When
+   * both are provided, items are bucketed inside each stage group by
+   * secondaryIdOf (one bucket per item) instead of by their category
+   * memberships - the Workbooks manager groups Family -> Stage/Book
+   * this way while its categories stay free for membership labels and
+   * bulk assignment. Search labels still use categoryIdsOf.
+   */
+  secondaryGroups?: ContentGroupCategory[];
+  secondaryIdOf?: (item: T) => string | null | undefined;
+  /**
+   * Round 89 (Part E): categories offered in the bulk-assign dropdown
+   * when they differ from the grouping `categories` list. Defaults to
+   * `categories`.
+   */
+  bulkCategories?: ContentGroupCategory[];
   titleOf: (item: T) => string;
   descriptionOf?: (item: T) => string | null | undefined;
   renderItem: (item: T, isLast: boolean) => React.ReactNode;
@@ -113,6 +129,9 @@ export default function GroupedContentList<T>({
   stageIdOf,
   categoryIdOf,
   categoryIdsOf,
+  secondaryGroups,
+  secondaryIdOf,
+  bulkCategories,
   titleOf,
   descriptionOf,
   renderItem,
@@ -223,10 +242,26 @@ export default function GroupedContentList<T>({
     }
     if (stageBuckets.has(UNTAGGED_KEY)) orderedStageKeys.push(UNTAGGED_KEY);
 
+    // Round 89 (Part E): with a secondary grouping override, the
+    // second level buckets by secondaryIdOf against secondaryGroups
+    // and the empty bucket reads "Untagged"; otherwise the Round 85
+    // category-membership bucketing below applies unchanged.
+    const useSecondary = !!secondaryIdOf && !!secondaryGroups;
+    const secondLevel = useSecondary ? secondaryGroups! : categories;
+    const noneLabel = useSecondary ? 'Untagged' : 'No category';
+
     return orderedStageKeys.map((stageKey) => {
       const bucket = stageBuckets.get(stageKey)!;
       const catBuckets = new Map<string, { categoryId: string | null; items: T[] }>();
       for (const item of bucket.items) {
+        if (useSecondary) {
+          const sid = secondaryIdOf!(item) || null;
+          const key = sid ?? NO_CATEGORY_KEY;
+          const cb = catBuckets.get(key) || { categoryId: sid, items: [] };
+          cb.items.push(item);
+          catBuckets.set(key, cb);
+          continue;
+        }
         // Round 85: an item is filed under EACH of its categories
         // (exact memberships - a subcategory membership does not
         // also file it under the parent here); no memberships at
@@ -245,10 +280,10 @@ export default function GroupedContentList<T>({
         }
       }
 
-      // Category order: the given category order first, then any
-      // unknown ids, with "No category" always last.
+      // Second-level order: the given list order first, then any
+      // unknown ids, with the empty bucket always last.
       const orderedCatKeys: string[] = [];
-      for (const c of categories) {
+      for (const c of secondLevel) {
         if (catBuckets.has(c.id)) orderedCatKeys.push(c.id);
       }
       for (const key of catBuckets.keys()) {
@@ -271,14 +306,14 @@ export default function GroupedContentList<T>({
             key: `${stageKey}|${ckey}`,
             label:
               cb.categoryId === null
-                ? 'No category'
-                : categories.find((c) => c.id === cb.categoryId)?.name || 'Category',
+                ? noneLabel
+                : secondLevel.find((c) => c.id === cb.categoryId)?.name || 'Category',
             items: cb.items,
           };
         }),
       };
     });
-  }, [items, stages, categories, stageIdOf, catIdsOfItem]);
+  }, [items, stages, categories, stageIdOf, catIdsOfItem, secondaryGroups, secondaryIdOf]);
 
   const expandAll = () => {
     const next: Record<string, boolean> = {};
@@ -502,7 +537,7 @@ export default function GroupedContentList<T>({
                 <AdminDropdown
                   value={bulkCategoryId}
                   onChange={setBulkCategoryId}
-                  options={categories.map((c) => ({ id: c.id, label: c.name }))}
+                  options={(bulkCategories ?? categories).map((c) => ({ id: c.id, label: c.name }))}
                   placeholder="Choose a category…"
                   noneLabel="Choose a category…"
                 />

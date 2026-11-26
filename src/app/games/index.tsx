@@ -24,6 +24,7 @@ interface Game {
   category: string;
   category_id?: string | null;
   stage_id?: string | null;
+  engine?: string | null;
 }
 
 // Stage labels for the card pill, keyed by the curriculum stage
@@ -44,6 +45,9 @@ const STAGE_LABELS: Record<string, string> = {
 // material, not arcade games, so they got their own home. The
 // workbook practice pages keep their URLs (/games/workbooks,
 // /games/textbook-workbooks) — the printed books point there.
+// Round 89: workbook-engine games are also excluded from this
+// shelf's list and chip counts (see the fetch below) — the Arcade
+// no longer reaches the workbooks at all.
 
 export default function GamesGallery() {
   const goBack = useSafeBack();
@@ -66,11 +70,11 @@ export default function GamesGallery() {
         // arcade never empties over a column.
         let { data, error } = await supabase
           .from('games')
-          .select('id, title, description, thumbnail_url, category_id, stage_id, categories(name)')
+          .select('id, title, description, thumbnail_url, category_id, stage_id, engine, categories(name)')
           .eq('is_published', true)
           .order('created_at', { ascending: false });
 
-        if (error && /stage_id|category_id/.test(error.message || '')) {
+        if (error && /stage_id|category_id|engine/.test(error.message || '')) {
           const retry = await supabase
             .from('games')
             .select('id, title, description, thumbnail_url, categories(name)')
@@ -88,7 +92,13 @@ export default function GamesGallery() {
           category: item.categories ? (item.categories as any).name : 'Uncategorized'
         }));
 
-        const rows = (formattedData || []) as Game[];
+        // Round 89: the playable workbooks live ONLY in Digital
+        // Workbooks now — workbook-engine games are excluded from
+        // the Arcade list AND from the category chip counts (the
+        // membership map below is built from these filtered rows),
+        // so the Arcade is games only, exactly as it was before the
+        // workbook games existed.
+        const rows = ((formattedData || []) as Game[]).filter((g) => g.engine !== 'workbook');
         setGames(rows);
 
         // Round 85: categories + memberships (fail-soft: before
