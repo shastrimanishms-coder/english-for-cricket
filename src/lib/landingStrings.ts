@@ -64,6 +64,9 @@ export interface LandingStrings {
   statGames: string;
   statSpeaking: string;
   statReading: string;
+  statVideos: string;
+  statDownloads: string;
+  statWorkbooks: string;
   statGrowing: string;
   tipsLabel: string;
   tipsTitle: string;
@@ -104,6 +107,9 @@ const EN: LandingStrings = {
   statGames: "Games",
   statSpeaking: "Speaking Practice",
   statReading: "Reading Texts",
+  statVideos: "Videos",
+  statDownloads: "Downloads",
+  statWorkbooks: "Digital Workbooks",
   statGrowing: "and growing",
   tipsLabel: "For Learners",
   tipsTitle: "How to Get the Best from English for Cricket",
@@ -124,6 +130,10 @@ const EN: LandingStrings = {
     {
       title: 'The Learning Path',
       text: 'A structured course of 320 lessons in five stages and forty modules. Each lesson builds carefully on those before it, introducing new language and returning to earlier language in new forms until it is secure.',
+    },
+    {
+      title: 'Digital Workbooks',
+      text: 'Every printed workbook in the programme can also be played on screen: the workbook for each of the 320 lessons, together with the workbooks of the five printed textbooks. Learners tap, build words and speak as they work through the same pages with a touch pen or a finger, and no printing is needed.',
     },
     {
       title: 'Speaking Practice',
@@ -223,6 +233,9 @@ const JA: LandingStrings = {
   statGames: "ゲーム",
   statSpeaking: "スピーキング練習",
   statReading: "リーディング教材",
+  statVideos: "ビデオ",
+  statDownloads: "ダウンロード",
+  statWorkbooks: "デジタルワークブック",
   statGrowing: "さらに増加中",
   tipsLabel: "学習者の皆さまへ",
   tipsTitle: "English for Cricket を最大限に活用する方法",
@@ -243,6 +256,10 @@ const JA: LandingStrings = {
     {
       title: 'ラーニングパス',
       text: '五つのステージと40のモジュールにわたる、全320レッスンの体系的なコースです。各レッスンは前のレッスンの上に丁寧に積み上げられ、新しい表現を導入しながら、以前の表現を新しい形で繰り返し、確実に定着させます。',
+    },
+    {
+      title: 'デジタルワークブック',
+      text: 'プログラムの印刷ワークブックは、すべて画面上でも取り組むことができます。320のレッスンそれぞれに対応するワークブックと、5冊の印刷テキストのワークブックです。学習者はタッチペンや指を使って、タップし、言葉を組み立て、声に出して読みながら、印刷版と同じページを進めます。印刷の必要はありません。',
     },
     {
       title: 'スピーキング練習',
@@ -342,6 +359,9 @@ const HI: LandingStrings = {
   statGames: "खेल",
   statSpeaking: "बोलने का अभ्यास",
   statReading: "पठन पाठ",
+  statVideos: "वीडियो",
+  statDownloads: "डाउनलोड",
+  statWorkbooks: "डिजिटल वर्कबुक",
   statGrowing: "और बढ़ रहे हैं",
   tipsLabel: "शिक्षार्थियों के लिए",
   tipsTitle: "English for Cricket से सर्वोत्तम लाभ कैसे प्राप्त करें",
@@ -362,6 +382,10 @@ const HI: LandingStrings = {
     {
       title: 'शिक्षण पथ',
       text: 'पाँच चरणों और चालीस मॉड्यूलों में 320 पाठों का एक सुनियोजित पाठ्यक्रम। प्रत्येक पाठ पिछले पाठों पर सावधानीपूर्वक आधारित है — नई भाषा प्रस्तुत करते हुए और पुरानी भाषा को नए रूपों में दोहराते हुए, जब तक वह पक्की न हो जाए।',
+    },
+    {
+      title: 'डिजिटल वर्कबुक',
+      text: 'कार्यक्रम की प्रत्येक मुद्रित वर्कबुक को स्क्रीन पर भी खेला जा सकता है: 320 पाठों में से प्रत्येक की वर्कबुक, साथ ही पाँच मुद्रित पाठ्यपुस्तकों की वर्कबुक। शिक्षार्थी टच पेन या उंगली से टैप करते हुए, शब्द बनाते हुए और बोलते हुए उन्हीं पृष्ठों पर काम करते हैं, और किसी मुद्रण की आवश्यकता नहीं होती।',
     },
     {
       title: 'बोलने का अभ्यास',
@@ -461,6 +485,9 @@ const UR: LandingStrings = {
   statGames: "کھیل",
   statSpeaking: "بولنے کی مشق",
   statReading: "مطالعے کی تحریریں",
+  statVideos: "ویڈیوز",
+  statDownloads: "ڈاؤن لوڈز",
+  statWorkbooks: "ڈیجیٹل ورک بکس",
   statGrowing: "اور بڑھ رہے ہیں",
   tipsLabel: "طلبہ کے لیے",
   tipsTitle: "English for Cricket سے بہترین فائدہ کیسے حاصل کریں",
@@ -481,6 +508,10 @@ const UR: LandingStrings = {
     {
       title: 'تعلیمی راستہ',
       text: 'پانچ مراحل اور چالیس ماڈیولز میں 320 اسباق کا ایک باقاعدہ کورس۔ ہر سبق احتیاط سے پچھلے اسباق پر استوار ہے — نئی زبان متعارف کراتے ہوئے اور پرانی زبان کو نئی صورتوں میں دہراتے ہوئے، یہاں تک کہ وہ پختہ ہو جائے۔',
+    },
+    {
+      title: 'ڈیجیٹل ورک بکس',
+      text: 'پروگرام کی ہر چھپی ہوئی ورک بک کو اسکرین پر بھی کھیلا جا سکتا ہے: 320 اسباق میں سے ہر ایک کی ورک بک، اس کے ساتھ پانچ چھپی ہوئی درسی کتابوں کی ورک بکس۔ سیکھنے والے ٹچ پین یا انگلی سے ٹیپ کرتے ہوئے، الفاظ بناتے ہوئے اور بولتے ہوئے انہی صفحات پر کام کرتے ہیں، اور چھپائی کی کوئی ضرورت نہیں ہوتی۔',
     },
     {
       title: 'بولنے کی مشق',
@@ -580,6 +611,9 @@ const PS: LandingStrings = {
   statGames: "لوبې",
   statSpeaking: "د خبرو کولو تمرین",
   statReading: "د لوستلو متنونه",
+  statVideos: "ویډیوګانې",
+  statDownloads: "ډاونلوډونه",
+  statWorkbooks: "ډیجیټل کاري کتابونه",
   statGrowing: "او نور هم زیاتیږي",
   tipsLabel: "د زده کوونکو لپاره",
   tipsTitle: "څنګه له English for Cricket څخه غوره ګټه واخلو",
@@ -600,6 +634,10 @@ const PS: LandingStrings = {
     {
       title: 'د زده کړې لاره',
       text: 'یو منظم کورس چې ۳۲۰ درسونه په پنځو مرحلو او څلویښتو ماډلونو کې لري. هر درس په دقت سره پر پخوانیو درسونو جوړېږي، نوې ژبه معرفي کوي او پخوانۍ ژبه په نویو بڼو کې تکراروي تر هغه چې ټینګه شي.',
+    },
+    {
+      title: 'ډیجیټل کاري کتابونه',
+      text: 'د پروګرام هر چاپ شوی کاري کتاب پر سکرین هم کارېدلی شي: د ۳۲۰ درسونو د هر یوه کاري کتاب، د پنځو چاپ شویو درسي کتابونو له کاري کتابونو سره. زده کوونکي په ټچ قلم یا ګوتې سره ټیپ کوي، ټکي جوړوي او خبرې کوي او پر هماغو مخونو کار کوي، او چاپ ته اړتیا نشته.',
     },
     {
       title: 'د خبرو کولو تمرین',
@@ -698,6 +736,9 @@ const SW: LandingStrings = {
   statGames: "Michezo",
   statSpeaking: "Mazoezi ya Kuzungumza",
   statReading: "Maandishi ya Kusoma",
+  statVideos: "Video",
+  statDownloads: "Vipakuliwa",
+  statWorkbooks: "Vitabu vya Kazi vya Kidijitali",
   statGrowing: "na yanaongezeka",
   tipsLabel: "Kwa Wanafunzi",
   tipsTitle: "Jinsi ya Kupata Faida Kamili kutoka English for Cricket",
@@ -718,6 +759,10 @@ const SW: LandingStrings = {
     {
       title: 'Njia ya Kujifunza',
       text: 'Kozi iliyopangwa ya masomo 320 katika hatua tano na moduli arobaini. Kila somo hujengwa kwa uangalifu juu ya yaliyotangulia, likileta lugha mpya na kurudia lugha ya awali katika maumbo mapya hadi iimarike.',
+    },
+    {
+      title: 'Vitabu vya Kazi vya Kidijitali',
+      text: 'Kila kitabu cha kazi kilichochapishwa katika programu kinaweza pia kuchezwa kwenye skrini: kitabu cha kazi cha kila moja ya masomo 320, pamoja na vitabu vya kazi vya vitabu vitano vya kiada vilivyochapishwa. Wanafunzi hugusa, hujenga maneno na kuzungumza wanapopitia kurasa zile zile kwa kalamu ya kugusa au kidole, na hakuna uchapishaji unaohitajika.',
     },
     {
       title: 'Mazoezi ya Kuzungumza',
@@ -817,6 +862,9 @@ const DE: LandingStrings = {
   statGames: "Spiele",
   statSpeaking: "Sprechübungen",
   statReading: "Lesetexte",
+  statVideos: "Videos",
+  statDownloads: "Downloads",
+  statWorkbooks: "Digitale Arbeitshefte",
   statGrowing: "und es werden mehr",
   tipsLabel: "Für Lernende",
   tipsTitle: "So holen Sie das Beste aus English for Cricket heraus",
@@ -837,6 +885,10 @@ const DE: LandingStrings = {
     {
       title: 'Der Lernpfad',
       text: 'Ein strukturierter Kurs mit 320 Lektionen in fünf Stufen und vierzig Modulen. Jede Lektion baut sorgfältig auf den vorherigen auf, führt neue Sprache ein und greift frühere Sprache in neuen Formen wieder auf, bis sie sicher sitzt.',
+    },
+    {
+      title: 'Digitale Arbeitshefte',
+      text: 'Jedes gedruckte Arbeitsheft des Programms kann auch am Bildschirm bearbeitet werden: das Arbeitsheft zu jeder der 320 Lektionen sowie die Arbeitshefte der fünf gedruckten Lehrbücher. Die Lernenden tippen, bauen Wörter und sprechen sich mit einem Touch-Stift oder dem Finger durch dieselben Seiten, und ein Ausdrucken ist nicht nötig.',
     },
     {
       title: 'Sprechtraining',
@@ -936,6 +988,9 @@ const ZU: LandingStrings = {
   statGames: "Imidlalo",
   statSpeaking: "Ukuzilolonga Kokukhuluma",
   statReading: "Imibhalo Yokufunda",
+  statVideos: "Amavidiyo",
+  statDownloads: "Okulandiwe",
+  statWorkbooks: "Izincwadi Zokusebenza Zedijithali",
   statGrowing: "futhi kuyanda",
   tipsLabel: "Kwabafundi",
   tipsTitle: "Ungayisebenzisa Kanjani Kakhulu i-English for Cricket",
@@ -956,6 +1011,10 @@ const ZU: LandingStrings = {
     {
       title: 'Indlela Yokufunda',
       text: 'Isifundo esihleliwe sezifundo ezingama-320 ezigabeni ezinhlanu nasemamojulini angamashumi amane. Isifundo ngasinye sakhela ngokucophelela phezu kwalezo ezingaphambi kwaso, sethula ulimi olusha futhi sibuyela olimini lwangaphambilini ngezindlela ezintsha ize luvikeleke.',
+    },
+    {
+      title: 'Izincwadi Zokusebenza Zedijithali',
+      text: 'Yonke incwadi yokusebenza ephrintiwe kulolu hlelo ingadlalwa nasesikrinini: incwadi yokusebenza yesifundo ngasinye kwezingama-320, kanye nezincwadi zokusebenza zezincwadi ezinhlanu eziphrintiwe. Abafundi bacofa, bakha amagama futhi bakhuluma njengoba bedlula emakhasini afanayo ngepeni lokuthinta noma ngomunwe, futhi akukho kuphrinta okudingekayo.',
     },
     {
       title: 'Ukuzilolonga Ukukhuluma',

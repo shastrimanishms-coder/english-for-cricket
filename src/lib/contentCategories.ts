@@ -18,8 +18,19 @@ import { supabase } from './supabase';
 // migration 38 has run, the join table / sort_order column simply do
 // not exist, reads fall back to the legacy category_id, and writes
 // degrade to setting the legacy primary only.
+//
+// Round 88: 'workbooks' joins the type set. Workbook-engine games
+// (engine 'workbook' - the Learning Path and textbook workbook games)
+// are filed under their OWN category tree (categories.type =
+// 'workbooks') with memberships recorded under content_type
+// 'workbooks', while their rows stay in the games table - so
+// CONTENT_TABLE maps 'workbooks' to 'games' for the legacy primary
+// sync. Migration 39 extends the content_categories CHECK to permit
+// the new value; until it runs, reads simply find no memberships
+// (a CHECK never blocks a SELECT) and writes fail soft into the
+// legacy-primary-only path below, exactly as before migration 38.
 
-export type ContentType = 'games' | 'reading' | 'speaking' | 'downloads' | 'videos';
+export type ContentType = 'games' | 'reading' | 'speaking' | 'downloads' | 'videos' | 'workbooks';
 
 export const CONTENT_TABLE: Record<ContentType, string> = {
   games: 'games',
@@ -27,6 +38,7 @@ export const CONTENT_TABLE: Record<ContentType, string> = {
   speaking: 'speaking_scenarios',
   downloads: 'downloads',
   videos: 'video_lectures',
+  workbooks: 'games',
 };
 
 export const MAX_CATEGORIES_PER_ITEM = 5;

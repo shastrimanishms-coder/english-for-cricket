@@ -22,6 +22,8 @@ const CATEGORY_TYPES = [
   { id: 'curriculum', label: 'Curriculum & Lessons', color: 'bg-navy/10 text-navy' },
   { id: 'downloads', label: 'Downloads & Workbooks', color: 'bg-gold-light/70 text-gold-dark' },
   { id: 'games', label: 'Games & Arcade', color: 'bg-pitch-light text-pitch-dark' },
+  // Round 88: workbook-engine games get their own category tree.
+  { id: 'workbooks', label: 'Workbooks', color: 'bg-gold/20 text-gold-dark' },
   { id: 'videos', label: 'Video Lectures', color: 'bg-slate-100 text-slate-700' },
   { id: 'speaking', label: 'Speaking Practice', color: 'bg-navy/5 text-navy-soft' },
   { id: 'reading', label: 'Smart Reading', color: 'bg-pitch/10 text-pitch-dark' },

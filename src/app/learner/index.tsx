@@ -47,6 +47,16 @@ const LEARNING_MODULES: {
     icon: 'library-outline',
   },
   {
+    // Round 88: the playable workbooks moved out of the Arcade to
+    // their own dashboard card — they are study material tied to
+    // the lessons and the printed books, not arcade games.
+    id: 'workbooks',
+    title: 'Digital Workbooks',
+    description: 'Play the workbook pages for every lesson and every printed textbook on screen — the same pages as the paper books, with no printing needed.',
+    cta: 'open workbooks',
+    icon: 'journal-outline',
+  },
+  {
     id: 'games',
     title: 'Games',
     description: 'Play Jumping Bird and other educational games. Learn English while playing.',
@@ -161,6 +171,9 @@ export default function LearnerDashboard() {
         break;
       case 'path':
         router.push('/learner/path');
+        break;
+      case 'workbooks':
+        router.push('/learner/workbooks' as any);
         break;
       case 'speaking':
         router.push('/learner/speaking');

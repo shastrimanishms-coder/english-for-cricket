@@ -41,6 +41,11 @@ interface Game {
 export default function GamesManager() {
   const [games, setGames] = useState<Game[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  // Round 88: workbook-engine games are filed under their own
+  // 'workbooks' category tree (content_type 'workbooks', migration
+  // 39); ordinary games keep the 'games' tree. Both trees are loaded
+  // here and every read/write below routes by the game's engine.
+  const [wbCategories, setWbCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -83,6 +88,8 @@ export default function GamesManager() {
       setLoading(true);
       const catData = await fetchCategoriesForType('games');
       setCategories(catData);
+      const wbData = await fetchCategoriesForType('workbooks');
+      setWbCategories(wbData);
 
       const { data: gameData, error: gameError } = await supabase
         .from('games')
@@ -92,8 +99,18 @@ export default function GamesManager() {
       if (gameError) throw gameError;
       const rows = (gameData || []) as Game[];
       setGames(rows);
-      const map = await fetchMembershipMap('games', rows, catData);
-      setMemberships(Object.fromEntries(map));
+      // Round 88: one membership map per tree; each game reads from
+      // the map of ITS OWN tree (workbook games under 'workbooks',
+      // everything else under 'games'). Both fetches are fail-soft,
+      // so before migration 39 the workbook map is simply the legacy
+      // fallback and nothing breaks.
+      const gamesMap = await fetchMembershipMap('games', rows, catData);
+      const wbMap = await fetchMembershipMap('workbooks', rows, wbData);
+      const merged = new Map<string, string[]>();
+      for (const row of rows) {
+        merged.set(row.id, (row.engine === 'workbook' ? wbMap : gamesMap).get(row.id) ?? []);
+      }
+      setMemberships(Object.fromEntries(merged));
     } catch (error: any) {
       showAlert('Error', error.message);
     } finally {
@@ -103,6 +120,14 @@ export default function GamesManager() {
 
   const categoryIdsFor = (game: Game): string[] =>
     memberships[game.id] ?? (game.category_id ? [game.category_id] : []);
+
+  // Round 88 helpers: which tree a game / a category belongs to.
+  const isWorkbookGame = (game?: Game | null) => game?.engine === 'workbook';
+  const allCategories = [...categories, ...wbCategories];
+  const catsForGame = (game?: Game | null): Category[] =>
+    isWorkbookGame(game) ? wbCategories : categories;
+  const typeForGame = (game?: Game | null): 'games' | 'workbooks' =>
+    isWorkbookGame(game) ? 'workbooks' : 'games';
 
   useEffect(() => {
     (async () => {
@@ -170,6 +195,9 @@ export default function GamesManager() {
 
   const editingGame = editId ? games.find((g) => g.id === editId) : undefined;
   const isBuiltinEdit = !!editingGame?.engine;
+  // Round 88: the edit form files a workbook game under the
+  // Workbooks tree, an ordinary game under the Games tree.
+  const formCategories = editingGame?.engine === 'workbook' ? wbCategories : categories;
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -201,8 +229,9 @@ export default function GamesManager() {
       const payload: any = {
         title: title.trim(),
         description: description.trim(),
-        // Legacy column keeps the PRIMARY category (first in display order).
-        category_id: primaryCategoryId(categoryIds, categories),
+        // Legacy column keeps the PRIMARY category (first in display
+        // order) within the game's OWN tree (Round 88).
+        category_id: primaryCategoryId(categoryIds, catsForGame(editingGame)),
         ...(taggingAvailable ? { lesson_id: lessonId } : {}),
         ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
         game_url: finalGameUrl,
@@ -221,8 +250,13 @@ export default function GamesManager() {
         if (error) throw error;
         savedId = (data as { id: string }).id;
       }
-      // Round 85: write the full membership set (join table + primary sync).
-      if (savedId) await setItemCategories('games', savedId, categoryIds, categories);
+      // Round 85: write the full membership set (join table + primary
+      // sync). Round 88: workbook games write under content_type
+      // 'workbooks' with the workbooks tree; ordinary games are
+      // unchanged.
+      if (savedId) {
+        await setItemCategories(typeForGame(editingGame), savedId, categoryIds, catsForGame(editingGame));
+      }
 
       cancelEdit();
       await fetchData();
@@ -333,7 +367,7 @@ export default function GamesManager() {
 
         <View className="border-t border-inkline pt-4">
           <ContentTagging
-            categories={categories}
+            categories={formCategories}
             categoryIds={categoryIds}
             onCategoryIds={setCategoryIds}
             stageId={stageId}
@@ -343,7 +377,11 @@ export default function GamesManager() {
             lessonId={lessonId}
             onLessonId={setLessonId}
           />
-          {categories.length === 0 ? (
+          {editingGame?.engine === 'workbook' ? (
+            <Text className="text-xs text-slate-400 mt-2">
+              This is a workbook game — it is filed under the Workbooks categories (create them under Categories → Workbooks).
+            </Text>
+          ) : categories.length === 0 ? (
             <Text className="text-xs text-slate-400 mt-2">No Games categories yet — create them under Categories and they will appear in the dropdown.</Text>
           ) : null}
         </View>
@@ -451,7 +489,10 @@ export default function GamesManager() {
       <View className="flex-col md:flex-row gap-4">
         <View className="flex-1">
           <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Category</Text>
-          <AdminDropdown value={fCategory} onChange={setFCategory} options={flattenCategoryTree(categories).map(({ cat, depth }) => ({ id: cat.id, label: `${'↳ '.repeat(depth)}${cat.name}` }))} placeholder="All categories" noneLabel="All categories" />
+          <AdminDropdown value={fCategory} onChange={setFCategory} options={[
+            ...flattenCategoryTree(categories).map(({ cat, depth }) => ({ id: cat.id, label: `${'↳ '.repeat(depth)}${cat.name}` })),
+            ...flattenCategoryTree(wbCategories).map(({ cat, depth }) => ({ id: cat.id, label: `${'↳ '.repeat(depth)}📗 ${cat.name}` })),
+          ]} placeholder="All categories" noneLabel="All categories" />
         </View>
         <View className="flex-1">
           <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Stage</Text>
@@ -484,7 +525,12 @@ export default function GamesManager() {
         <GroupedContentList
           items={visibleGames}
           stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
-          categories={flattenCategoryTree(categories).map(({ cat }) => ({ id: cat.id, name: cat.name }))}
+          categories={[
+            ...flattenCategoryTree(categories).map(({ cat }) => ({ id: cat.id, name: cat.name })),
+            // Round 88: workbook groups are marked with 📗 so the two
+            // trees stay distinguishable in one list.
+            ...flattenCategoryTree(wbCategories).map(({ cat }) => ({ id: cat.id, name: `📗 ${cat.name}` })),
+          ]}
           idOf={(g) => g.id}
           stageIdOf={(g) => g.stage_id ?? null}
           categoryIdOf={(g) => g.category_id ?? null}
@@ -495,21 +541,63 @@ export default function GamesManager() {
           searchPlaceholder="Search games by title…"
           emptyMessage={games.length === 0 ? 'No games added yet.' : 'No games match these filters.'}
           bulkAssign={{
+            // Round 88: the chosen category's tree decides which
+            // selected items it can file - a Workbooks category only
+            // files workbook games, a Games category only ordinary
+            // games; the rest are reported as skipped.
             onAssign: async (ids, categoryId) => {
-              const res = await bulkAddCategory('games', ids, categoryId, games, categories);
+              const forWorkbooks = wbCategories.some((c) => c.id === categoryId);
+              const eligible = ids.filter((id) => {
+                const g = games.find((x) => x.id === id);
+                return forWorkbooks ? isWorkbookGame(g) : !isWorkbookGame(g);
+              });
+              const skipped = ids.length - eligible.length;
+              if (eligible.length === 0) {
+                return forWorkbooks
+                  ? 'No workbook games were selected, so nothing was filed under that Workbooks category.'
+                  : 'Only workbook games were selected - they are filed under Workbooks categories, not Games categories.';
+              }
+              const res = await bulkAddCategory(
+                forWorkbooks ? 'workbooks' : 'games',
+                eligible,
+                categoryId,
+                games,
+                forWorkbooks ? wbCategories : categories,
+              );
               await fetchData();
-              return res.message;
+              return skipped > 0
+                ? `${res.message} ${skipped} selected item${skipped === 1 ? '' : 's'} belong${skipped === 1 ? 's' : ''} to the other section and were skipped.`
+                : res.message;
             },
             onRemove: async (ids, categoryId) => {
-              const res = await bulkRemoveCategory('games', ids, categoryId, games, categories);
+              const forWorkbooks = wbCategories.some((c) => c.id === categoryId);
+              const eligible = ids.filter((id) => {
+                const g = games.find((x) => x.id === id);
+                return forWorkbooks ? isWorkbookGame(g) : !isWorkbookGame(g);
+              });
+              const skipped = ids.length - eligible.length;
+              if (eligible.length === 0) {
+                return forWorkbooks
+                  ? 'No workbook games were selected, so nothing was removed.'
+                  : 'Only workbook games were selected - their categories live in the Workbooks section.';
+              }
+              const res = await bulkRemoveCategory(
+                forWorkbooks ? 'workbooks' : 'games',
+                eligible,
+                categoryId,
+                games,
+                forWorkbooks ? wbCategories : categories,
+              );
               await fetchData();
-              return res.message;
+              return skipped > 0
+                ? `${res.message} ${skipped} selected item${skipped === 1 ? '' : 's'} belong${skipped === 1 ? 's' : ''} to the other section and were skipped.`
+                : res.message;
             },
           }}
           renderItem={(game, isLast) => {
             const catName =
               categoryIdsFor(game)
-                .map((id) => categories.find((c) => c.id === id)?.name)
+                .map((id) => allCategories.find((c) => c.id === id)?.name)
                 .filter(Boolean)
                 .join(' · ') || 'No category';
             const tagLine = [stageName(game.stage_id), moduleName(game.module_id)].filter(Boolean).join(' · ');

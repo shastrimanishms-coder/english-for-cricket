@@ -24,9 +24,14 @@ import { useAppLogo } from '../lib/useAppLogo';
 const MASCOT_MALE = require('../../assets/images/mascot-male.png');
 const MASCOT_FEMALE = require('../../assets/images/mascot-female.png');
 
+// Fallback figures for the live landing counts (the counts at the
+// time of this build), used until — or unless — the database answers.
+const COUNT_FALLBACKS = { games: 39, speaking: 47, reading: 40, videos: 1, downloads: 0, workbooks: 321 };
+
 // Feature icons, in the same order as the features in landingStrings.
 const FEATURE_ICONS = [
   'library-outline',
+  'journal-outline',
   'mic-outline',
   'book-outline',
   'volume-high-outline',
@@ -146,24 +151,31 @@ export default function LandingPage() {
 
   // Live content counts for the hero figures: read from the database on
   // every visit, so the numbers grow by themselves as new games,
-  // conversations and reading texts are published. The starting values
-  // are the counts at the time of this build and remain as the fallback
-  // if the counts cannot be read.
-  const [liveCounts, setLiveCounts] = useState({ games: 39, speaking: 47, reading: 40 });
+  // conversations, reading texts, videos, downloads and playable
+  // workbooks are published. The starting values are the counts at the
+  // time of this build and remain as the fallback if a count cannot
+  // be read (each figure falls back on its own).
+  const [liveCounts, setLiveCounts] = useState(COUNT_FALLBACKS);
 
   useEffect(() => {
     (async () => {
       try {
         const opts = { count: 'exact' as const, head: true };
-        const [g, sp, rd] = await Promise.all([
+        const [g, sp, rd, vd, dl, wb] = await Promise.all([
           supabase.from('games').select('id', opts).eq('is_published', true),
           supabase.from('speaking_scenarios').select('id', opts).eq('is_published', true),
           supabase.from('reading_stories').select('id', opts).eq('is_published', true),
+          supabase.from('video_lectures').select('id', opts).eq('is_published', true),
+          supabase.from('downloads').select('id', opts).eq('is_published', true),
+          supabase.from('games').select('id', opts).eq('is_published', true).eq('engine', 'workbook'),
         ]);
         setLiveCounts({
-          games: g.count ?? 39,
-          speaking: sp.count ?? 47,
-          reading: rd.count ?? 40,
+          games: g.count ?? COUNT_FALLBACKS.games,
+          speaking: sp.count ?? COUNT_FALLBACKS.speaking,
+          reading: rd.count ?? COUNT_FALLBACKS.reading,
+          videos: vd.count ?? COUNT_FALLBACKS.videos,
+          downloads: dl.count ?? COUNT_FALLBACKS.downloads,
+          workbooks: wb.count ?? COUNT_FALLBACKS.workbooks,
         });
       } catch {
         // Keep the fallback figures.
@@ -171,25 +183,25 @@ export default function LandingPage() {
     })();
   }, []);
 
-  // The three live figures count up smoothly to their real values when
-  // the database answers, so a visitor can see that they are live.
-  const displayRef = useRef({ games: 39, speaking: 47, reading: 40 });
-  const [displayCounts, setDisplayCounts] = useState({ games: 39, speaking: 47, reading: 40 });
+  // The live figures count up smoothly to their real values when the
+  // database answers, so a visitor can see that they are live.
+  const displayRef = useRef({ ...COUNT_FALLBACKS });
+  const [displayCounts, setDisplayCounts] = useState({ ...COUNT_FALLBACKS });
 
   useEffect(() => {
     const from = { ...displayRef.current };
     const to = liveCounts;
-    if (from.games === to.games && from.speaking === to.speaking && from.reading === to.reading) return;
+    const keys = Object.keys(to) as (keyof typeof to)[];
+    if (keys.every((k) => from[k] === to[k])) return;
     const steps = 24;
     let i = 0;
     const timer = setInterval(() => {
       i += 1;
       const k = 1 - Math.pow(1 - i / steps, 3);
-      const next = {
-        games: Math.round(from.games + (to.games - from.games) * k),
-        speaking: Math.round(from.speaking + (to.speaking - from.speaking) * k),
-        reading: Math.round(from.reading + (to.reading - from.reading) * k),
-      };
+      const next = { ...from };
+      for (const key of keys) {
+        next[key] = Math.round(from[key] + (to[key] - from[key]) * k);
+      }
       displayRef.current = next;
       setDisplayCounts(next);
       if (i >= steps) clearInterval(timer);
@@ -448,9 +460,11 @@ export default function LandingPage() {
           </View>
 
           {/* Programme figures — one elegant band across the full width
-              of the hero, so all eight figures sit on a single line.
-              The games, speaking and reading figures are counted live
-              from the database; the rest describe the course itself. */}
+              of the hero. Eleven figures now, so the band wraps to two
+              rows where the width requires it. The games, speaking,
+              reading, videos, downloads and digital workbooks figures
+              are counted live from the database; the rest describe
+              the course itself. */}
           <View
             className="flex-row flex-wrap justify-between gap-x-6 gap-y-4 mt-12 w-full rounded-[16px] px-6 py-4"
             style={{
@@ -467,6 +481,9 @@ export default function LandingPage() {
               { value: String(displayCounts.games), label: t.statGames, growing: true },
               { value: String(displayCounts.speaking), label: t.statSpeaking, growing: true },
               { value: String(displayCounts.reading), label: t.statReading, growing: true },
+              { value: String(displayCounts.videos), label: t.statVideos, growing: true },
+              { value: String(displayCounts.downloads), label: t.statDownloads, growing: true },
+              { value: String(displayCounts.workbooks), label: t.statWorkbooks, growing: true },
               { value: '100%', label: t.statFree, growing: false },
             ].map((stat) => (
               <View key={stat.label}>
