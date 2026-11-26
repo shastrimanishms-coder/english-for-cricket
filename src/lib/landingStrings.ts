@@ -134,8 +134,8 @@ const EN: LandingStrings = {
       text: 'Short stories in two forms: Listen and Read, in which each word is highlighted as it is spoken, and Read Aloud, in which the learner\u2019s own reading is scored sentence by sentence.',
     },
     {
-      title: 'Real Human Voices',
-      text: 'Every line of the course is being recorded by real voice artists, in several distinct voices. Learners choose the voice they wish to hear, and listen to natural, human English throughout.',
+      title: 'Voices You Can Choose',
+      text: 'Lessons, stories and conversations are read aloud by named teaching voices, including recordings made by real voice artists for this programme. Learners choose the voice they wish to hear.',
     },
     {
       title: 'Tricky Words Review',
@@ -143,7 +143,7 @@ const EN: LandingStrings = {
     },
     {
       title: 'XP, Stars and Badges',
-      text: 'Learners earn experience points and stars for completed work, and badges for significant achievements. A class may follow its own weekly star board; there are no public rankings.',
+      text: 'Learners earn experience points and stars for completed work, and badges for significant achievements. Progress is private to each learner and their teacher or manager; there are no public rankings.',
     },
     {
       title: 'Study Days and Streaks',
@@ -253,8 +253,8 @@ const JA: LandingStrings = {
       text: '短い物語を二つの形式で提供します。「聞いて読む」では、読み上げに合わせて単語が一つずつハイライトされます。「声に出して読む」では、学習者自身の朗読が一文ごとに採点されます。',
     },
     {
-      title: '本物の人間の声',
-      text: 'コースのすべてのセリフを、複数の異なる声の持ち主である実際の声優が録音しています。学習者は聞きたい声を選ぶことができ、全体を通して自然な人間の英語を聞くことができます。',
+      title: '選べる声',
+      text: 'レッスン、物語、会話は、名前のある指導用の声で読み上げられます。その中には、このプログラムのために実際の声優が録音した音声も含まれます。学習者は、聞きたい声を自分で選ぶことができます。',
     },
     {
       title: '苦手な単語の復習',
@@ -262,7 +262,7 @@ const JA: LandingStrings = {
     },
     {
       title: 'XP、星、バッジ',
-      text: '学習者は、完了した学習に対して経験値と星を獲得し、大きな達成にはバッジが授与されます。クラスごとに週間の星ボードを確認できますが、公開ランキングはありません。',
+      text: '学習者は、完了した学習に対して経験値と星を獲得し、大きな達成にはバッジが授与されます。進み具合は学習者本人と担当の先生やマネージャーだけが見ることができ、公開ランキングはありません。',
     },
     {
       title: '学習曜日と連続記録',
@@ -372,8 +372,8 @@ const HI: LandingStrings = {
       text: "दो रूपों में छोटी कहानियाँ: 'सुनें और पढ़ें', जिसमें प्रत्येक शब्द बोले जाने पर उजागर होता है, और 'ज़ोर से पढ़ें', जिसमें शिक्षार्थी के अपने पठन को वाक्य-दर-वाक्य अंक दिए जाते हैं।",
     },
     {
-      title: 'वास्तविक मानवीय आवाज़ें',
-      text: 'पाठ्यक्रम की प्रत्येक पंक्ति को वास्तविक ध्वनि कलाकारों द्वारा कई अलग-अलग आवाज़ों में रिकॉर्ड किया जा रहा है। शिक्षार्थी अपनी पसंद की आवाज़ चुनते हैं और पूरे पाठ्यक्रम में स्वाभाविक, मानवीय अंग्रेज़ी सुनते हैं।',
+      title: 'चुनने योग्य आवाज़ें',
+      text: 'पाठ, कहानियाँ और वार्तालाप नाम वाले शिक्षण स्वरों में पढ़कर सुनाए जाते हैं, जिनमें इस कार्यक्रम के लिए वास्तविक ध्वनि कलाकारों द्वारा की गई रिकॉर्डिंग भी शामिल हैं। शिक्षार्थी स्वयं चुन सकते हैं कि वे कौन-सी आवाज़ सुनना चाहते हैं।',
     },
     {
       title: 'कठिन शब्दों की पुनरावृत्ति',
@@ -381,7 +381,7 @@ const HI: LandingStrings = {
     },
     {
       title: 'XP, सितारे और बैज',
-      text: 'शिक्षार्थी पूर्ण किए गए कार्य के लिए अनुभव अंक और सितारे अर्जित करते हैं, और महत्वपूर्ण उपलब्धियों के लिए बैज प्राप्त करते हैं। कोई कक्षा अपना साप्ताहिक स्टार बोर्ड देख सकती है; कोई सार्वजनिक रैंकिंग नहीं है।',
+      text: 'शिक्षार्थी पूर्ण किए गए कार्य के लिए अनुभव अंक और सितारे अर्जित करते हैं, और महत्वपूर्ण उपलब्धियों के लिए बैज प्राप्त करते हैं। प्रगति प्रत्येक शिक्षार्थी और उनके शिक्षक या प्रबंधक तक ही सीमित रहती है; कोई सार्वजनिक रैंकिंग नहीं है।',
     },
     {
       title: 'अध्ययन दिवस और निरंतरता',
@@ -491,8 +491,8 @@ const UR: LandingStrings = {
       text: "دو صورتوں میں مختصر کہانیاں: 'سنیں اور پڑھیں'، جس میں ہر لفظ بولے جانے پر نمایاں ہوتا ہے، اور 'بلند آواز سے پڑھیں'، جس میں سیکھنے والے کی اپنی تلاوت کو جملہ بہ جملہ نمبر دیے جاتے ہیں۔",
     },
     {
-      title: 'حقیقی انسانی آوازیں',
-      text: 'کورس کی ہر سطر کو حقیقی آواز کے فنکار کئی مختلف آوازوں میں ریکارڈ کر رہے ہیں۔ سیکھنے والے اپنی پسند کی آواز منتخب کرتے ہیں اور پورے کورس میں فطری، انسانی انگریزی سنتے ہیں۔',
+      title: 'منتخب کرنے کے قابل آوازیں',
+      text: 'اسباق، کہانیاں اور گفتگو نام والی تدریسی آوازوں میں پڑھ کر سنائی جاتی ہیں، جن میں اس پروگرام کے لیے حقیقی آواز کے فنکاروں کی ریکارڈنگ بھی شامل ہیں۔ سیکھنے والے خود منتخب کر سکتے ہیں کہ وہ کون سی آواز سننا چاہتے ہیں۔',
     },
     {
       title: 'مشکل الفاظ کی دہرائی',
@@ -500,7 +500,7 @@ const UR: LandingStrings = {
     },
     {
       title: 'XP، ستارے اور بیجز',
-      text: 'سیکھنے والے مکمل کیے گئے کام کے لیے تجربے کے پوائنٹس اور ستارے حاصل کرتے ہیں، اور نمایاں کامیابیوں کے لیے بیجز۔ کوئی جماعت اپنا ہفتہ وار اسٹار بورڈ دیکھ سکتی ہے؛ کوئی عوامی درجہ بندی نہیں ہے۔',
+      text: 'سیکھنے والے مکمل کیے گئے کام کے لیے تجربے کے پوائنٹس اور ستارے حاصل کرتے ہیں، اور نمایاں کامیابیوں کے لیے بیجز ملتے ہیں۔ پیش رفت ہر سیکھنے والے اور اس کے استاد یا منیجر تک محدود رہتی ہے؛ کوئی عوامی درجہ بندی نہیں ہے۔',
     },
     {
       title: 'مطالعے کے دن اور تسلسل',
@@ -610,8 +610,8 @@ const PS: LandingStrings = {
       text: "لنډې کیسې په دوو بڼو کې: 'واورئ او ولولئ'، په کوم کې چې هر ټکی د ویلو پر مهال روښانه کېږي، او 'په لوړ غږ ولولئ'، په کوم کې چې د زده کوونکي خپل لوستل جمله په جمله نمرې ورکول کېږي.",
     },
     {
-      title: 'اصلي انساني غږونه',
-      text: 'د کورس هره کرښه د اصلي غږ هنرمندانو لخوا په څو مختلفو غږونو کې ثبتېږي. زده کوونکي هغه غږ غوره کوي چې غواړي یې واوري، او په ټول کورس کې طبیعي، انساني انګلیسي اوري.',
+      title: 'د ټاکلو وړ غږونه',
+      text: 'درسونه، کیسې او خبرې اترې په نومول شویو ښوونیزو غږونو کې په لوړ غږ لوستل کېږي، چې پکې د دې پروګرام لپاره د اصلي غږ هنرمندانو ثبت شوي غږونه هم شامل دي. زده کوونکي کولای شي هغه غږ وټاکي چې اورېدل یې غواړي.',
     },
     {
       title: 'د ستونزمنو ټکو بیاکتنه',
@@ -619,7 +619,7 @@ const PS: LandingStrings = {
     },
     {
       title: 'XP، ستوري او بیجونه',
-      text: 'زده کوونکي د بشپړ شوي کار لپاره د تجربې نمرې او ستوري ترلاسه کوي، او د مهمو لاسته راوړنو لپاره بیجونه. یو ټولګی کولی شي خپل اوونیز ستوري بورډ تعقیب کړي؛ عامه درجه بندي نشته.',
+      text: 'زده کوونکي د بشپړ شوي کار لپاره د تجربې نمرې او ستوري ترلاسه کوي، او د مهمو لاسته راوړنو لپاره بیجونه ورکول کېږي. پرمختګ یوازې هر زده کوونکی او د هغه ښوونکی یا مدیر لیدلی شي؛ عامه درجه بندي نشته.',
     },
     {
       title: 'د مطالعې ورځې او تسلسل',
@@ -728,8 +728,8 @@ const SW: LandingStrings = {
       text: 'Hadithi fupi katika maumbo mawili: Sikiliza na Usome, ambamo kila neno huangaziwa linapotamkwa, na Soma kwa Sauti, ambamo usomaji wa mwanafunzi mwenyewe hupewa alama sentensi kwa sentensi.',
     },
     {
-      title: 'Sauti Halisi za Binadamu',
-      text: 'Kila mstari wa kozi unarekodiwa na wasanii halisi wa sauti, kwa sauti kadhaa tofauti. Wanafunzi huchagua sauti wanayotaka kusikia, na husikiliza Kiingereza cha asili cha kibinadamu katika kozi yote.',
+      title: 'Sauti Unazoweza Kuchagua',
+      text: 'Masomo, hadithi na mazungumzo husomwa kwa sauti na sauti za kufundishia zenye majina, zikiwemo rekodi zilizofanywa na wasanii halisi wa sauti kwa ajili ya programu hii. Wanafunzi huchagua sauti wanayotaka kuisikia.',
     },
     {
       title: 'Marudio ya Maneno Magumu',
@@ -737,7 +737,7 @@ const SW: LandingStrings = {
     },
     {
       title: 'XP, Nyota na Beji',
-      text: 'Wanafunzi hupata pointi za uzoefu na nyota kwa kazi iliyokamilika, na beji kwa mafanikio makubwa. Darasa linaweza kufuata ubao wake wa nyota wa kila wiki; hakuna orodha za hadharani za viwango.',
+      text: 'Wanafunzi hupata pointi za uzoefu na nyota kwa kazi iliyokamilika, na beji kwa mafanikio makubwa. Maendeleo ni ya faragha kwa kila mwanafunzi na mwalimu au meneja wake; hakuna orodha za hadharani za viwango.',
     },
     {
       title: 'Siku za Kusoma na Mfululizo',
@@ -847,8 +847,8 @@ const DE: LandingStrings = {
       text: 'Kurzgeschichten in zwei Formen: „Zuhören und Mitlesen", bei der jedes Wort hervorgehoben wird, während es gesprochen wird, und „Laut Vorlesen", bei der das eigene Vorlesen des Lernenden Satz für Satz bewertet wird.',
     },
     {
-      title: 'Echte menschliche Stimmen',
-      text: 'Jede Zeile des Kurses wird von echten Sprechern in mehreren unterschiedlichen Stimmen aufgenommen. Die Lernenden wählen die Stimme, die sie hören möchten, und hören durchgehend natürliches, menschliches Englisch.',
+      title: 'Stimmen zur Auswahl',
+      text: 'Lektionen, Geschichten und Gespräche werden von benannten Lehrstimmen vorgelesen, darunter auch Aufnahmen, die echte Sprecherinnen und Sprecher für dieses Programm gemacht haben. Lernende wählen selbst, welche Stimme sie hören möchten.',
     },
     {
       title: 'Wiederholung schwieriger Wörter',
@@ -856,7 +856,7 @@ const DE: LandingStrings = {
     },
     {
       title: 'XP, Sterne und Abzeichen',
-      text: 'Lernende erhalten Erfahrungspunkte und Sterne für abgeschlossene Arbeit sowie Abzeichen für bedeutende Leistungen. Eine Klasse kann ihre eigene wöchentliche Sternentafel verfolgen; es gibt keine öffentlichen Ranglisten.',
+      text: 'Lernende erhalten Erfahrungspunkte und Sterne für abgeschlossene Arbeit sowie Abzeichen für bedeutende Leistungen. Der Fortschritt ist nur für die Lernenden selbst und ihre Lehrkraft oder Leitung sichtbar; es gibt keine öffentlichen Ranglisten.',
     },
     {
       title: 'Lerntage und Serien',
@@ -966,8 +966,8 @@ const ZU: LandingStrings = {
       text: 'Izindaba ezimfushane ngezindlela ezimbili: Lalela Futhi Funda, lapho igama ngalinye ligqanyiswa njengoba likhulunywa, kanye noFunda Ngokuzwakalayo, lapho ukufunda komfundi uqobo kuthola amaphuzu isigwebo ngesigwebo.',
     },
     {
-      title: 'Amazwi Angempela Abantu',
-      text: 'Yonke imigqa yesifundo irekhodwa ngabaculi bangempela bamazwi, ngamazwi amaningi ahlukene. Abafundi bakhetha izwi abafisa ukulizwa, futhi balalela isiNgisi esingokwemvelo, esabantu kuso sonke isifundo.',
+      title: 'Amazwi Ongawakhetha',
+      text: 'Izifundo, izindaba nezingxoxo zifundwa ngokuzwakalayo ngamazwi okufundisa anamagama, okuhlanganisa nokurekhodwa okwenziwe ngabaculi bangempela bezwi balolu hlelo. Abafundi bakhetha izwi abafuna ukulizwa.',
     },
     {
       title: 'Ukubuyekezwa Kwamagama Anzima',
@@ -975,7 +975,7 @@ const ZU: LandingStrings = {
     },
     {
       title: 'Ama-XP, Izinkanyezi Namabheji',
-      text: 'Abafundi bathola amaphuzu olwazi nezinkanyezi ngomsebenzi oqediwe, namabheji ngezinto ezinkulu abazifinyelele. Ikilasi lingalandela ibhodi yalo yezinkanyezi yamasonto onke; ayikho imigqa yasesidlangalaleni.',
+      text: 'Abafundi bathola amaphuzu olwazi nezinkanyezi ngomsebenzi oqediwe, namabheji ngezinto ezinkulu abazifinyelele. Inqubekelaphambili iyimfihlo kumfundi ngamunye nothisha noma umphathi wakhe; ayikho imigqa yasesidlangalaleni.',
     },
     {
       title: 'Izinsuku Zokufunda Nokulandelana',

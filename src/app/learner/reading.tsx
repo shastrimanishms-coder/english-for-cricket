@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
@@ -24,6 +23,7 @@ import { playDing, playRecordedLine } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
+import { useSafeBack } from '../../lib/useSafeBack';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
 import type { VoiceCategory } from '../../lib/voiceStudio';
 
@@ -185,7 +185,13 @@ function estimateMs(sentence: string, rate: number): number {
 }
 
 export default function SmartReading() {
-  const router = useRouter();
+  // Shelf-level back goes through useSafeBack like every other
+  // learner screen (Round 84): a bare router.back() is a silent
+  // no-op when this screen was opened without navigation history
+  // (refreshed page, deep link, restored tab), which is exactly
+  // the "back button sometimes does not work" report. In the
+  // reader, back still returns to the shelf first (backToShelf).
+  const goBack = useSafeBack();
 
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
@@ -646,7 +652,7 @@ export default function SmartReading() {
       <SafeAreaView edges={['top']} className="w-full bg-navy">
         <ScreenHeader
           title="Smart Reading 📖"
-          onBack={() => (story ? backToShelf() : router.back())}
+          onBack={() => (story ? backToShelf() : goBack())}
           right={
             story && !summary ? (
               <Text className="font-sans text-white/70 font-bold text-sm">

@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DeleteAccountBlock from '../../components/ui/DeleteAccountBlock';
 import { GoldButton, NavyButton, ScreenHeader } from '../../components/ui/Elegant';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { showAlert } from '../../lib/showAlert';
@@ -17,6 +18,7 @@ export default function OrganizationSettings() {
   // Profile State
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [authProviders, setAuthProviders] = useState<string[]>([]);
   
   // Organization State
   const [orgId, setOrgId] = useState<string | null>(null);
@@ -33,8 +35,16 @@ export default function OrganizationSettings() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
-      
+
       setEmail(user.email || '');
+      const meta: any = user.app_metadata || {};
+      setAuthProviders(
+        Array.isArray(meta.providers) && meta.providers.length > 0
+          ? meta.providers
+          : meta.provider
+            ? [meta.provider]
+            : []
+      );
 
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -320,6 +330,13 @@ export default function OrganizationSettings() {
               className="w-full"
             />
           </View>
+
+          {/* Delete Account (Round 84): managers are signed-in auth
+              accounts, so the self-service deletion lives here too.
+              The RPC refuses while students are still enrolled. */}
+          {email ? (
+            <DeleteAccountBlock email={email} providers={authProviders} variant="manager" />
+          ) : null}
 
         </View>
       </ScrollView>

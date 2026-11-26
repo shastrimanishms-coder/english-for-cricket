@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link, useRouter } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +39,14 @@ const FEATURE_ICONS = [
 
 export default function LandingPage() {
   const router = useRouter();
+
+  // Account-deleted notice (Round 84): self-service deletion ends
+  // here with ?deleted=1 so the user gets a clear confirmation on
+  // the public page instead of a silent sign-out. Dismissible, and
+  // shown in English like the page's other buttons and notices.
+  const { deleted } = useLocalSearchParams<{ deleted?: string }>();
+  const [deletedNoticeShown, setDeletedNoticeShown] = useState(true);
+  const showDeletedNotice = deleted === '1' && deletedNoticeShown;
 
   // Header logo: an admin-uploaded logo (Admin → System Settings) when
   // one is set, otherwise the bundled default logo. A remote logo that fails
@@ -324,6 +332,19 @@ export default function LandingPage() {
           </View>
         </View>
       </SafeAreaView>
+
+      {showDeletedNotice ? (
+        <View className="w-full bg-gold-light border-b border-gold">
+          <View className="max-w-7xl w-full mx-auto flex-row items-center justify-between px-4 py-3 md:px-6 gap-3">
+            <Text className="font-sans text-sm font-bold text-navy flex-1">
+              Your account has been deleted. Thank you for learning with English for Cricket.
+            </Text>
+            <Pressable onPress={() => setDeletedNoticeShown(false)} className="px-2 py-1">
+              <Text className="font-sans text-base font-bold text-navy">✕</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {/* HERO SECTION — the mascots stand large in the background,
           blended into the navy at low opacity. */}

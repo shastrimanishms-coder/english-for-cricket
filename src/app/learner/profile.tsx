@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AnimatedButton from '../../components/ui/AnimatedButton';
+import DeleteAccountBlock from '../../components/ui/DeleteAccountBlock';
 import { ElegantCard, ScreenHeader } from '../../components/ui/Elegant';
 import RewardsCard from '../../components/ui/RewardsCard';
 import StudyDaysPicker, { isValidStudyDays } from '../../components/ui/StudyDaysPicker';
@@ -98,6 +99,11 @@ export default function StudentProfile() {
   const [updating, setUpdating] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [isEmailUser, setIsEmailUser] = useState(false);
+  // Auth account details for the Delete Account block (Round 84):
+  // only ever set on the email/Google path below - PIN students
+  // (scenario 1) return before this is touched and never see it.
+  const [authEmail, setAuthEmail] = useState('');
+  const [authProviders, setAuthProviders] = useState<string[]>([]);
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
   
   const [currentPin, setCurrentPin] = useState('');
@@ -303,6 +309,15 @@ export default function StudentProfile() {
       // SCENARIO 2: Email Learner (Standard Supabase Auth)
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        setAuthEmail(session.user.email || '');
+        const meta: any = session.user.app_metadata || {};
+        setAuthProviders(
+          Array.isArray(meta.providers) && meta.providers.length > 0
+            ? meta.providers
+            : meta.provider
+              ? [meta.provider]
+              : []
+        );
         const { data, error } = await supabase
           .from('user_profiles')
           .select('*')
@@ -755,6 +770,14 @@ export default function StudentProfile() {
             </View>
           </ElegantCard>
         )}
+
+        {/* Delete Account (Round 84): signed-in email/Google
+            accounts only. isEmailUser is set solely on the auth
+            path in fetchProfileData; PIN students never reach it,
+            because their accounts are deleted by their manager. */}
+        {isEmailUser && authEmail ? (
+          <DeleteAccountBlock email={authEmail} providers={authProviders} variant="learner" />
+        ) : null}
 
       </View>
     </ScrollView>
