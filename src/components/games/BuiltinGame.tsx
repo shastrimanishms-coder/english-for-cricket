@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { cancelSpeechCue, playDing, speakWithCallback } from '../../lib/speechCue';
+import WorkbookGame from './WorkbookGame';
 
 // ============================================================================
 // Built-in games (Round 39). A game row with an `engine` and a `data`
@@ -35,6 +36,10 @@ import { cancelSpeechCue, playDing, speakWithCallback } from '../../lib/speechCu
 //   data_dash    { display: { heading?, columns?, rows?, lines? },
 //                  timePerQuestion?, questions: [{ question, options, answer }] }
 //                  Read the scorecard/table, then answer against a gentle timer.
+//   workbook     (Round 83, own component — see WorkbookGame.tsx)
+//                { version, stage, module, lesson, lessonTitle, goal,
+//                  scene, pages: [3 pages of workbook activities] }
+//                  The playable twin of the printed lesson workbook.
 // ============================================================================
 
 interface TapItem { word?: string; text?: string; image?: string; value?: number }
@@ -952,7 +957,22 @@ function DataDash({ data }: { data: any }) {
 
 
 // ---------------------------------------------------------------------------
-export default function BuiltinGame({ engine, data, title }: { engine: string; data: any; title: string }) {
+export default function BuiltinGame({
+  engine,
+  data,
+  title,
+  onComplete,
+}: {
+  engine: string;
+  data: any;
+  title: string;
+  onComplete?: () => void;
+}) {
+  // The workbook player carries its own printed-page header, so the
+  // generic title line is skipped for it (Round 83).
+  if (engine === 'workbook') {
+    return <WorkbookGame data={data} title={title} onComplete={onComplete} />;
+  }
   return (
     <View>
       <Text className="font-display text-2xl font-semibold text-navy mb-4">{title}</Text>

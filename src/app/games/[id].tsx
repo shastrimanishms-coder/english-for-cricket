@@ -13,7 +13,7 @@ import { WebView } from 'react-native-webview';
 import BuiltinGame from '../../components/games/BuiltinGame';
 import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
 import { awardExtraIfTagged } from '../../lib/extras';
-import { getStudentIdentity } from '../../lib/studentIdentity';
+import { getStudentIdentity, type StudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSafeBack } from '../../lib/useSafeBack';
@@ -103,6 +103,10 @@ export default function GamePlayer() {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   // Badges newly earned by opening this game, toasted one at a time.
   const [badgeToasts, setBadgeToasts] = useState<AwardedBadge[]>([]);
+  // The signed-in student, kept so a game's own completion moment
+  // (the workbook player's Finish page, Round 83) can re-run the
+  // extra award then — the ledger dedupes, so this never double-pays.
+  const [identity, setIdentity] = useState<StudentIdentity | null>(null);
 
   // Playtime telemetry for both identity kinds (see useActivityLogger).
   // Starts once the game row is loaded; fails soft until migration
@@ -118,6 +122,7 @@ export default function GamePlayer() {
     (async () => {
       const identity = await getStudentIdentity();
       if (!identity) return;
+      setIdentity(identity);
       const awarded = await evaluateGameBadge(identity, game.id);
       if (awarded.length > 0) setBadgeToasts(awarded);
       // If this game is tagged to a lesson, opening it also completes
@@ -125,6 +130,15 @@ export default function GamePlayer() {
       await awardExtraIfTagged(identity, 'game', game.id, game.lesson_id);
     })();
   }, [game]);
+
+  // A built-in game reporting its own completion (workbook player):
+  // make sure the lesson-tag extra award has landed. Idempotent.
+  const handleGameComplete = useCallback(async () => {
+    if (!game) return;
+    const who = identity ?? (await getStudentIdentity());
+    if (!who) return;
+    await awardExtraIfTagged(who, 'game', game.id, game.lesson_id);
+  }, [game, identity]);
 
   const fetchGameDetails = useCallback(async () => {
     try {
@@ -286,7 +300,7 @@ export default function GamePlayer() {
         {game.engine ? (
           <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
             <View className="w-full max-w-3xl mx-auto">
-              <BuiltinGame engine={game.engine} data={game.data} title={game.title} />
+              <BuiltinGame engine={game.engine} data={game.data} title={game.title} onComplete={handleGameComplete} />
             </View>
           </ScrollView>
         ) : embedStatus === 'error' ? (

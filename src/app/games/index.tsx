@@ -108,6 +108,25 @@ export default function GamesGallery() {
           <Text className="font-sans text-lg text-slate-500">Play and practice your English vocabulary.</Text>
         </View>
 
+        {/* Workbook Practice (Round 83): the playable twin of every
+            printed lesson workbook, organised stage → module → lesson. */}
+        <Link href={'/games/workbooks' as any} asChild>
+          <Pressable className="mb-8 bg-white rounded-[20px] border-2 border-gold shadow-sm overflow-hidden">
+            <View className="flex-row items-center gap-4 p-5">
+              <View className="w-14 h-14 rounded-full bg-navy items-center justify-center">
+                <Text className="text-2xl">📘</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="font-display text-xl font-semibold text-navy">Workbook Practice</Text>
+                <Text className="font-sans text-slate-500 text-sm">
+                  Play the workbook pages for every lesson — the same pages as the printed book, no printing needed.
+                </Text>
+              </View>
+              <Text className="text-gold-dark font-bold text-lg">›</Text>
+            </View>
+          </Pressable>
+        </Link>
+
         {!loading && games.length > 0 ? (
           <ListFilterChips chips={chips} selectedKey={filter} onChange={setFilter} />
         ) : null}
