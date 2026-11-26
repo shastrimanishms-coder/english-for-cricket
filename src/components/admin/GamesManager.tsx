@@ -11,11 +11,18 @@ import GroupedContentList from './GroupedContentList';
 import BuiltinGame from '../games/BuiltinGame';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { useLessonTagging } from '../../lib/useLessonTagging';
+import {
+  bulkAddCategory,
+  bulkRemoveCategory,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  flattenCategoryTree,
+  primaryCategoryId,
+  setItemCategories,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 
-interface Category {
-  id: string;
-  name: string;
-}
+type Category = CategoryNode;
 
 interface Game {
   id: string;
@@ -41,7 +48,10 @@ export default function GamesManager() {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  // Round 85: an item can belong to up to 5 categories at once.
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  // Item id -> its category ids in display order (Round 85).
+  const [memberships, setMemberships] = useState<Record<string, string[]>>({});
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const [moduleId, setModuleId] = useState<string | null>(null);
@@ -71,33 +81,28 @@ export default function GamesManager() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: catData, error: catError } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('type', 'games')
-        .order('name');
-      
-      if (catError) throw catError;
-      setCategories(catData || []);
-      if (catData && catData.length > 0) {
-        // Default to the first category only when none is selected yet.
-        // The functional update keeps fetchData free of reactive deps.
-        setCategoryId(prev => prev || catData[0].id);
-      }
+      const catData = await fetchCategoriesForType('games');
+      setCategories(catData);
 
       const { data: gameData, error: gameError } = await supabase
         .from('games')
         .select('*')
         .order('created_at', { ascending: false });
-        
+
       if (gameError) throw gameError;
-      setGames(gameData || []);
+      const rows = (gameData || []) as Game[];
+      setGames(rows);
+      const map = await fetchMembershipMap('games', rows, catData);
+      setMemberships(Object.fromEntries(map));
     } catch (error: any) {
       showAlert('Error', error.message);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const categoryIdsFor = (game: Game): string[] =>
+    memberships[game.id] ?? (game.category_id ? [game.category_id] : []);
 
   useEffect(() => {
     (async () => {
@@ -196,19 +201,28 @@ export default function GamesManager() {
       const payload: any = {
         title: title.trim(),
         description: description.trim(),
-        category_id: categoryId || null,
+        // Legacy column keeps the PRIMARY category (first in display order).
+        category_id: primaryCategoryId(categoryIds, categories),
         ...(taggingAvailable ? { lesson_id: lessonId } : {}),
         ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
         game_url: finalGameUrl,
         thumbnail_url: finalThumbUrl,
       };
+      let savedId = editId;
       if (editId) {
         const { error } = await supabase.from('games').update(payload).eq('id', editId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('games').insert([payload]);
+        const { data, error } = await supabase
+          .from('games')
+          .insert([payload])
+          .select('id')
+          .single();
         if (error) throw error;
+        savedId = (data as { id: string }).id;
       }
+      // Round 85: write the full membership set (join table + primary sync).
+      if (savedId) await setItemCategories('games', savedId, categoryIds, categories);
 
       cancelEdit();
       await fetchData();
@@ -223,7 +237,7 @@ export default function GamesManager() {
     setEditId(game.id);
     setTitle(game.title);
     setDescription(game.description || '');
-    setCategoryId(game.category_id || '');
+    setCategoryIds(categoryIdsFor(game));
     setLessonId(game.lesson_id ?? null);
     setStageId(game.stage_id ?? null);
     setModuleId(game.module_id ?? null);
@@ -283,11 +297,11 @@ export default function GamesManager() {
     setLessonId(null);
     setStageId(null);
     setModuleId(null);
-    if (categories.length > 0) setCategoryId(categories[0].id);
+    setCategoryIds([]);
   };
 
   const visibleGames = games.filter((g) => {
-    if (fCategory && g.category_id !== fCategory) return false;
+    if (fCategory && !categoryIdsFor(g).includes(fCategory)) return false;
     if (fStage && g.stage_id !== fStage) return false;
     if (fModule && g.module_id !== fModule) return false;
     return true;
@@ -320,8 +334,8 @@ export default function GamesManager() {
         <View className="border-t border-inkline pt-4">
           <ContentTagging
             categories={categories}
-            categoryId={categoryId}
-            onCategoryId={setCategoryId}
+            categoryIds={categoryIds}
+            onCategoryIds={setCategoryIds}
             stageId={stageId}
             onStageId={setStageId}
             moduleId={moduleId}
@@ -437,7 +451,7 @@ export default function GamesManager() {
       <View className="flex-col md:flex-row gap-4">
         <View className="flex-1">
           <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Category</Text>
-          <AdminDropdown value={fCategory} onChange={setFCategory} options={categories.map((c) => ({ id: c.id, label: c.name }))} placeholder="All categories" noneLabel="All categories" />
+          <AdminDropdown value={fCategory} onChange={setFCategory} options={flattenCategoryTree(categories).map(({ cat, depth }) => ({ id: cat.id, label: `${'↳ '.repeat(depth)}${cat.name}` }))} placeholder="All categories" noneLabel="All categories" />
         </View>
         <View className="flex-1">
           <Text className="text-sm font-semibold text-text-secondary mb-2">Filter by Stage</Text>
@@ -470,10 +484,11 @@ export default function GamesManager() {
         <GroupedContentList
           items={visibleGames}
           stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
-          categories={categories}
+          categories={flattenCategoryTree(categories).map(({ cat }) => ({ id: cat.id, name: cat.name }))}
           idOf={(g) => g.id}
           stageIdOf={(g) => g.stage_id ?? null}
           categoryIdOf={(g) => g.category_id ?? null}
+          categoryIdsOf={(g) => categoryIdsFor(g)}
           titleOf={(g) => g.title}
           descriptionOf={(g) => g.description}
           itemNoun="games"
@@ -481,16 +496,22 @@ export default function GamesManager() {
           emptyMessage={games.length === 0 ? 'No games added yet.' : 'No games match these filters.'}
           bulkAssign={{
             onAssign: async (ids, categoryId) => {
-              const { error } = await supabase
-                .from('games')
-                .update({ category_id: categoryId })
-                .in('id', ids);
-              if (error) throw error;
+              const res = await bulkAddCategory('games', ids, categoryId, games, categories);
               await fetchData();
+              return res.message;
+            },
+            onRemove: async (ids, categoryId) => {
+              const res = await bulkRemoveCategory('games', ids, categoryId, games, categories);
+              await fetchData();
+              return res.message;
             },
           }}
           renderItem={(game, isLast) => {
-            const catName = categories.find(c => c.id === game.category_id)?.name || 'No category';
+            const catName =
+              categoryIdsFor(game)
+                .map((id) => categories.find((c) => c.id === id)?.name)
+                .filter(Boolean)
+                .join(' · ') || 'No category';
             const tagLine = [stageName(game.stage_id), moduleName(game.module_id)].filter(Boolean).join(' · ');
             return (
               <View

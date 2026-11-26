@@ -18,6 +18,13 @@ import { MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import {
+  buildShelfChips,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  matchesShelfChip,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 import { downloadPdf } from '../../lib/downloadPdf';
 import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import {
@@ -274,6 +281,10 @@ export default function SpeakingPractice() {
   // published rows; the built-in starter library is the fallback so
   // the menu is never empty (e.g. before migration 15 is run).
   const [dbScenarios, setDbScenarios] = useState<SpeakingScenario[] | null>(null);
+  // Round 85: the speaking category tree + each scenario's category
+  // memberships (loaded with the scenarios below).
+  const [speakingCats, setSpeakingCats] = useState<CategoryNode[]>([]);
+  const [memberships, setMemberships] = useState<Map<string, string[]>>(new Map());
   useEffect(() => {
     (async () => {
       try {
@@ -317,7 +328,20 @@ export default function SpeakingPractice() {
             imageUrl: row.image_url ?? null,
           }))
           .filter((s: SpeakingScenario) => s.turns.length > 0);
-        if (rows.length > 0) setDbScenarios(rows);
+        if (rows.length > 0) {
+          setDbScenarios(rows);
+          // Round 85: category tree + multi-category memberships
+          // (fail-soft to each scenario's primary category).
+          const cats = await fetchCategoriesForType('speaking');
+          setSpeakingCats(cats);
+          setMemberships(
+            await fetchMembershipMap(
+              'speaking',
+              rows.map((s) => ({ id: s.id, category_id: s.categoryId })),
+              cats,
+            ),
+          );
+        }
       } catch (error) {
         console.log('Speaking scenarios failed to load, using built-ins:', error);
       }
@@ -334,33 +358,20 @@ export default function SpeakingPractice() {
   // after the stages, so stage chips duplicated the category
   // names.
   const [shelfFilter, setShelfFilter] = useState('all');
-  const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from('categories')
-          .select('id, name')
-          .eq('type', 'speaking')
-          .order('name');
-        setSpeakingCats((data || []) as { id: string; name: string }[]);
-      } catch {
-        // No category chips without the list.
-      }
-    })();
-  }, []);
 
-  const shelfChips = [
-    { key: 'all', label: 'All' },
-    ...speakingCats
-      .filter((c) => scenarios.some((s) => s.categoryId === c.id))
-      .map((c) => ({ key: `cat:${c.id}`, label: c.name })),
-  ];
+  // Round 85: chips count multi-category memberships and
+  // descendants, in category display order; a parent chip also
+  // shows scenarios filed under its subcategories.
+  const shelfChips = buildShelfChips(
+    speakingCats,
+    memberships,
+    scenarios.map((s) => s.id),
+  );
 
   const filteredScenarios =
     shelfFilter === 'all'
       ? null
-      : scenarios.filter((s) => s.categoryId === shelfFilter.slice(4));
+      : scenarios.filter((s) => matchesShelfChip(speakingCats, memberships, s.id, shelfFilter));
   const filteredLabel =
     speakingCats.find((c) => c.id === shelfFilter.slice(4))?.name || 'Category';
 

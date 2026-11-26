@@ -16,6 +16,16 @@ import AdminDropdown from './AdminDropdown';
 import ContentTagging from './ContentTagging';
 import GroupedContentList from './GroupedContentList';
 import SentenceVoices from './SentenceVoices';
+import {
+  bulkAddCategory,
+  bulkRemoveCategory,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  flattenCategoryTree,
+  primaryCategoryId,
+  setItemCategories,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 
 // Admin manager for the standalone Speaking Practice area ONLY
 // (interviews + small talk role-plays). Lessons keep their own
@@ -74,8 +84,11 @@ export default function SpeakingManager() {
   const [stageId, setStageId] = useState<string | null>(null);
   const [moduleId, setModuleId] = useState<string | null>(null);
   const [stageTagging, setStageTagging] = useState(false);
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [speakingCats, setSpeakingCats] = useState<{ id: string; name: string }[]>([]);
+  // Round 85: up to 5 categories per scenario.
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  const [speakingCats, setSpeakingCats] = useState<CategoryNode[]>([]);
+  // Item id -> its category ids in display order (Round 85).
+  const [memberships, setMemberships] = useState<Record<string, string[]>>({});
   // Stage names for the grouped list (Round 76).
   const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
   const taggingAvailable = useLessonTagging('speaking_scenarios');
@@ -90,7 +103,12 @@ export default function SpeakingManager() {
         .order('created_at', { ascending: true });
       if (error) throw error;
       setTableMissing(false);
-      setScenarios((data || []) as ScenarioRow[]);
+      const rows = (data || []) as ScenarioRow[];
+      setScenarios(rows);
+      const catData = await fetchCategoriesForType('speaking');
+      setSpeakingCats(catData);
+      const map = await fetchMembershipMap('speaking', rows, catData);
+      setMemberships(Object.fromEntries(map));
     } catch (error: any) {
       if (/speaking_scenarios/.test(error?.message || '')) {
         // Migration 15 not run yet: show guidance instead of an error.
@@ -107,13 +125,14 @@ export default function SpeakingManager() {
   useEffect(() => {
     (async () => {
       await fetchData();
-      const { data } = await supabase.from('categories').select('id, name').eq('type', 'speaking').order('name');
-      setSpeakingCats((data || []) as { id: string; name: string }[]);
       const { error: stageErr } = await supabase.from('speaking_scenarios').select('stage_id').limit(1);
       setStageTagging(!stageErr);
       setTaxonomy(await fetchTaxonomy());
     })();
   }, [fetchData]);
+
+  const categoryIdsFor = (row: ScenarioRow): string[] =>
+    memberships[row.id] ?? (row.category_id ? [row.category_id] : []);
 
   const openCreateForm = () => {
     setEditId(null);
@@ -129,7 +148,7 @@ export default function SpeakingManager() {
     setLessonId(null);
     setStageId(null);
     setModuleId(null);
-    setCategoryId('');
+    setCategoryIds([]);
     setShowForm(true);
   };
 
@@ -144,7 +163,7 @@ export default function SpeakingManager() {
     setLessonId(row.lesson_id ?? null);
     setStageId(row.stage_id ?? null);
     setModuleId(row.module_id ?? null);
-    setCategoryId(row.category_id ?? '');
+    setCategoryIds(categoryIdsFor(row));
     setShowForm(true);
   };
 
@@ -201,9 +220,13 @@ export default function SpeakingManager() {
         description: description.trim() || null,
         other_name: otherName.trim() || 'Partner',
         turns: cleanTurns,
-        ...(taggingAvailable ? { lesson_id: lessonId, category_id: categoryId || null } : {}),
+        // Legacy column keeps the PRIMARY category (first in display order).
+        ...(taggingAvailable
+          ? { lesson_id: lessonId, category_id: primaryCategoryId(categoryIds, speakingCats) }
+          : {}),
         ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
       };
+      let savedId = editId;
       if (editId) {
         const { error } = await supabase
           .from('speaking_scenarios')
@@ -211,10 +234,17 @@ export default function SpeakingManager() {
           .eq('id', editId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('speaking_scenarios')
-          .insert([{ ...payload, order_index: scenarios.length }]);
+          .insert([{ ...payload, order_index: scenarios.length }])
+          .select('id')
+          .single();
         if (error) throw error;
+        savedId = (data as { id: string }).id;
+      }
+      // Round 85: write the full membership set (join table + primary sync).
+      if (savedId && taggingAvailable) {
+        await setItemCategories('speaking', savedId, categoryIds, speakingCats);
       }
       cancelEdit();
       await fetchData();
@@ -361,9 +391,9 @@ export default function SpeakingManager() {
           <View className="border-t border-inkline pt-4">
             <ContentTagging
               categories={speakingCats}
-              categoryId={categoryId}
-              onCategoryId={setCategoryId}
-              categoryLabel="Shelf Category (optional)"
+              categoryIds={categoryIds}
+              onCategoryIds={setCategoryIds}
+              categoryLabel="Shelf Categories (optional)"
               stageId={stageId}
               onStageId={setStageId}
               moduleId={moduleId}
@@ -484,10 +514,11 @@ export default function SpeakingManager() {
         <GroupedContentList
           items={scenarios}
           stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
-          categories={speakingCats}
+          categories={flattenCategoryTree(speakingCats).map(({ cat }) => ({ id: cat.id, name: cat.name }))}
           idOf={(row) => row.id}
           stageIdOf={(row) => row.stage_id ?? null}
           categoryIdOf={(row) => row.category_id ?? null}
+          categoryIdsOf={(row) => categoryIdsFor(row)}
           titleOf={(row) => row.title}
           descriptionOf={(row) => row.description}
           itemNoun="scenarios"
@@ -496,12 +527,14 @@ export default function SpeakingManager() {
           framed={false}
           bulkAssign={{
             onAssign: async (ids, categoryId) => {
-              const { error } = await supabase
-                .from('speaking_scenarios')
-                .update({ category_id: categoryId })
-                .in('id', ids);
-              if (error) throw error;
+              const res = await bulkAddCategory('speaking', ids, categoryId, scenarios, speakingCats);
               await fetchData();
+              return res.message;
+            },
+            onRemove: async (ids, categoryId) => {
+              const res = await bulkRemoveCategory('speaking', ids, categoryId, scenarios, speakingCats);
+              await fetchData();
+              return res.message;
             },
           }}
           renderItem={(row) => (

@@ -9,7 +9,14 @@ interface Category {
   description: string;
   type: string;
   parent_id?: string | null;
+  sort_order?: number | null;
 }
+
+/** Sibling order (Round 85): sort_order first, then name. */
+const bySiblingOrder = (a: Category, b: Category): number => {
+  const d = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  return d !== 0 ? d : a.name.localeCompare(b.name);
+};
 
 const CATEGORY_TYPES = [
   { id: 'curriculum', label: 'Curriculum & Lessons', color: 'bg-navy/10 text-navy' },
@@ -33,6 +40,9 @@ export default function CategoriesManager() {
   const [parentId, setParentId] = useState<string | null>(null);
   // True once a fetched row proves the parent_id column exists (migration 17).
   const [hasParentColumn, setHasParentColumn] = useState(false);
+  // True once a fetched row proves sort_order exists (migration 38, Round 85).
+  const [hasSortColumn, setHasSortColumn] = useState(false);
+  const [moving, setMoving] = useState(false);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -46,6 +56,7 @@ export default function CategoriesManager() {
       if (error) throw error;
       setCategories(data || []);
       if ((data || []).length > 0 && 'parent_id' in data[0]) setHasParentColumn(true);
+      if ((data || []).length > 0 && 'sort_order' in data[0]) setHasSortColumn(true);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -75,6 +86,19 @@ export default function CategoriesManager() {
       // Only write parent_id when the column exists (migration 17) or a
       // parent is actually chosen — pre-migration saves keep working.
       if (hasParentColumn || parentId) payload.parent_id = parentId;
+      // Round 85: a brand-new category (or one moved to a different
+      // parent) goes to the END of its sibling level.
+      if (hasSortColumn) {
+        const original = editId ? categories.find((c) => c.id === editId) : undefined;
+        const parentChanged = !!original && (original.parent_id ?? null) !== parentId;
+        if (!editId || parentChanged) {
+          const siblings = categories.filter(
+            (c) => c.type === selectedType && (c.parent_id ?? null) === parentId && c.id !== editId,
+          );
+          payload.sort_order =
+            siblings.reduce((max, c) => Math.max(max, c.sort_order ?? 0), 0) + 10;
+        }
+      }
       if (editId) {
         // Update existing
         const { error } = await supabase
@@ -164,7 +188,8 @@ export default function CategoriesManager() {
   );
 
   // Display order: grouped by type, parents first, children indented under
-  // their parent (depth-first, capped at 3 levels).
+  // their parent (depth-first, capped at 3 levels). Round 85: siblings
+  // are ordered by sort_order (then name) at every level.
   const displayCategories: { cat: Category; depth: number }[] = (() => {
     const out: { cat: Category; depth: number }[] = [];
     const byType = new Map<string, Category[]>();
@@ -176,16 +201,67 @@ export default function CategoriesManager() {
     for (const type of typeOrder) {
       const list = byType.get(type) || [];
       const ids = new Set(list.map((c) => c.id));
-      const roots = list.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+      const roots = list.filter((c) => !c.parent_id || !ids.has(c.parent_id)).sort(bySiblingOrder);
       const walk = (cat: Category, depth: number) => {
         out.push({ cat, depth });
         if (depth >= 3) return;
-        list.filter((c) => c.parent_id === cat.id).forEach((child) => walk(child, depth + 1));
+        list
+          .filter((c) => c.parent_id === cat.id)
+          .sort(bySiblingOrder)
+          .forEach((child) => walk(child, depth + 1));
       };
       roots.forEach((r) => walk(r, 0));
     }
     return out;
   })();
+
+  // Position of each category within its own sibling level (same
+  // type + same parent), for the move up/down buttons (Round 85):
+  // a category only ever moves among its siblings.
+  const siblingBounds = (() => {
+    const bounds = new Map<string, { isFirst: boolean; isLast: boolean }>();
+    const groups = new Map<string, Category[]>();
+    for (const c of categories) {
+      const key = `${c.type}|${c.parent_id ?? ''}`;
+      const list = groups.get(key) || [];
+      list.push(c);
+      groups.set(key, list);
+    }
+    for (const list of groups.values()) {
+      const sorted = [...list].sort(bySiblingOrder);
+      sorted.forEach((c, i) => {
+        bounds.set(c.id, { isFirst: i === 0, isLast: i === sorted.length - 1 });
+      });
+    }
+    return bounds;
+  })();
+
+  const moveCategory = async (cat: Category, dir: -1 | 1) => {
+    if (!hasSortColumn || moving) return;
+    const siblings = categories
+      .filter((c) => c.type === cat.type && (c.parent_id ?? null) === (cat.parent_id ?? null))
+      .sort(bySiblingOrder);
+    const idx = siblings.findIndex((c) => c.id === cat.id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= siblings.length) return;
+    const reordered = [...siblings];
+    [reordered[idx], reordered[target]] = [reordered[target], reordered[idx]];
+    setMoving(true);
+    try {
+      // Rewrite the whole sibling level with clean 10-step values so
+      // repeated moves never tangle.
+      await Promise.all(
+        reordered.map((c, i) =>
+          supabase.from('categories').update({ sort_order: (i + 1) * 10 }).eq('id', c.id),
+        ),
+      );
+      await fetchCategories();
+    } catch (error: any) {
+      Alert.alert('Reorder Failed', error.message);
+    } finally {
+      setMoving(false);
+    }
+  };
 
   const getTypeStyle = (typeId: string) => {
     const typeDef = CATEGORY_TYPES.find(t => t.id === typeId);
@@ -318,6 +394,24 @@ export default function CategoriesManager() {
               </View>
               
               <View className="flex-row gap-3">
+                {hasSortColumn ? (
+                  <>
+                    <Pressable
+                      onPress={() => moveCategory(cat, -1)}
+                      disabled={moving || siblingBounds.get(cat.id)?.isFirst}
+                      className={`px-3 py-1.5 bg-slate-100 rounded-full border border-inkline ${siblingBounds.get(cat.id)?.isFirst ? 'opacity-40' : ''}`}
+                    >
+                      <Text className="text-text-secondary text-sm font-semibold">↑ Up</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveCategory(cat, 1)}
+                      disabled={moving || siblingBounds.get(cat.id)?.isLast}
+                      className={`px-3 py-1.5 bg-slate-100 rounded-full border border-inkline ${siblingBounds.get(cat.id)?.isLast ? 'opacity-40' : ''}`}
+                    >
+                      <Text className="text-text-secondary text-sm font-semibold">↓ Down</Text>
+                    </Pressable>
+                  </>
+                ) : null}
                 <Pressable onPress={() => handleEdit(cat)} className="px-3 py-1.5 bg-slate-100 rounded-full border border-inkline">
                   <Text className="text-text-secondary text-sm font-semibold">Edit</Text>
                 </Pressable>

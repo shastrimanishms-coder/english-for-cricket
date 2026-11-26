@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import AdminDropdown from './AdminDropdown';
 
@@ -36,6 +36,14 @@ interface GroupedContentListProps<T> {
   idOf: (item: T) => string;
   stageIdOf: (item: T) => string | null | undefined;
   categoryIdOf: (item: T) => string | null | undefined;
+  /**
+   * Round 85: when provided, ALL of an item's category memberships.
+   * The item then appears under EACH of its categories in the grouped
+   * view (counts are memberships), and search results label it with
+   * every category. An empty list files it under "No category".
+   * categoryIdOf stays as the legacy primary fallback.
+   */
+  categoryIdsOf?: (item: T) => string[] | null | undefined;
   titleOf: (item: T) => string;
   descriptionOf?: (item: T) => string | null | undefined;
   renderItem: (item: T, isLast: boolean) => React.ReactNode;
@@ -62,7 +70,15 @@ interface GroupedContentListProps<T> {
    * can open the manager and edit an item can bulk-assign it.
    */
   bulkAssign?: {
-    onAssign: (ids: string[], categoryId: string) => Promise<void>;
+    /**
+     * Round 85 semantics: ADD the chosen category to every selected
+     * item (existing memberships are kept). May return a feedback
+     * message (e.g. reporting items skipped at the 5-category cap);
+     * returning nothing keeps the default "assigned" message.
+     */
+    onAssign: (ids: string[], categoryId: string) => Promise<string | void>;
+    /** Round 85: REMOVE the chosen category from every selected item. */
+    onRemove?: (ids: string[], categoryId: string) => Promise<string | void>;
   };
 }
 
@@ -82,6 +98,13 @@ interface StageGroup<T> {
 const UNTAGGED_KEY = '__untagged';
 const NO_CATEGORY_KEY = '__none';
 
+// Last bulk-assign result message (Round 85): survives the remount
+// every manager's refetch causes, so the admin actually sees it.
+const lastBulkFeedback: { current: { ok: boolean; text: string } | null } = { current: null };
+function rememberBulkFeedback(next: { ok: boolean; text: string } | null) {
+  lastBulkFeedback.current = next;
+}
+
 export default function GroupedContentList<T>({
   items,
   stages,
@@ -89,6 +112,7 @@ export default function GroupedContentList<T>({
   idOf,
   stageIdOf,
   categoryIdOf,
+  categoryIdsOf,
   titleOf,
   descriptionOf,
   renderItem,
@@ -104,8 +128,19 @@ export default function GroupedContentList<T>({
   // by group expand/collapse or by the search filter.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [bulkMode, setBulkMode] = useState<'add' | 'remove'>('add');
   const [assigning, setAssigning] = useState(false);
-  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  // Round 85: the bulk result message is ALSO kept in a module-level
+  // slot (below) — every manager's refetch toggles its loading state,
+  // which unmounts this list mid-assign and would otherwise take the
+  // "added to N, skipped M" message with it before it is ever seen.
+  const [feedback, setFeedbackState] = useState<{ ok: boolean; text: string } | null>(
+    () => lastBulkFeedback.current,
+  );
+  const setFeedback = (next: { ok: boolean; text: string } | null) => {
+    rememberBulkFeedback(next);
+    setFeedbackState(next);
+  };
 
   const toggleSelected = (id: string) => {
     setFeedback(null);
@@ -131,10 +166,25 @@ export default function GroupedContentList<T>({
     return stages.find((s) => s.id === sid)?.title || 'Stage';
   };
 
+  // Every category an item belongs to (Round 85 multi-membership);
+  // falls back to the legacy primary when categoryIdsOf is absent.
+  const catIdsOfItem = useCallback(
+    (item: T): string[] => {
+      if (categoryIdsOf) {
+        return (categoryIdsOf(item) || []).filter(Boolean) as string[];
+      }
+      const cid = categoryIdOf(item) || null;
+      return cid ? [cid] : [];
+    },
+    [categoryIdsOf, categoryIdOf],
+  );
+
   const categoryLabelOf = (item: T) => {
-    const cid = categoryIdOf(item) || null;
-    if (!cid) return 'No category';
-    return categories.find((c) => c.id === cid)?.name || 'Category';
+    const ids = catIdsOfItem(item);
+    if (ids.length === 0) return 'No category';
+    return ids
+      .map((id) => categories.find((c) => c.id === id)?.name || 'Category')
+      .join(', ');
   };
 
   const searching = query.trim().length > 0;
@@ -177,11 +227,22 @@ export default function GroupedContentList<T>({
       const bucket = stageBuckets.get(stageKey)!;
       const catBuckets = new Map<string, { categoryId: string | null; items: T[] }>();
       for (const item of bucket.items) {
-        const cid = categoryIdOf(item) || null;
-        const ckey = cid ?? NO_CATEGORY_KEY;
-        const cb = catBuckets.get(ckey) || { categoryId: cid, items: [] };
-        cb.items.push(item);
-        catBuckets.set(ckey, cb);
+        // Round 85: an item is filed under EACH of its categories
+        // (exact memberships - a subcategory membership does not
+        // also file it under the parent here); no memberships at
+        // all files it under "No category".
+        const ids = catIdsOfItem(item);
+        if (ids.length === 0) {
+          const cb = catBuckets.get(NO_CATEGORY_KEY) || { categoryId: null, items: [] };
+          cb.items.push(item);
+          catBuckets.set(NO_CATEGORY_KEY, cb);
+        } else {
+          for (const cid of ids) {
+            const cb = catBuckets.get(cid) || { categoryId: cid, items: [] };
+            cb.items.push(item);
+            catBuckets.set(cid, cb);
+          }
+        }
       }
 
       // Category order: the given category order first, then any
@@ -217,7 +278,7 @@ export default function GroupedContentList<T>({
         }),
       };
     });
-  }, [items, stages, categories, stageIdOf, categoryIdOf]);
+  }, [items, stages, categories, stageIdOf, catIdsOfItem]);
 
   const expandAll = () => {
     const next: Record<string, boolean> = {};
@@ -257,21 +318,29 @@ export default function GroupedContentList<T>({
 
   const runBulkAssign = async () => {
     if (!bulkAssign || !bulkCategoryId || selectedIds.size === 0 || assigning) return;
+    const removing = bulkMode === 'remove' && !!bulkAssign.onRemove;
     const ids = [...selectedIds];
     setAssigning(true);
     setFeedback(null);
     try {
-      await bulkAssign.onAssign(ids, bulkCategoryId);
+      const result = removing
+        ? await bulkAssign.onRemove!(ids, bulkCategoryId)
+        : await bulkAssign.onAssign(ids, bulkCategoryId);
       setFeedback({
         ok: true,
-        text: `Category assigned to ${ids.length} ${itemNoun}.`,
+        text:
+          typeof result === 'string' && result
+            ? result
+            : removing
+              ? `Category removed from ${ids.length} ${itemNoun}.`
+              : `Category assigned to ${ids.length} ${itemNoun}.`,
       });
       setSelectedIds(new Set());
       setBulkCategoryId('');
     } catch (e: any) {
       setFeedback({
         ok: false,
-        text: `Could not assign the category: ${e?.message || 'unknown error'}`,
+        text: `Could not ${removing ? 'remove' : 'assign'} the category: ${e?.message || 'unknown error'}`,
       });
     } finally {
       setAssigning(false);
@@ -392,7 +461,9 @@ export default function GroupedContentList<T>({
       {bulkAssign ? (
         selectedIds.size === 0 && !feedback ? (
           <Text className="text-sm text-slate-400">
-            Tick items to assign a category to many at once.
+            {bulkAssign.onRemove
+              ? 'Tick items to add or remove a category for many at once.'
+              : 'Tick items to assign a category to many at once.'}
           </Text>
         ) : (
           <View className="bg-white border border-gold/60 rounded-2xl p-4 gap-3 shadow-sm">
@@ -406,6 +477,26 @@ export default function GroupedContentList<T>({
                 </Text>
               ) : null}
             </View>
+            {bulkAssign.onRemove ? (
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => setBulkMode('add')}
+                  className={`px-4 py-2 rounded-full border ${bulkMode === 'add' ? 'bg-navy border-navy' : 'bg-white border-inkline'}`}
+                >
+                  <Text className={`text-sm font-semibold ${bulkMode === 'add' ? 'text-gold-light' : 'text-navy'}`}>
+                    Add category
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setBulkMode('remove')}
+                  className={`px-4 py-2 rounded-full border ${bulkMode === 'remove' ? 'bg-navy border-navy' : 'bg-white border-inkline'}`}
+                >
+                  <Text className={`text-sm font-semibold ${bulkMode === 'remove' ? 'text-gold-light' : 'text-navy'}`}>
+                    Remove category
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
             <View className="flex-col lg:flex-row gap-3 lg:items-start">
               <View className="flex-1 min-w-[220px]">
                 <AdminDropdown
@@ -437,7 +528,13 @@ export default function GroupedContentList<T>({
                   }`}
                 >
                   <Text className="text-navy text-sm font-bold">
-                    {assigning ? 'Assigning…' : 'Assign'}
+                    {assigning
+                      ? bulkMode === 'remove' && bulkAssign.onRemove
+                        ? 'Removing…'
+                        : 'Assigning…'
+                      : bulkMode === 'remove' && bulkAssign.onRemove
+                        ? 'Remove'
+                        : 'Assign'}
                   </Text>
                 </Pressable>
               </View>

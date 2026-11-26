@@ -15,6 +15,16 @@ import { useLessonTagging } from '../../lib/useLessonTagging';
 import ContentTagging from './ContentTagging';
 import GroupedContentList from './GroupedContentList';
 import SentenceVoices from './SentenceVoices';
+import {
+  bulkAddCategory,
+  bulkRemoveCategory,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  flattenCategoryTree,
+  primaryCategoryId,
+  setItemCategories,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 
 // The same sentence split the learner app narrates with, so the
 // sentences listed for voice uploads are exactly the units playback
@@ -47,7 +57,9 @@ interface StoryRow {
 
 export default function ReadingManager() {
   const [stories, setStories] = useState<StoryRow[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string; parent_id?: string | null }[]>([]);
+  const [categories, setCategories] = useState<CategoryNode[]>([]);
+  // Item id -> its category ids in display order (Round 85).
+  const [memberships, setMemberships] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tableMissing, setTableMissing] = useState(false);
@@ -58,7 +70,8 @@ export default function ReadingManager() {
   const [emoji, setEmoji] = useState('📖');
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState('');
-  const [categoryId, setCategoryId] = useState<string>('');
+  // Round 85: up to 5 categories per story.
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const [moduleId, setModuleId] = useState<string | null>(null);
@@ -87,14 +100,17 @@ export default function ReadingManager() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [storiesRes, catsRes] = await Promise.all([
+      const [storiesRes, catData] = await Promise.all([
         supabase.from('reading_stories').select('*').order('order_index').order('created_at'),
-        supabase.from('categories').select('id, name, parent_id').eq('type', 'reading').order('name'),
+        fetchCategoriesForType('reading'),
       ]);
       if (storiesRes.error) throw storiesRes.error;
       setTableMissing(false);
-      setStories((storiesRes.data || []) as StoryRow[]);
-      setCategories((catsRes.data || []) as { id: string; name: string }[]);
+      const rows = (storiesRes.data || []) as StoryRow[];
+      setStories(rows);
+      setCategories(catData);
+      const map = await fetchMembershipMap('reading', rows, catData);
+      setMemberships(Object.fromEntries(map));
     } catch (error: any) {
       if (/reading_stories/.test(error?.message || '')) {
         setTableMissing(true);
@@ -113,13 +129,16 @@ export default function ReadingManager() {
     })();
   }, [fetchData]);
 
+  const categoryIdsFor = (row: StoryRow): string[] =>
+    memberships[row.id] ?? (row.category_id ? [row.category_id] : []);
+
   const openCreateForm = () => {
     setEditId(null);
     setTitle('');
     setEmoji('📖');
     setDescription('');
     setLevel('');
-    setCategoryId('');
+    setCategoryIds([]);
     setLessonId(null);
     setStageId(null);
     setModuleId(null);
@@ -134,7 +153,7 @@ export default function ReadingManager() {
     setEmoji(row.emoji || '📖');
     setDescription(row.description || '');
     setLevel(row.level || '');
-    setCategoryId(row.category_id || '');
+    setCategoryIds(categoryIdsFor(row));
     setLessonId(row.lesson_id ?? null);
     setStageId(row.stage_id ?? null);
     setModuleId(row.module_id ?? null);
@@ -181,28 +200,33 @@ export default function ReadingManager() {
         emoji: emoji.trim() || '📖',
         description: description.trim(),
         level: level.trim(),
-        category_id: categoryId || null,
+        // Legacy column keeps the PRIMARY category (first in display order).
+        category_id: primaryCategoryId(categoryIds, categories),
         pages: cleanPages,
         ...(taggingAvailable ? { lesson_id: lessonId } : {}),
         ...(stageTagging ? { stage_id: stageId, module_id: moduleId } : {}),
       };
       const payload: any = { ...basePayload, questions: parsedQuestions };
-      const saveWith = async (p: any) => {
+      const saveWith = async (p: any): Promise<{ error: any; id: string | null }> => {
         if (editId) {
           const { error } = await supabase.from('reading_stories').update(p).eq('id', editId);
-          return error;
+          return { error, id: editId };
         }
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('reading_stories')
-          .insert([{ ...p, order_index: stories.length }]);
-        return error;
+          .insert([{ ...p, order_index: stories.length }])
+          .select('id')
+          .single();
+        return { error, id: (data as { id: string } | null)?.id ?? null };
       };
-      let error = await saveWith(payload);
+      let { error, id: savedId } = await saveWith(payload);
       if (error && /questions/.test(error.message)) {
         // Migration 30 not run yet: save without the questions column.
-        error = await saveWith(basePayload);
+        ({ error, id: savedId } = await saveWith(basePayload));
       }
       if (error) throw error;
+      // Round 85: write the full membership set (join table + primary sync).
+      if (savedId) await setItemCategories('reading', savedId, categoryIds, categories);
       cancelEdit();
       await fetchData();
     } catch (error: any) {
@@ -414,9 +438,9 @@ export default function ReadingManager() {
           <View className="border-t border-inkline pt-4">
             <ContentTagging
               categories={categories}
-              categoryId={categoryId}
-              onCategoryId={setCategoryId}
-              categoryLabel="Shelf Category (optional)"
+              categoryIds={categoryIds}
+              onCategoryIds={setCategoryIds}
+              categoryLabel="Shelf Categories (optional)"
               stageId={stageId}
               onStageId={setStageId}
               moduleId={moduleId}
@@ -449,10 +473,11 @@ export default function ReadingManager() {
         <GroupedContentList
           items={stories}
           stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
-          categories={categories}
+          categories={flattenCategoryTree(categories).map(({ cat }) => ({ id: cat.id, name: cat.name }))}
           idOf={(row) => row.id}
           stageIdOf={(row) => row.stage_id ?? null}
           categoryIdOf={(row) => row.category_id ?? null}
+          categoryIdsOf={(row) => categoryIdsFor(row)}
           titleOf={(row) => row.title}
           descriptionOf={(row) => row.description}
           itemNoun="stories"
@@ -460,12 +485,14 @@ export default function ReadingManager() {
           emptyMessage="No stories yet. Add your first one above."
           bulkAssign={{
             onAssign: async (ids, categoryId) => {
-              const { error } = await supabase
-                .from('reading_stories')
-                .update({ category_id: categoryId })
-                .in('id', ids);
-              if (error) throw error;
+              const res = await bulkAddCategory('reading', ids, categoryId, stories, categories);
               await fetchData();
+              return res.message;
+            },
+            onRemove: async (ids, categoryId) => {
+              const res = await bulkRemoveCategory('reading', ids, categoryId, stories, categories);
+              await fetchData();
+              return res.message;
             },
           }}
           renderItem={(row, isLast) => (
@@ -480,7 +507,9 @@ export default function ReadingManager() {
                   <Text className="text-sm text-slate-500">
                     {(Array.isArray(row.pages) ? row.pages.length : 0)} pages
                     {row.level ? ` · ${row.level}` : ''}
-                    {row.category_id ? ` · ${categories.find((c) => c.id === row.category_id)?.name || ''}` : ''}
+                    {categoryIdsFor(row).length
+                      ? ` · ${categoryIdsFor(row).map((id) => categories.find((c) => c.id === id)?.name || '').filter(Boolean).join(' · ')}`
+                      : ''}
                     {row.lesson_id ? ' · 🎯 tied to a lesson' : ''}
                   </Text>
                 </View>

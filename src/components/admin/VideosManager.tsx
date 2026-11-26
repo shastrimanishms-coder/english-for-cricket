@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { contentTypeForFileName } from '../../lib/fileTypes';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import BelongsToPicker from './BelongsToPicker';
+import CategoryMultiSelect from './CategoryMultiSelect';
 import GroupedContentList from './GroupedContentList';
 import { useLessonTagging } from '../../lib/useLessonTagging';
+import {
+  bulkAddCategory,
+  bulkRemoveCategory,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  flattenCategoryTree,
+  primaryCategoryId,
+  setItemCategories,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 
-interface Category {
-  id: string;
-  name: string;
-}
+type Category = CategoryNode;
 
 interface Video {
   id: string;
@@ -52,7 +60,10 @@ export default function VideosManager() {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  // Round 85: up to 5 categories per video (at least one required).
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  // Item id -> its category ids in display order (Round 85).
+  const [memberships, setMemberships] = useState<Record<string, string[]>>({});
   const [lessonId, setLessonId] = useState<string | null>(null);
   const taggingAvailable = useLessonTagging('video_lectures');
   
@@ -66,19 +77,8 @@ export default function VideosManager() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: catData, error: catError } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('type', 'videos')
-        .order('name');
-      
-      if (catError) throw catError;
-      setCategories(catData || []);
-      if (catData && catData.length > 0) {
-        // Default to the first category only when none is selected yet.
-        // The functional update keeps fetchData free of reactive deps.
-        setCategoryId(prev => prev || catData[0].id);
-      }
+      const catData = await fetchCategoriesForType('videos');
+      setCategories(catData);
 
       // The learner gallery/player read from `video_lectures` (and
       // filter on is_published), so the CMS writes there too. Uploaded
@@ -88,15 +88,21 @@ export default function VideosManager() {
         .from('video_lectures')
         .select('*')
         .order('created_at', { ascending: false });
-        
+
       if (vidError) throw vidError;
-      setVideos(vidData || []);
+      const rows = (vidData || []) as Video[];
+      setVideos(rows);
+      const map = await fetchMembershipMap('videos', rows, catData);
+      setMemberships(Object.fromEntries(map));
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const categoryIdsFor = (vid: Video): string[] =>
+    memberships[vid.id] ?? (vid.category_id ? [vid.category_id] : []);
 
   useEffect(() => {
     (async () => {
@@ -161,8 +167,8 @@ export default function VideosManager() {
   };
 
   const handleSave = async () => {
-    if (!title.trim() || !categoryId) {
-      Alert.alert('Missing Fields', 'Title and Category are required.');
+    if (!title.trim() || categoryIds.length === 0) {
+      Alert.alert('Missing Fields', 'Title and at least one Category are required.');
       return;
     }
     if (!videoUrl.trim() && !selectedVideoFile) {
@@ -183,13 +189,15 @@ export default function VideosManager() {
         finalThumbUrl = await uploadFileToSupabase(selectedImage, 'thumb');
       }
 
+      const primary = primaryCategoryId(categoryIds, categories);
+      let savedId = editId;
       if (editId) {
         const { error } = await supabase
           .from('video_lectures')
           .update({
             title: title.trim(),
             description: description.trim(),
-            category_id: categoryId,
+            category_id: primary,
             ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             video_url: finalVideoUrl,
             thumbnail_url: finalThumbUrl,
@@ -198,19 +206,24 @@ export default function VideosManager() {
           .eq('id', editId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('video_lectures')
           .insert([{
             title: title.trim(),
             description: description.trim(),
-            category_id: categoryId,
+            category_id: primary,
             ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             video_url: finalVideoUrl,
             thumbnail_url: finalThumbUrl,
             is_published: isPublished
-          }]);
+          }])
+          .select('id')
+          .single();
         if (error) throw error;
+        savedId = (data as { id: string }).id;
       }
+      // Round 85: write the full membership set (join table + primary sync).
+      if (savedId) await setItemCategories('videos', savedId, categoryIds, categories);
 
       cancelEdit();
       await fetchData();
@@ -225,7 +238,7 @@ export default function VideosManager() {
     setEditId(vid.id);
     setTitle(vid.title);
     setDescription(vid.description || '');
-    setCategoryId(vid.category_id);
+    setCategoryIds(categoryIdsFor(vid));
     setLessonId(vid.lesson_id ?? null);
     setVideoUrl(vid.video_url);
     setThumbnailUrl(vid.thumbnail_url || '');
@@ -297,7 +310,7 @@ export default function VideosManager() {
     setSelectedImage(null);
     setSelectedVideoFile(null);
     setLessonId(null);
-    if (categories.length > 0) setCategoryId(categories[0].id);
+    setCategoryIds([]);
   };
 
   return (
@@ -323,23 +336,15 @@ export default function VideosManager() {
             />
           </View>
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-text-secondary mb-2">Category</Text>
+            <Text className="text-sm font-semibold text-text-secondary mb-2">Categories (choose 1 to 5)</Text>
             {categories.length === 0 ? (
               <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a &apos;Videos&apos; category first.</Text>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setCategoryId(cat.id)}
-                    className={`mr-2 px-4 py-3 rounded-full border ${categoryId === cat.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-                  >
-                    <Text className={`font-semibold text-sm ${categoryId === cat.id ? 'text-white' : 'text-slate-600'}`}>
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <CategoryMultiSelect
+                categories={categories}
+                selectedIds={categoryIds}
+                onChange={setCategoryIds}
+              />
             )}
           </View>
         </View>
@@ -472,10 +477,11 @@ export default function VideosManager() {
         <GroupedContentList
           items={videos}
           stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
-          categories={categories}
+          categories={flattenCategoryTree(categories).map(({ cat }) => ({ id: cat.id, name: cat.name }))}
           idOf={(vid) => vid.id}
           stageIdOf={stageIdForVideo}
           categoryIdOf={(vid) => vid.category_id ?? null}
+          categoryIdsOf={(vid) => categoryIdsFor(vid)}
           titleOf={(vid) => vid.title}
           descriptionOf={(vid) => vid.description}
           itemNoun="videos"
@@ -483,16 +489,22 @@ export default function VideosManager() {
           emptyMessage="No videos added yet."
           bulkAssign={{
             onAssign: async (ids, categoryId) => {
-              const { error } = await supabase
-                .from('videos')
-                .update({ category_id: categoryId })
-                .in('id', ids);
-              if (error) throw error;
+              const res = await bulkAddCategory('videos', ids, categoryId, videos, categories);
               await fetchData();
+              return res.message;
+            },
+            onRemove: async (ids, categoryId) => {
+              const res = await bulkRemoveCategory('videos', ids, categoryId, videos, categories);
+              await fetchData();
+              return res.message;
             },
           }}
           renderItem={(vid, isLast) => {
-            const catName = categories.find(c => c.id === vid.category_id)?.name || 'Unknown Category';
+            const catName =
+              categoryIdsFor(vid)
+                .map((id) => categories.find((c) => c.id === id)?.name)
+                .filter(Boolean)
+                .join(' · ') || 'No category';
             return (
               <View
                 key={vid.id}

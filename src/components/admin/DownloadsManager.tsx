@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { contentTypeForFileName } from '../../lib/fileTypes';
@@ -7,13 +7,21 @@ import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import BelongsToPicker from './BelongsToPicker';
+import CategoryMultiSelect from './CategoryMultiSelect';
 import GroupedContentList from './GroupedContentList';
 import { useLessonTagging } from '../../lib/useLessonTagging';
+import {
+  bulkAddCategory,
+  bulkRemoveCategory,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  flattenCategoryTree,
+  primaryCategoryId,
+  setItemCategories,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 
-interface Category {
-  id: string;
-  name: string;
-}
+type Category = CategoryNode;
 
 interface Download {
   id: string;
@@ -51,7 +59,10 @@ export default function DownloadsManager() {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  // Round 85: up to 5 categories per download (at least one required).
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
+  // Item id -> its category ids in display order (Round 85).
+  const [memberships, setMemberships] = useState<Record<string, string[]>>({});
   const [lessonId, setLessonId] = useState<string | null>(null);
   const taggingAvailable = useLessonTagging('downloads');
   const [fileUrl, setFileUrl] = useState('');
@@ -61,34 +72,29 @@ export default function DownloadsManager() {
     try {
       setLoading(true);
       // Fetch categories meant for downloads
-      const { data: catData, error: catError } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('type', 'downloads')
-        .order('name');
-      
-      if (catError) throw catError;
-      setCategories(catData || []);
-      if (catData && catData.length > 0) {
-        // Default to the first category only when none is selected yet.
-        // The functional update keeps fetchData free of reactive deps.
-        setCategoryId(prev => prev || catData[0].id);
-      }
+      const catData = await fetchCategoriesForType('downloads');
+      setCategories(catData);
 
       // Fetch downloads
       const { data: dlData, error: dlError } = await supabase
         .from('downloads')
         .select('*')
         .order('created_at', { ascending: false });
-        
+
       if (dlError) throw dlError;
-      setDownloads(dlData || []);
+      const rows = (dlData || []) as Download[];
+      setDownloads(rows);
+      const map = await fetchMembershipMap('downloads', rows, catData);
+      setMemberships(Object.fromEntries(map));
     } catch (error: any) {
       showAlert('Error', error.message);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const categoryIdsFor = (dl: Download): string[] =>
+    memberships[dl.id] ?? (dl.category_id ? [dl.category_id] : []);
 
   useEffect(() => {
     (async () => {
@@ -143,8 +149,8 @@ export default function DownloadsManager() {
   };
 
   const handleSave = async () => {
-    if (!title.trim() || !categoryId) {
-      showAlert('Missing Fields', 'Title and Category are required.');
+    if (!title.trim() || categoryIds.length === 0) {
+      showAlert('Missing Fields', 'Title and at least one Category are required.');
       return;
     }
     if (!fileUrl && !selectedFile) {
@@ -161,6 +167,8 @@ export default function DownloadsManager() {
         finalFileUrl = await uploadFile(selectedFile);
       }
 
+      const primary = primaryCategoryId(categoryIds, categories);
+      let savedId = editId;
       if (editId) {
         // UPDATE existing
         const { error } = await supabase
@@ -168,7 +176,7 @@ export default function DownloadsManager() {
           .update({
             title: title.trim(),
             description: description.trim(),
-            category_id: categoryId,
+            category_id: primary,
             ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             file_url: finalFileUrl
           })
@@ -176,17 +184,22 @@ export default function DownloadsManager() {
         if (error) throw error;
       } else {
         // CREATE new
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('downloads')
           .insert([{
             title: title.trim(),
             description: description.trim(),
-            category_id: categoryId,
+            category_id: primary,
             ...(taggingAvailable ? { lesson_id: lessonId } : {}),
             file_url: finalFileUrl
-          }]);
+          }])
+          .select('id')
+          .single();
         if (error) throw error;
+        savedId = (data as { id: string }).id;
       }
+      // Round 85: write the full membership set (join table + primary sync).
+      if (savedId) await setItemCategories('downloads', savedId, categoryIds, categories);
 
       cancelEdit();
       await fetchData();
@@ -201,7 +214,7 @@ export default function DownloadsManager() {
     setEditId(dl.id);
     setTitle(dl.title);
     setDescription(dl.description || '');
-    setCategoryId(dl.category_id);
+    setCategoryIds(categoryIdsFor(dl));
     setLessonId(dl.lesson_id ?? null);
     setFileUrl(dl.file_url);
     setSelectedFile(null); // Clear any pending selection
@@ -246,7 +259,7 @@ export default function DownloadsManager() {
     setFileUrl('');
     setSelectedFile(null);
     setLessonId(null);
-    if (categories.length > 0) setCategoryId(categories[0].id);
+    setCategoryIds([]);
   };
 
   return (
@@ -272,23 +285,15 @@ export default function DownloadsManager() {
             />
           </View>
           <View className="flex-1">
-            <Text className="text-sm font-semibold text-text-secondary mb-2">Category</Text>
+            <Text className="text-sm font-semibold text-text-secondary mb-2">Categories (choose 1 to 5)</Text>
             {categories.length === 0 ? (
               <Text className="p-4 text-red-500 bg-red-50 rounded-xl">Please create a &apos;Downloads&apos; category first.</Text>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setCategoryId(cat.id)}
-                    className={`mr-2 px-4 py-3 rounded-full border ${categoryId === cat.id ? 'border-navy bg-navy' : 'border-inkline bg-white'}`}
-                  >
-                    <Text className={`font-semibold text-sm ${categoryId === cat.id ? 'text-white' : 'text-slate-600'}`}>
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <CategoryMultiSelect
+                categories={categories}
+                selectedIds={categoryIds}
+                onChange={setCategoryIds}
+              />
             )}
           </View>
         </View>
@@ -357,10 +362,11 @@ export default function DownloadsManager() {
         <GroupedContentList
           items={downloads}
           stages={(taxonomy?.stages || []).map((s) => ({ id: s.id, title: s.title }))}
-          categories={categories}
+          categories={flattenCategoryTree(categories).map(({ cat }) => ({ id: cat.id, name: cat.name }))}
           idOf={(dl) => dl.id}
           stageIdOf={stageIdForDownload}
           categoryIdOf={(dl) => dl.category_id ?? null}
+          categoryIdsOf={(dl) => categoryIdsFor(dl)}
           titleOf={(dl) => dl.title}
           descriptionOf={(dl) => dl.description}
           itemNoun="documents"
@@ -368,16 +374,22 @@ export default function DownloadsManager() {
           emptyMessage="No documents uploaded yet."
           bulkAssign={{
             onAssign: async (ids, categoryId) => {
-              const { error } = await supabase
-                .from('downloads')
-                .update({ category_id: categoryId })
-                .in('id', ids);
-              if (error) throw error;
+              const res = await bulkAddCategory('downloads', ids, categoryId, downloads, categories);
               await fetchData();
+              return res.message;
+            },
+            onRemove: async (ids, categoryId) => {
+              const res = await bulkRemoveCategory('downloads', ids, categoryId, downloads, categories);
+              await fetchData();
+              return res.message;
             },
           }}
           renderItem={(dl, isLast) => {
-            const catName = categories.find(c => c.id === dl.category_id)?.name || 'Unknown Category';
+            const catName =
+              categoryIdsFor(dl)
+                .map((id) => categories.find((c) => c.id === id)?.name)
+                .filter(Boolean)
+                .join(' · ') || 'No category';
             return (
               <View
                 key={dl.id}

@@ -6,6 +6,12 @@ import { ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
 import SpeechScoreView from '../../components/ui/SpeechScoreView';
+import {
+  buildShelfChips,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  matchesShelfChip,
+} from '../../lib/contentCategories';
 import { downloadPdf, type PdfSection } from '../../lib/downloadPdf';
 import { awardExtraIfTagged } from '../../lib/extras';
 import {
@@ -201,6 +207,9 @@ export default function SmartReading() {
   // Category quick-jump filter for the shelf (Round 76, categories
   // only since Round 79): 'all' or 'cat:<id>'.
   const [shelfFilter, setShelfFilter] = useState('all');
+  // Round 85: multi-category memberships — a story shows under every
+  // category it belongs to; a parent chip also covers subcategories.
+  const [memberships, setMemberships] = useState<Map<string, string[]>>(new Map());
 
   const [story, setStory] = useState<Story | null>(null);
 
@@ -243,13 +252,16 @@ export default function SmartReading() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [storiesRes, catsRes] = await Promise.all([
+      const [storiesRes, cats] = await Promise.all([
         supabase.from('reading_stories').select('*').eq('is_published', true).order('order_index').order('created_at'),
-        supabase.from('categories').select('id, name, parent_id').eq('type', 'reading'),
+        fetchCategoriesForType('reading'),
       ]);
       if (storiesRes.error) throw storiesRes.error;
-      setStories((storiesRes.data || []) as Story[]);
-      setCategories((catsRes.data || []) as Category[]);
+      const storyRows = (storiesRes.data || []) as Story[];
+      setStories(storyRows);
+      setCategories(cats as Category[]);
+      // Round 85: memberships (fail-soft to primary category only).
+      setMemberships(await fetchMembershipMap('reading', storyRows, cats));
 
       const identity = await getStudentIdentity();
       if (identity) {
@@ -618,34 +630,41 @@ export default function SmartReading() {
   }, [stories, categories]);
 
   // Chips for the quick-jump bar: "All" plus one per category
-  // (from the Categories manager) that has stories. Empty
-  // categories never appear, so the bar grows by itself as the
-  // admin assigns categories. Stage chips were removed in
-  // Round 79: the categories are named after the stages, so
-  // stage chips duplicated the category names.
+  // (from the Categories manager) that has stories, in category
+  // display order. Empty categories never appear, so the bar grows
+  // by itself as the admin assigns categories. Stage chips were
+  // removed in Round 79: the categories are named after the stages,
+  // so stage chips duplicated the category names. Round 85: chips
+  // count multi-category memberships and descendants — a parent
+  // chip appears when only a subcategory holds stories.
   const shelfChips = useMemo(
-    () => [
-      { key: 'all', label: 'All' },
-      ...categories
-        .filter((c) => stories.some((s) => s.category_id === c.id))
-        .map((c) => ({ key: `cat:${c.id}`, label: categoryLabel(c) })),
-    ],
+    () =>
+      buildShelfChips(
+        categories,
+        memberships,
+        stories.map((s) => s.id),
+      ).map((chip) => {
+        if (chip.key === 'all') return chip;
+        const cat = categories.find((c) => `cat:${c.id}` === chip.key);
+        return cat ? { ...chip, label: categoryLabel(cat) } : chip;
+      }),
     // categoryLabel reads the same categories list the memo deps on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stories, categories],
+    [stories, categories, memberships],
   );
 
   // What the shelf actually shows: the full category groups under
-  // "All"; a single group under a category chip.
+  // "All"; a single group under a category chip (Round 85: every
+  // story filed under the chip's category or any subcategory).
   const shelfGroups = useMemo(() => {
     if (shelfFilter === 'all') return groups;
     const cid = shelfFilter.slice(4);
-    const items = stories.filter((s) => s.category_id === cid);
+    const items = stories.filter((s) => matchesShelfChip(categories, memberships, s.id, shelfFilter));
     const cat = categories.find((c) => c.id === cid);
     return items.length ? [{ label: cat ? categoryLabel(cat) : 'Category', items }] : [];
     // categoryLabel reads the same categories list the memo deps on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shelfFilter, groups, stories, categories]);
+  }, [shelfFilter, groups, stories, categories, memberships]);
 
   return (
     <View className="flex-1 bg-canvas">

@@ -1,12 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
+import type { CategoryNode } from '../../lib/contentCategories';
 import AdminDropdown from './AdminDropdown';
+import CategoryMultiSelect from './CategoryMultiSelect';
 
 interface Props {
-  categories: { id: string; name: string }[];
-  categoryId: string;
-  onCategoryId: (id: string) => void;
+  categories: CategoryNode[];
+  /** Single-select category (unused when categoryIds is provided). */
+  categoryId?: string;
+  onCategoryId?: (id: string) => void;
+  /**
+   * Round 85: when provided, the Category field becomes a
+   * multi-select (up to 5 categories, tree order) driven by these
+   * props instead of the single dropdown.
+   */
+  categoryIds?: string[];
+  onCategoryIds?: (ids: string[]) => void;
   categoryLabel?: string;
   stageId: string | null;
   onStageId: (id: string | null) => void;
@@ -28,6 +38,8 @@ export default function ContentTagging({
   categories,
   categoryId,
   onCategoryId,
+  categoryIds,
+  onCategoryIds,
   categoryLabel = 'Category',
   stageId,
   onStageId,
@@ -91,19 +103,35 @@ export default function ContentTagging({
     }
   };
 
+  const multiCategory = categoryIds !== undefined && onCategoryIds !== undefined;
+
   return (
     <View className="gap-4">
-      <View className="flex-col md:flex-row gap-4">
-        <View className="flex-1">
-          <Text className="text-sm font-semibold text-text-secondary mb-2">{categoryLabel}</Text>
-          <AdminDropdown
-            value={categoryId}
-            onChange={onCategoryId}
-            options={categories.map((c) => ({ id: c.id, label: c.name }))}
-            placeholder="No category"
-            noneLabel="No category"
+      {multiCategory ? (
+        <View>
+          <Text className="text-sm font-semibold text-text-secondary mb-2">
+            {categoryLabel} (up to 5)
+          </Text>
+          <CategoryMultiSelect
+            categories={categories}
+            selectedIds={categoryIds}
+            onChange={onCategoryIds}
           />
         </View>
+      ) : null}
+      <View className="flex-col md:flex-row gap-4">
+        {multiCategory ? null : (
+          <View className="flex-1">
+            <Text className="text-sm font-semibold text-text-secondary mb-2">{categoryLabel}</Text>
+            <AdminDropdown
+              value={categoryId || ''}
+              onChange={(id) => onCategoryId?.(id)}
+              options={categories.map((c) => ({ id: c.id, label: c.name }))}
+              placeholder="No category"
+              noneLabel="No category"
+            />
+          </View>
+        )}
         <View className="flex-1">
           <Text className="text-sm font-semibold text-text-secondary mb-2">Stage</Text>
           <AdminDropdown

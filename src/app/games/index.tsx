@@ -6,6 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, MicroLabel, ScreenHeader } from '../../components/ui/Elegant';
 import { HelpButton } from '../../components/ui/HelpPopup';
 import ListFilterChips from '../../components/ui/ListFilterChips';
+import {
+  buildShelfChips,
+  fetchCategoriesForType,
+  fetchMembershipMap,
+  matchesShelfChip,
+  type CategoryNode,
+} from '../../lib/contentCategories';
 import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 
@@ -37,6 +44,11 @@ export default function GamesGallery() {
   // Category quick-jump filter (Round 76, categories only since
   // Round 79): 'all' or 'cat:<id>'.
   const [filter, setFilter] = useState('all');
+  // Round 85: category tree + multi-category memberships, so a game
+  // appears under every category it belongs to (parent chips count
+  // their subcategories' games too).
+  const [categories, setCategories] = useState<CategoryNode[]>([]);
+  const [memberships, setMemberships] = useState<Map<string, string[]>>(new Map());
 
   useEffect(() => {
     const fetchGames = async () => {
@@ -68,7 +80,15 @@ export default function GamesGallery() {
           category: item.categories ? (item.categories as any).name : 'Uncategorized'
         }));
 
-        setGames((formattedData || []) as Game[]);
+        const rows = (formattedData || []) as Game[];
+        setGames(rows);
+
+        // Round 85: categories + memberships (fail-soft: before
+        // migration 38 the map falls back to each game's primary
+        // category, exactly the old behaviour).
+        const cats = await fetchCategoriesForType('games');
+        setCategories(cats);
+        setMemberships(await fetchMembershipMap('games', rows, cats));
       } catch (error) {
         console.error('Error fetching games:', error);
       } finally {
@@ -79,24 +99,23 @@ export default function GamesGallery() {
     fetchGames();
   }, []);
 
-  // Chips: "All" plus one per category (from the Categories
-  // manager, via the joined category name) that has games. Empty
-  // categories never appear. Stage chips were removed in Round 79:
-  // the categories are named after the stages, so stage chips
-  // duplicated the category names.
-  const chips = [
-    { key: 'all', label: 'All' },
-    ...Array.from(
-      new Map(
-        games
-          .filter((g) => g.category_id)
-          .map((g) => [g.category_id as string, g.category] as const),
-      ).entries(),
-    ).map(([cid, name]) => ({ key: `cat:${cid}`, label: name })),
-  ];
+  // Chips: "All" plus one per category (from the Categories manager)
+  // that has games, in category display order (depth-first over the
+  // tree, Round 85). Empty categories never appear. Stage chips were
+  // removed in Round 79: the categories are named after the stages,
+  // so stage chips duplicated the category names. A game filed under
+  // several categories shows under each of their chips, and a parent
+  // chip also shows games filed under its subcategories.
+  const chips = buildShelfChips(
+    categories,
+    memberships,
+    games.map((g) => g.id),
+  );
 
   const visibleGames =
-    filter === 'all' ? games : games.filter((g) => g.category_id === filter.slice(4));
+    filter === 'all'
+      ? games
+      : games.filter((g) => matchesShelfChip(categories, memberships, g.id, filter));
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
