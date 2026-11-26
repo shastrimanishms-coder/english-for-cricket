@@ -26,7 +26,7 @@ const MASCOT_FEMALE = require('../../assets/images/mascot-female.png');
 
 // Fallback figures for the live landing counts (the counts at the
 // time of this build), used until — or unless — the database answers.
-const COUNT_FALLBACKS = { games: 39, speaking: 47, reading: 40, videos: 1, downloads: 0, workbooks: 321 };
+const COUNT_FALLBACKS = { games: 68, speaking: 47, reading: 40, videos: 1, downloads: 0, workbooks: 321 };
 
 // Feature icons, in the same order as the features in landingStrings.
 const FEATURE_ICONS = [
@@ -162,7 +162,7 @@ export default function LandingPage() {
       try {
         const opts = { count: 'exact' as const, head: true };
         const [g, sp, rd, vd, dl, wb] = await Promise.all([
-          supabase.from('games').select('id', opts).eq('is_published', true),
+          supabase.from('games').select('id', opts).eq('is_published', true).neq('engine', 'workbook'),
           supabase.from('speaking_scenarios').select('id', opts).eq('is_published', true),
           supabase.from('reading_stories').select('id', opts).eq('is_published', true),
           supabase.from('video_lectures').select('id', opts).eq('is_published', true),
