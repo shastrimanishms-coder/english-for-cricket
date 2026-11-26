@@ -27,6 +27,13 @@ import { groupStudentsByClass } from '../../lib/studentGroups';
  * "Active time" is deliberate wording: since Round 81 the app only
  * records seconds while it is visible and being used, so these
  * figures are learning time, never login duration.
+ *
+ * Round 82 adds speaking accuracy and a "Practice focus" list per
+ * student (migration 35's speaking_line_results — scores and our
+ * own curriculum phrases only, never the child's words). Both are
+ * absent until that migration runs, and speaking accuracy has no
+ * history from before it: earlier practice was scored live and not
+ * kept, and the report says so rather than inventing a figure.
  */
 
 const pct = (v: number | null) => (v === null ? '—' : `${v}%`);
@@ -62,6 +69,12 @@ function studentPdfSections(s: StudentReport): PdfSection[] {
             ['Stories / articles read', `${s.storiesRead}`],
             ['Reading accuracy (Read Aloud)', pct(s.readingAccuracy)],
             ['Conversations completed', count(s.speakingCompleted)],
+            [
+              'Speaking accuracy',
+              s.speakingAccuracy !== null
+                ? `${s.speakingAccuracy}% (based on ${s.speakingLinesAttempted} lines)`
+                : '—',
+            ],
             ['Study days', `${s.studyDays}`],
             ['Last active', formatReportDate(s.lastActiveAt)],
           ],
@@ -69,9 +82,28 @@ function studentPdfSections(s: StudentReport): PdfSection[] {
         {
           kind: 'paragraphs',
           texts: [
-            'Active time counts only while the app is visible and being used; time with the app open but idle is not counted. Speaking Practice conversations are scored live in the app and no score is stored, so this report counts completed conversations without an accuracy figure.',
+            'Active time counts only while the app is visible and being used; time with the app open but idle is not counted.',
+            s.speakingAccuracy !== null
+              ? 'Speaking accuracy counts the first attempt at each line in a conversation, from speaking practice recorded since scores began being kept. Only the score and the app\'s own practice phrase are kept — the student\'s voice and words are never stored.'
+              : 'Speaking accuracy will appear once this student has practised speaking in the current version of the app. Earlier speaking practice was scored live but not kept, so there is no history to show.',
           ],
         },
+        ...(s.practiceFocus !== null
+          ? [
+              {
+                kind: 'paragraphs' as const,
+                texts: [
+                  'Practice focus — phrases and activities to revisit:',
+                  ...(s.practiceFocus.length > 0
+                    ? s.practiceFocus.map(
+                        (i) =>
+                          `${i.type === 'speaking' ? 'Speaking' : i.type === 'reading' ? 'Reading' : 'Lesson'} — ${i.label} (${i.detail})`
+                      )
+                    : ['Nothing flagged — either everything is going well, or there is not enough practice recorded yet.']),
+                ],
+              },
+            ]
+          : []),
       ],
     },
   ];
@@ -195,6 +227,14 @@ export default function StudentReports() {
               ['Conversations completed (all students)', count(g.speakingCompleted)],
               ['Average lesson accuracy', pct(g.lessonAccuracy)],
               ['Average reading accuracy', pct(g.readingAccuracy)],
+              ...(g.speakingAccuracy !== null
+                ? [
+                    [
+                      'Average speaking accuracy',
+                      `${g.speakingAccuracy}% (${g.speakingAccuracyStudents} student${g.speakingAccuracyStudents === 1 ? '' : 's'})`,
+                    ] as [string, string],
+                  ]
+                : []),
             ],
           },
           {
@@ -286,6 +326,9 @@ export default function StudentReports() {
                 <Text className="font-sans text-sm text-slate-500">
                   Average lesson accuracy {pct(group?.lessonAccuracy ?? null)} • Average reading accuracy{' '}
                   {pct(group?.readingAccuracy ?? null)}
+                  {group?.speakingAccuracy != null
+                    ? ` • Average speaking accuracy ${group.speakingAccuracy}% (${group.speakingAccuracyStudents} student${group.speakingAccuracyStudents === 1 ? '' : 's'})`
+                    : ''}
                 </Text>
               </View>
 
@@ -374,16 +417,62 @@ export default function StudentReports() {
                                       <Text className="font-sans text-slate-600">Conversations completed</Text>
                                       <Text className="font-sans font-bold text-navy">{count(student.speakingCompleted)}</Text>
                                     </View>
+                                    <View className="flex-row justify-between px-4 py-2.5 border-b border-inkline">
+                                      <Text className="font-sans text-slate-600">Speaking accuracy</Text>
+                                      <Text className="font-sans font-bold text-navy">
+                                        {student.speakingAccuracy !== null
+                                          ? `${student.speakingAccuracy}% · ${student.speakingLinesAttempted} lines`
+                                          : '—'}
+                                      </Text>
+                                    </View>
                                     <View className="flex-row justify-between px-4 py-2.5">
                                       <Text className="font-sans text-slate-600">Last active</Text>
                                       <Text className="font-sans font-bold text-navy">{formatReportDate(student.lastActiveAt)}</Text>
                                     </View>
                                   </View>
                                   <Text className="font-sans text-xs text-slate-400 mt-2">
-                                    Speaking Practice is scored live in the app and no score is stored, so completed
-                                    conversations are counted without an accuracy figure.
+                                    {student.speakingAccuracy !== null
+                                      ? 'Speaking accuracy counts the first attempt at each line in a conversation, from practice recorded since scores began being kept. Only the score and the app\'s own practice phrase are kept — the student\'s voice and words are never stored.'
+                                      : 'Speaking accuracy will appear here once this student has practised speaking in the current version of the app. Earlier speaking practice was scored live but not kept, so there is no history to show.'}
                                   </Text>
                                 </View>
+
+                                {student.practiceFocus !== null && (
+                                  <View className="mb-6">
+                                    <MicroLabel className="mb-3">
+                                      Practice focus — phrases and activities to revisit
+                                    </MicroLabel>
+                                    {student.practiceFocus.length === 0 ? (
+                                      <Text className="font-sans text-sm text-slate-500">
+                                        No practice focus yet — either everything is going well, or there is
+                                        not enough practice recorded yet.
+                                      </Text>
+                                    ) : (
+                                      <View className="bg-canvas rounded-xl border border-inkline overflow-hidden">
+                                        {student.practiceFocus.map((item, i) => (
+                                          <View
+                                            key={`${item.type}-${i}`}
+                                            className={`px-4 py-2.5 ${i < student.practiceFocus!.length - 1 ? 'border-b border-inkline' : ''}`}
+                                          >
+                                            <View className="flex-row items-center gap-2 mb-0.5">
+                                              <View className="rounded-full bg-gold-light px-2 py-0.5">
+                                                <Text className="font-sans text-[10px] font-bold text-navy uppercase tracking-wider">
+                                                  {item.type === 'speaking'
+                                                    ? 'Speaking'
+                                                    : item.type === 'reading'
+                                                      ? 'Reading'
+                                                      : 'Lesson'}
+                                                </Text>
+                                              </View>
+                                              <Text className="font-sans text-xs text-slate-400">{item.detail}</Text>
+                                            </View>
+                                            <Text className="font-sans text-slate-700">{item.label}</Text>
+                                          </View>
+                                        ))}
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
 
                                 {Platform.OS === 'web' ? (
                                   <Pressable

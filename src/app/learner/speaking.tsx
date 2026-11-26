@@ -41,7 +41,8 @@ import {
   runActiveVoiceResolution,
   voiceGatePendingFor,
 } from '../../lib/lessonVoices';
-import { getStudentIdentity } from '../../lib/studentIdentity';
+import { getStudentIdentity, type StudentIdentity } from '../../lib/studentIdentity';
+import { newSpeakingSessionId, recordSpeakingLine } from '../../lib/speakingResults';
 import { supabase } from '../../lib/supabase';
 import type { VoiceCategory } from '../../lib/voiceStudio';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -179,9 +180,16 @@ export default function SpeakingPractice() {
   // generic "You" wherever we know it (PIN students carry their name
   // in the session; email learners in their profile).
   const [learnerName, setLearnerName] = useState<string | null>(null);
+  // Round 82: the identity + play-session for speaking line results.
+  // The session id groups one play of a conversation (or one run
+  // through the lesson lines) so the reports can apply the
+  // first-attempt rule; a fresh one starts with every new play.
+  const identityRef = useRef<StudentIdentity | null>(null);
+  const speakingSessionRef = useRef<string>(newSpeakingSessionId());
   useEffect(() => {
     let alive = true;
     void getStudentIdentity().then((identity) => {
+      identityRef.current = identity;
       if (alive) setLearnerName(identity?.displayName || null);
     });
     return () => {
@@ -442,6 +450,21 @@ export default function SpeakingPractice() {
       if (!target.text) return;
       const score = scoreSpeech(target.text, transcript);
       setCheckResult({ transcript, score });
+      // Round 82: keep the score (fire-and-forget) so the manager
+      // reports can show speaking accuracy and a practice-focus
+      // list. Only the score and OUR OWN target phrase are stored —
+      // the transcript above stays on this device and is never
+      // sent anywhere. Partner lines are playback, never scored,
+      // so they never reach this callback.
+      recordSpeakingLine(identityRef.current, {
+        sessionId: speakingSessionRef.current,
+        scenarioId: target.kind === 'turn' ? (scenario?.id ?? null) : null,
+        scenarioTitle:
+          target.kind === 'turn' ? (scenario?.title ?? null) : (current?.lessonTitle ?? 'Lesson Lines'),
+        lineIndex: target.index,
+        targetText: target.text,
+        score: score.accuracy,
+      });
       if (target.kind === 'turn') {
         setScenarioScores((prev) => ({
           ...prev,
@@ -787,6 +810,7 @@ export default function SpeakingPractice() {
     setRecordingUri(null);
     setCheckResult(null);
     setCheckError(null);
+    speakingSessionRef.current = newSpeakingSessionId();
     setLineScores({});
     setIndex(0);
     setFinished(false);
@@ -810,6 +834,7 @@ export default function SpeakingPractice() {
     (next: SpeakingScenario) => {
       resetTurnState();
       if (speech.listening) speech.abort();
+      speakingSessionRef.current = newSpeakingSessionId();
       setScenario(next);
       setTurnIndex(0);
       setScenarioScores({});
@@ -852,6 +877,7 @@ export default function SpeakingPractice() {
 
   const scenarioAgain = useCallback(() => {
     resetTurnState();
+    speakingSessionRef.current = newSpeakingSessionId();
     setTurnIndex(0);
     setScenarioScores({});
     wordScoresRef.current = {};
@@ -961,7 +987,10 @@ export default function SpeakingPractice() {
             </Text>
 
             <Pressable
-              onPress={() => setMode('lines')}
+              onPress={() => {
+                speakingSessionRef.current = newSpeakingSessionId();
+                setMode('lines');
+              }}
               className="bg-white rounded-[20px] border border-inkline shadow-sm p-6 mb-8"
             >
               <Text className="text-4xl mb-2">📚</Text>

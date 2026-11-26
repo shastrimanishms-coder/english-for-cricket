@@ -22,12 +22,24 @@ import { supabase } from './supabase';
  *  - Times are ACTIVE seconds from activity_logs. The 'app' stream
  *    is the total; section streams overlap it and are a breakdown,
  *    never a sum.
- *  - Speaking has NO accuracy field: Speaking Practice stores no
- *    per-conversation score anywhere, so the report carries the
- *    completion count and time only. Nothing here invents one.
+ *  - Speaking accuracy exists only since Round 82 (migration 35):
+ *    speaking_line_results stores each scored attempt's score (and
+ *    our own target phrase — never the child's words), and the RPC
+ *    reduces them by the first-attempt rule. Before that migration
+ *    — or for a student with no recorded lines yet — the field is
+ *    null and the UI shows "—". There is no history from before
+ *    Round 82 and nothing here invents one.
  *  - Reading accuracy averages only the records that carry one
  *    (Read Aloud sessions); Listen sessions are excluded, not zeroed.
  */
+
+/** One "Practice focus" entry (Round 82): something to revisit,
+ * with the context a teacher or parent needs to act on it. */
+export interface PracticeFocusItem {
+  type: 'speaking' | 'reading' | 'lesson';
+  label: string;
+  detail: string;
+}
 
 export interface StudentReport {
   id: string;
@@ -51,6 +63,14 @@ export interface StudentReport {
   readingAccuracy: number | null;
   /** Conversations completed; null when unavailable (pre-migration-34 fallback). */
   speakingCompleted: number | null;
+  /** Speaking accuracy % (first attempt per line per session);
+   * null before migration 35 or when no lines are recorded yet. */
+  speakingAccuracy: number | null;
+  /** How many first-attempt lines the accuracy is based on. */
+  speakingLinesAttempted: number;
+  /** Practice-focus items; null before migration 35 (section
+   * hidden), [] when the data exists but nothing is flagged. */
+  practiceFocus: PracticeFocusItem[] | null;
   /** Distinct days with any recorded activity or completion. */
   studyDays: number;
   lastActiveAt: string | null;
@@ -72,6 +92,10 @@ export interface GroupSummary {
   speakingCompleted: number | null;
   lessonAccuracy: number | null;
   readingAccuracy: number | null;
+  /** Mean speaking accuracy across the students who have one. */
+  speakingAccuracy: number | null;
+  /** How many students that average covers. */
+  speakingAccuracyStudents: number;
 }
 
 export interface ManagerReportsData {
@@ -152,6 +176,9 @@ function blankReport(b: StudentBasics): StudentReport {
     storiesRead: 0,
     readingAccuracy: null,
     speakingCompleted: null,
+    speakingAccuracy: null,
+    speakingLinesAttempted: 0,
+    practiceFocus: null,
     studyDays: 0,
     lastActiveAt: null,
     currentStageTitle: null,
@@ -188,6 +215,8 @@ function summarise(students: StudentReport[]): GroupSummary {
       : null,
     lessonAccuracy: meanOf((s) => s.lessonAccuracy),
     readingAccuracy: meanOf((s) => s.readingAccuracy),
+    speakingAccuracy: meanOf((s) => s.speakingAccuracy),
+    speakingAccuracyStudents: students.filter((s) => s.speakingAccuracy !== null).length,
   };
 }
 
@@ -214,6 +243,18 @@ async function fetchViaRpc(basics: StudentBasics[]): Promise<StudentReport[] | n
       report.storiesRead = Number(r.stories_read) || 0;
       report.readingAccuracy = r.reading_accuracy != null ? Math.round(Number(r.reading_accuracy)) : null;
       report.speakingCompleted = Number(r.speaking_completed) || 0;
+      // Round 82 fields exist only once migration 35 has run; with
+      // migration 34's RPC they are absent and the report keeps its
+      // honest "no speaking accuracy yet" state.
+      if ('speaking_accuracy' in r) {
+        report.speakingAccuracy = r.speaking_accuracy != null ? Math.round(Number(r.speaking_accuracy)) : null;
+        report.speakingLinesAttempted = Number(r.speaking_lines_attempted) || 0;
+        report.practiceFocus = Array.isArray(r.practice_focus)
+          ? (r.practice_focus as PracticeFocusItem[]).filter(
+              (i) => i && typeof i.label === 'string' && typeof i.detail === 'string'
+            )
+          : [];
+      }
       report.studyDays = Number(r.study_days) || 0;
       report.lastActiveAt = (r.last_active_at as string | null) ?? null;
       report.currentStageTitle = (r.current_stage_title as string | null) ?? null;
