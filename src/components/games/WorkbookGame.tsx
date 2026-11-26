@@ -61,7 +61,7 @@ interface WbLine { who: string; line: string; learner: boolean }
 // books use picture-choice and colouring activities the Learning
 // Path workbooks do not have.
 interface WbPickOption { word: string; emoji?: string; image: string }
-interface WbColourItem { thing: string; emoji?: string; instruction: string; colour: string; choices: string[] }
+interface WbColourItem { thing: string; emoji?: string; image?: string; instruction: string; colour: string; choices: string[] }
 type WbActivity =
   | { type: 'word_cards'; heading: string; words: WbWord[] }
   | { type: 'say_it'; heading: string; phrases: string[]; note?: string }
@@ -802,7 +802,11 @@ function ColourCard({ item, say, onCheck }: { item: WbColourItem; say: SayFn; on
           opacity: coloured ? 1 : 0.55,
         }}
       >
-        <Text style={{ fontSize: 56 }}>{item.emoji || '🖍'}</Text>
+        {item.image ? (
+          <WbImage uri={item.image} emoji={item.emoji} height={84} width={84} />
+        ) : (
+          <Text style={{ fontSize: 56 }}>{item.emoji || '🖍'}</Text>
+        )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
         <Text style={{ fontSize: 15, fontWeight: '800', color: INK, textAlign: 'center', flexShrink: 1 }}>{item.instruction}</Text>

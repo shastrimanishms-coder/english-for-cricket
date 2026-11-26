@@ -1,4 +1,9 @@
 /**
+ * DEPRECATED (Round 87): superseded by
+ * scripts/generate-textbook-workbook-games.py, which builds ALL 144
+ * textbook workbook games into the same JSON file. Do not run this
+ * script — it would overwrite the full set with the single sample.
+ *
  * Round 86 generator — SAMPLE playable textbook workbook game:
  * Book 1, Lesson 1 only, for Shastri's look-and-feel approval
  * before the full 144-lesson production.

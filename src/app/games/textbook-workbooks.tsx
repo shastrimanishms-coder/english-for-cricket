@@ -27,6 +27,10 @@ export default function TextbookWorkbookPractice() {
   const [games, setGames] = useState<TbGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [openBooks, setOpenBooks] = useState<Set<number>>(new Set([1]));
+  // Round 87: the part/level groupings inside each book (Starter A/B,
+  // Level 1–13) are collapsible accordions too, mirroring the
+  // Learning Path page's stage → module pattern. Parts start closed.
+  const [openParts, setOpenParts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -57,12 +61,24 @@ export default function TextbookWorkbookPractice() {
     }
     return Array.from(byBook.entries())
       .sort((a, b) => a[0] - b[0])
-      .map(([bookNo, bookGames]) => ({
-        bookNo,
-        bookTitle: bookGames[0].data.bookTitle || '',
-        partTitle: bookGames[0].data.partTitle || '',
-        games: bookGames.sort((a, b) => (Number(a.data.lesson) || 0) - (Number(b.data.lesson) || 0)),
-      }));
+      .map(([bookNo, bookGames]) => {
+        const sorted = bookGames.sort((a, b) => (Number(a.data.lesson) || 0) - (Number(b.data.lesson) || 0));
+        // Group the book's lessons under their part/level titles, in
+        // the order the parts first appear (Starter A before B,
+        // Level 1 before Level 2, and so on).
+        const parts: { partTitle: string; games: TbGame[] }[] = [];
+        for (const g of sorted) {
+          const pt = g.data.partTitle || '';
+          const last = parts[parts.length - 1];
+          if (last && last.partTitle === pt) last.games.push(g);
+          else parts.push({ partTitle: pt, games: [g] });
+        }
+        return {
+          bookNo,
+          bookTitle: sorted[0].data.bookTitle || '',
+          parts,
+        };
+      });
   }, [games]);
 
   const toggleBook = (bookNo: number) =>
@@ -70,6 +86,14 @@ export default function TextbookWorkbookPractice() {
       const next = new Set(prev);
       if (next.has(bookNo)) next.delete(bookNo);
       else next.add(bookNo);
+      return next;
+    });
+
+  const togglePart = (key: string) =>
+    setOpenParts((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 
@@ -98,7 +122,7 @@ export default function TextbookWorkbookPractice() {
               <Text className="font-sans text-slate-500 text-center">The playable textbook workbooks will appear here soon.</Text>
             </ElegantCard>
           ) : (
-            books.map(({ bookNo, bookTitle, partTitle, games: bookGames }) => (
+            books.map(({ bookNo, bookTitle, parts }) => (
               <View key={bookNo} className="mb-6">
                 <Pressable
                   onPress={() => toggleBook(bookNo)}
@@ -106,13 +130,29 @@ export default function TextbookWorkbookPractice() {
                 >
                   <Text className="font-display text-lg font-semibold text-white">
                     Book {bookNo} · {bookTitle}
-                    {partTitle ? ` — ${partTitle}` : ''}
                   </Text>
                   <Ionicons name={openBooks.has(bookNo) ? 'chevron-up' : 'chevron-down'} size={20} color="#D4AF37" />
                 </Pressable>
-                {openBooks.has(bookNo) ? (
-                  <View className="gap-2 mt-4">
-                    {bookGames.map((g) => (
+                {openBooks.has(bookNo)
+                  ? parts.map(({ partTitle, games: partGames }) => {
+                      const partKey = `${bookNo}:${partTitle}`;
+                      return (
+                      <View key={partKey} className="mt-4">
+                        <Pressable
+                          onPress={() => togglePart(partKey)}
+                          className="flex-row items-center justify-between bg-white border border-inkline rounded-[14px] px-4 py-3 mb-2 shadow-sm"
+                        >
+                          <Text className="font-sans text-[13px] font-bold text-navy uppercase tracking-[1px]">
+                            {partTitle}
+                          </Text>
+                          <View className="flex-row items-center gap-2">
+                            <Text className="font-sans text-xs text-slate-400">{partGames.length} lessons</Text>
+                            <Ionicons name={openParts.has(partKey) ? 'chevron-up' : 'chevron-down'} size={16} color="#B8912A" />
+                          </View>
+                        </Pressable>
+                        {openParts.has(partKey) ? (
+                        <View className="gap-2">
+                          {partGames.map((g) => (
                       <Link key={g.id} href={`/games/${g.id}`} asChild>
                         <Pressable className="flex-row items-center gap-3 bg-white border border-inkline rounded-[16px] px-3 py-2.5 shadow-sm">
                           {g.thumbnail_url ? (
@@ -133,9 +173,13 @@ export default function TextbookWorkbookPractice() {
                           <Text className="text-gold-dark font-bold">Play ›</Text>
                         </Pressable>
                       </Link>
-                    ))}
-                  </View>
-                ) : null}
+                          ))}
+                        </View>
+                        ) : null}
+                      </View>
+                      );
+                    })
+                  : null}
               </View>
             ))
           )}

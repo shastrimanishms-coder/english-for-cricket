@@ -44,6 +44,10 @@ export default function WorkbookPractice() {
   const [lessonMeta, setLessonMeta] = useState<Map<string, { title: string; order: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [openStages, setOpenStages] = useState<Set<number>>(new Set([1]));
+  // Round 87: modules are collapsible accordions inside their stage
+  // too (Shastri's ask) — stages start open as before, modules start
+  // closed so a stage's eight modules stay a tidy list.
+  const [openModules, setOpenModules] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -121,6 +125,14 @@ export default function WorkbookPractice() {
       return next;
     });
 
+  const toggleModule = (moduleId: string) =>
+    setOpenModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) next.delete(moduleId);
+      else next.add(moduleId);
+      return next;
+    });
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-canvas">
       <ScreenHeader title="Workbook Practice" onBack={goBack} right={<HelpButton slug="help-games" />} />
@@ -160,9 +172,19 @@ export default function WorkbookPractice() {
                 {openStages.has(stageNo)
                   ? modules.map(({ moduleId, title, games: moduleGames }) => (
                       <View key={moduleId} className="mt-4">
-                        <Text className="font-sans text-[12px] font-bold text-gold-dark uppercase tracking-[2px] mb-2 px-1">
-                          {title}
-                        </Text>
+                        <Pressable
+                          onPress={() => toggleModule(moduleId)}
+                          className="flex-row items-center justify-between bg-white border border-inkline rounded-[14px] px-4 py-3 mb-2 shadow-sm"
+                        >
+                          <Text className="font-sans text-[13px] font-bold text-navy uppercase tracking-[1px]">
+                            {title}
+                          </Text>
+                          <View className="flex-row items-center gap-2">
+                            <Text className="font-sans text-xs text-slate-400">{moduleGames.length} lessons</Text>
+                            <Ionicons name={openModules.has(moduleId) ? 'chevron-up' : 'chevron-down'} size={16} color="#B8912A" />
+                          </View>
+                        </Pressable>
+                        {openModules.has(moduleId) ? (
                         <View className="gap-2">
                           {moduleGames.map((g, gi) => (
                             <Link key={g.id} href={`/games/${g.id}`} asChild>
@@ -185,6 +207,7 @@ export default function WorkbookPractice() {
                             </Link>
                           ))}
                         </View>
+                        ) : null}
                       </View>
                     ))
                   : null}
