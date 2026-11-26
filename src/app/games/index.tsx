@@ -130,7 +130,7 @@ export default function GamesGallery() {
         {/* Workbook Practice (Round 83): the playable twin of every
             printed lesson workbook, organised stage → module → lesson. */}
         <Link href={'/games/workbooks' as any} asChild>
-          <Pressable className="mb-8 bg-white rounded-[20px] border-2 border-gold shadow-sm overflow-hidden">
+          <Pressable className="mb-4 bg-white rounded-[20px] border-2 border-gold shadow-sm overflow-hidden">
             <View className="flex-row items-center gap-4 p-5">
               <View className="w-14 h-14 rounded-full bg-navy items-center justify-center">
                 <Text className="text-2xl">📘</Text>
@@ -139,6 +139,26 @@ export default function GamesGallery() {
                 <Text className="font-display text-xl font-semibold text-navy">Workbook Practice</Text>
                 <Text className="font-sans text-slate-500 text-sm">
                   Play the workbook pages for every lesson — the same pages as the printed book, no printing needed.
+                </Text>
+              </View>
+              <Text className="text-gold-dark font-bold text-lg">›</Text>
+            </View>
+          </Pressable>
+        </Link>
+
+        {/* Textbook Workbook Practice (Round 86): the playable twin
+            of the traditional printed textbook workbooks, organised
+            book → lesson. */}
+        <Link href={'/games/textbook-workbooks' as any} asChild>
+          <Pressable className="mb-8 bg-white rounded-[20px] border-2 border-gold shadow-sm overflow-hidden">
+            <View className="flex-row items-center gap-4 p-5">
+              <View className="w-14 h-14 rounded-full bg-navy items-center justify-center">
+                <Text className="text-2xl">📗</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="font-display text-xl font-semibold text-navy">Textbook Workbook Practice</Text>
+                <Text className="font-sans text-slate-500 text-sm">
+                  Play the workbook pages from the printed English for Cricket books — Book 1 to Book 5, lesson by lesson.
                 </Text>
               </View>
               <Text className="text-gold-dark font-bold text-lg">›</Text>

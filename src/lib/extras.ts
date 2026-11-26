@@ -140,3 +140,19 @@ export async function awardExtraIfTagged(
   if (!lessonId) return;
   await awardPoints(identity, EXTRA_META[kind].pointKind, 0, POINTS.EXTRA_STARS, id);
 }
+
+/**
+ * Workbook-practice stars for workbook games that carry no lesson
+ * tag (Round 86). Learning Path workbook games are tagged to their
+ * lesson, so they earn through awardExtraIfTagged above; textbook
+ * workbook games belong to the printed books, not to app lessons,
+ * so they can never be tagged. Playing one earns the same +3 stars
+ * through the same ledger entry (kind extra_game, ref = game id),
+ * so both families pay identically, once per game, never twice.
+ */
+export async function awardWorkbookPractice(
+  identity: StudentIdentity,
+  gameId: string
+): Promise<void> {
+  await awardPoints(identity, EXTRA_META.game.pointKind, 0, POINTS.EXTRA_STARS, gameId);
+}

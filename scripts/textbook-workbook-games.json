@@ -1,0 +1,128 @@
+[
+ {
+  "id": "e4000000-0000-4000-8000-000000001001",
+  "title": "Textbook Workbook — Hello!",
+  "description": "The playable workbook for Lesson 1 (B1-L01) of Book 1: The Foundation — Starter A, from the printed English for Cricket textbook workbook. No printing needed — play the pages!",
+  "game_url": "",
+  "thumbnail_url": null,
+  "engine": "workbook",
+  "stage_id": null,
+  "module_id": null,
+  "lesson_id": null,
+  "category_id": null,
+  "is_published": true,
+  "created_at": "2026-01-01T00:16:41.000Z",
+  "data": {
+   "version": 1,
+   "source": "textbook",
+   "book": 1,
+   "lesson": 1,
+   "code": "B1-L01",
+   "workbookCode": "B1-WB-L01",
+   "bookTitle": "The Foundation",
+   "partTitle": "Starter A",
+   "lessonTitle": "Hello!",
+   "goal": "The words hello, good morning and goodbye · How to be polite and friendly",
+   "scene": "",
+   "finishLine": "Well done! You finished Lesson 1 — Hello!!",
+   "finishSub": "Colour the star. Say one thing you can do now!",
+   "pages": [
+    {
+     "kind": "write",
+     "title": "Trace It and Circle It",
+     "activities": [
+      {
+       "type": "word_build",
+       "heading": "Trace It",
+       "words": [
+        {
+         "word": "hello",
+         "example": "Say hello!",
+         "emoji": "👋",
+         "image": ""
+        },
+        {
+         "word": "good morning",
+         "example": "Say it in the morning.",
+         "emoji": "🌅",
+         "image": ""
+        },
+        {
+         "word": "goodbye",
+         "example": "Wave and say goodbye.",
+         "emoji": "🖐",
+         "image": ""
+        }
+       ]
+      },
+      {
+       "type": "pick_picture",
+       "heading": "Circle It",
+       "prompt": "Circle the hello.",
+       "options": [
+        {
+         "word": "morning",
+         "emoji": "🌅",
+         "image": ""
+        },
+        {
+         "word": "friend",
+         "emoji": "🧑‍🤝‍🧑",
+         "image": ""
+        },
+        {
+         "word": "hello",
+         "emoji": "👋",
+         "image": ""
+        }
+       ],
+       "answer": 2
+      }
+     ]
+    },
+    {
+     "kind": "play",
+     "title": "Colour It and Draw It",
+     "activities": [
+      {
+       "type": "colour_it",
+       "heading": "Colour It",
+       "items": [
+        {
+         "thing": "sun",
+         "emoji": "☀️",
+         "instruction": "Colour the sun yellow.",
+         "colour": "yellow",
+         "choices": [
+          "red",
+          "yellow",
+          "blue"
+         ]
+        },
+        {
+         "thing": "star",
+         "emoji": "⭐",
+         "instruction": "Colour the star gold.",
+         "colour": "gold",
+         "choices": [
+          "green",
+          "gold",
+          "purple"
+         ]
+        }
+       ]
+      },
+      {
+       "type": "say_it",
+       "heading": "Draw It",
+       "note": "The printed page says: draw a friend. Drawing stays on paper — say the words from the page here!",
+       "phrases": [
+        "Hello, friend!"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+]

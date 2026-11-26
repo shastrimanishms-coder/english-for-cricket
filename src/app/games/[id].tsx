@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import BuiltinGame from '../../components/games/BuiltinGame';
 import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
-import { awardExtraIfTagged } from '../../lib/extras';
+import { awardExtraIfTagged, awardWorkbookPractice } from '../../lib/extras';
 import { getStudentIdentity, type StudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -128,6 +128,12 @@ export default function GamePlayer() {
       // If this game is tagged to a lesson, opening it also completes
       // that lesson's recommended extra (+3 stars, once per game).
       await awardExtraIfTagged(identity, 'game', game.id, game.lesson_id);
+      // Textbook workbook games carry no lesson tag (they belong to
+      // the printed books); they earn the same workbook stars
+      // through the untagged path instead (Round 86).
+      if (game.engine === 'workbook' && !game.lesson_id) {
+        await awardWorkbookPractice(identity, game.id);
+      }
     })();
   }, [game]);
 
@@ -138,6 +144,9 @@ export default function GamePlayer() {
     const who = identity ?? (await getStudentIdentity());
     if (!who) return;
     await awardExtraIfTagged(who, 'game', game.id, game.lesson_id);
+    if (game.engine === 'workbook' && !game.lesson_id) {
+      await awardWorkbookPractice(who, game.id);
+    }
   }, [game, identity]);
 
   const fetchGameDetails = useCallback(async () => {

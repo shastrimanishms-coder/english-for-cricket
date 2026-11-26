@@ -30,9 +30,20 @@ import { speechErrorMessage, useSpeechCheck } from '../../lib/useSpeechCheck';
 // to Speaking Practice alone — the privacy boundary Shastri set).
 // Points/stars/completion flow through the game screen's existing
 // systems (extra award + activity logger), exactly like other games.
+//
+// Round 86 adds a SECOND family on the same player: the traditional
+// textbook workbooks (data.source === 'textbook'). Those books have
+// their own print design — white page header with a gold-dark
+// kicker, navy serif title, a navy video-code chip and a gold rule
+// (colours taken from book-1-workbook.html) — 2–3 pages per lesson,
+// and two extra activity types (pick_picture for "Circle It",
+// colour_it for "Colour It"). Drawing pages have no playable twin;
+// the say-aloud line printed beside them is what plays.
 // ============================================================================
 
 const NAVY = '#1B2A4A';
+// The traditional books' navy (h2.lesson / .vchip in their CSS).
+const NAVY_DEEP = '#0A192F';
 const GOLD = '#D4AF37';
 const GOLD_DARK = '#B8860B';
 const GREEN = '#2E7D32';
@@ -46,23 +57,42 @@ interface WbPhonics { letter: string; sound: string; word: string; emoji?: strin
 interface WbCircle { question: string; options: string[]; answer: number }
 interface WbPattern { model: string; say: string; modelImage: string; sayImage: string }
 interface WbLine { who: string; line: string; learner: boolean }
+// Textbook-workbook families (Round 86): the printed traditional
+// books use picture-choice and colouring activities the Learning
+// Path workbooks do not have.
+interface WbPickOption { word: string; emoji?: string; image: string }
+interface WbColourItem { thing: string; emoji?: string; instruction: string; colour: string; choices: string[] }
 type WbActivity =
   | { type: 'word_cards'; heading: string; words: WbWord[] }
-  | { type: 'say_it'; heading: string; phrases: string[] }
+  | { type: 'say_it'; heading: string; phrases: string[]; note?: string }
   | { type: 'match'; heading: string; pairs: WbWord[] }
   | { type: 'phonics'; heading: string; cards: WbPhonics[] }
   | { type: 'word_build'; heading: string; words: WbWord[] }
   | { type: 'circle'; heading: string; items: WbCircle[] }
   | { type: 'pattern'; heading: string; pairs: WbPattern[] }
-  | { type: 'dialogue'; heading: string; lines: WbLine[] };
+  | { type: 'dialogue'; heading: string; lines: WbLine[] }
+  | { type: 'pick_picture'; heading: string; prompt: string; options: WbPickOption[]; answer: number }
+  | { type: 'colour_it'; heading: string; items: WbColourItem[] };
 interface WbPage { kind: string; title: string; activities: WbActivity[] }
 export interface WorkbookData {
   version: number;
-  stage: number;
-  module: number;
+  // Learning Path family (Round 83): stage/module identify the
+  // curriculum lesson the workbook belongs to.
+  stage?: number;
+  module?: number;
   lesson: number;
-  stageName: string;
-  moduleTitle: string;
+  stageName?: string;
+  moduleTitle?: string;
+  // Textbook family (Round 86): the traditional printed books are
+  // NOT tied to app lessons; book/code identify them instead.
+  source?: string;
+  book?: number;
+  code?: string;
+  workbookCode?: string;
+  bookTitle?: string;
+  partTitle?: string;
+  finishLine?: string;
+  finishSub?: string;
   lessonTitle: string;
   goal: string;
   scene: string;
@@ -116,11 +146,12 @@ function Tick({ done }: { done: boolean }) {
   );
 }
 
-function ActBlock({ title, ins, children }: { title: string; ins?: string; children: React.ReactNode }) {
+function ActBlock({ title, ins, note, children }: { title: string; ins?: string; note?: string; children: React.ReactNode }) {
   return (
     <View style={{ borderWidth: 2, borderColor: LINE, borderRadius: 14, padding: 14, marginTop: 12 }}>
       <Text style={{ fontWeight: '800', color: GREEN, letterSpacing: 0.6, fontSize: 13, textTransform: 'uppercase' }}>{title}</Text>
       {ins ? <Text style={{ fontSize: 14, color: SLATE, marginTop: 2, marginBottom: 6 }}>{ins}</Text> : null}
+      {note ? <Text style={{ fontSize: 13.5, color: SLATE, fontStyle: 'italic', marginBottom: 6 }}>{note}</Text> : null}
       {children}
     </View>
   );
@@ -428,21 +459,25 @@ function WordAttempt({
   onCheck: CheckFn;
   onDone: () => void;
 }) {
+  // A traced "word" can be a short phrase ("good morning" in the
+  // textbook books): the space is a printed gap, not a tile — the
+  // child builds the letters and the gap is already there.
+  const target = current.word;
+  const letters = useMemo(() => target.replace(/ /g, ''), [target]);
   const tiles = useMemo(
-    () => shuffle(current.word.split('').map((ch, i) => ({ ch, id: i }))),
-    [current]
+    () => shuffle(letters.split('').map((ch, i) => ({ ch, id: i }))),
+    [letters]
   );
   const [placed, setPlaced] = useState<number[]>([]); // tile ids, in order
   const [flash, setFlash] = useState<number | null>(null);
   const firstTryRef = useRef(true);
-  const target = current.word;
   const tapTile = (tile: { ch: string; id: number }) => {
     if (placed.includes(tile.id)) return;
-    const expected = target[placed.length];
+    const expected = letters[placed.length];
     if (tile.ch === expected) {
       const next = [...placed, tile.id];
       setPlaced(next);
-      if (next.length === target.length) {
+      if (next.length === letters.length) {
         playDing();
         onCheck(firstTryRef.current);
         setTimeout(onDone, 700);
@@ -454,24 +489,38 @@ function WordAttempt({
     }
   };
 
+  // Slot layout: one slot per character; a space maps to li -1
+  // (a printed gap) and each letter to its index into `letters`.
+  const slots = useMemo(
+    () =>
+      target.split('').map((ch, i) => ({
+        ch,
+        li: ch === ' ' ? -1 : target.slice(0, i).replace(/ /g, '').length,
+      })),
+    [target]
+  );
   return (
     <View style={{ marginTop: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <WbImage uri={current.image} emoji={current.emoji} height={64} width={88} />
         <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', flex: 1 }}>
-          {target.split('').map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: 30, height: 38, borderBottomWidth: 3, borderBottomColor: '#C9D4DF',
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Text style={{ fontSize: 22, fontWeight: '800', color: NAVY }}>
-                {i < placed.length ? target[i] : ''}
-              </Text>
-            </View>
-          ))}
+          {slots.map((slot, i) =>
+            slot.li < 0 ? (
+              <View key={i} style={{ width: 14, height: 38 }} />
+            ) : (
+              <View
+                key={i}
+                style={{
+                  width: 30, height: 38, borderBottomWidth: 3, borderBottomColor: '#C9D4DF',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 22, fontWeight: '800', color: NAVY }}>
+                  {slot.li < placed.length ? letters[slot.li] : ''}
+                </Text>
+              </View>
+            )
+          )}
         </View>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
@@ -682,6 +731,127 @@ function DialogueGame({ lines, say, onCheck }: { lines: WbLine[]; say: SayFn; on
 }
 
 // ---------------------------------------------------------------------------
+// Textbook books — Circle It: hear/read the prompt, tap the picture
+// (the printed page asks the child to circle it)
+// ---------------------------------------------------------------------------
+function PickPicture({ prompt, options, answer, say, onCheck }: { prompt: string; options: WbPickOption[]; answer: number; say: SayFn; onCheck: CheckFn }) {
+  const [solved, setSolved] = useState(false);
+  const [wrong, setWrong] = useState<number | null>(null);
+  const spoiledRef = useRef(false);
+
+  return (
+    <View style={{ marginTop: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: INK, flex: 1 }}>{prompt}</Text>
+        <ListenButton small onPress={() => say(prompt)} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {options.map((opt, i) => (
+          <Pressable
+            key={i}
+            disabled={solved}
+            onPress={() => {
+              if (i === answer) {
+                playDing();
+                onCheck(!spoiledRef.current);
+                setSolved(true);
+              } else {
+                spoiledRef.current = true;
+                setWrong(i);
+                setTimeout(() => setWrong(null), 500);
+              }
+            }}
+            style={{
+              flex: 1, borderWidth: 2, borderRadius: 12, padding: 8, alignItems: 'center',
+              borderColor: solved && i === answer ? GREEN : wrong === i ? '#C0392B' : LINE,
+              backgroundColor: solved && i === answer ? '#E3EFE3' : '#FFFFFF',
+            }}
+          >
+            <WbImage uri={opt.image} emoji={opt.emoji} height={84} width={110} />
+            {solved && i === answer ? <Ionicons name="checkmark-circle" size={20} color={GREEN} /> : null}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Textbook books — Colour It: read the instruction, tap the named
+// colour and the picture fills (free colouring itself stays on
+// paper; the colour-word learning point is what plays)
+// ---------------------------------------------------------------------------
+const COLOUR_HEX: Record<string, string> = {
+  red: '#E05252', yellow: '#F2C230', blue: '#4A90D9', gold: '#D4AF37',
+  green: '#58A05C', purple: '#8E6BC8', pink: '#F2A7C3', brown: '#9C6B4F',
+  orange: '#F08C3C', black: '#3A3A3A', white: '#FFFFFF', grey: '#B9C2CC',
+};
+
+function ColourCard({ item, say, onCheck }: { item: WbColourItem; say: SayFn; onCheck: CheckFn }) {
+  const [coloured, setColoured] = useState(false);
+  const [wrong, setWrong] = useState<string | null>(null);
+  const spoiledRef = useRef(false);
+  const hex = COLOUR_HEX[item.colour] || '#F2C230';
+
+  return (
+    <View style={{ flex: 1, borderWidth: 2, borderColor: coloured ? hex : LINE, borderRadius: 14, padding: 10, alignItems: 'center' }}>
+      <View
+        style={{
+          width: '100%', height: 96, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: coloured ? hex + '33' : '#F1F4F8',
+          opacity: coloured ? 1 : 0.55,
+        }}
+      >
+        <Text style={{ fontSize: 56 }}>{item.emoji || '🖍'}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: INK, textAlign: 'center', flexShrink: 1 }}>{item.instruction}</Text>
+        <ListenButton small onPress={() => say(item.instruction)} />
+      </View>
+      {coloured ? (
+        <Text style={{ fontSize: 13.5, color: GREEN, fontWeight: '700', marginTop: 8 }}>Coloured {item.colour}! ✓</Text>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+          {item.choices.map((name) => (
+            <Pressable
+              key={name}
+              accessibilityLabel={`Colour ${name}`}
+              onPress={() => {
+                if (name === item.colour) {
+                  playDing();
+                  onCheck(!spoiledRef.current);
+                  setColoured(true);
+                } else {
+                  spoiledRef.current = true;
+                  setWrong(name);
+                  setTimeout(() => setWrong(null), 500);
+                }
+              }}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: COLOUR_HEX[name] || '#EEEEEE',
+                borderWidth: wrong === name ? 3 : 2,
+                borderColor: wrong === name ? '#C0392B' : '#C9D4DF',
+              }}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ColourIt({ items, say, onCheck }: { items: WbColourItem[]; say: SayFn; onCheck: CheckFn }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
+      {items.map((item, i) => (
+        <ColourCard key={i} item={item} say={say} onCheck={onCheck} />
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The flow: three pages + the star-box finish, inside one paper page
 // ---------------------------------------------------------------------------
 function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: () => void }) {
@@ -724,9 +894,15 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
           else if (a.type === 'circle') a.items.forEach((it) => texts.push(it.question, ...it.options));
           else if (a.type === 'pattern') a.pairs.forEach((pr) => texts.push(pr.model, pr.say));
           else if (a.type === 'dialogue') a.lines.forEach((ln) => texts.push(ln.line));
+          else if (a.type === 'pick_picture') texts.push(a.prompt);
+          else if (a.type === 'colour_it') a.items.forEach((it) => texts.push(it.instruction));
         }
       }
-      const preferred: VoiceCategory[] = data.module % 2 === 1 ? ['M1', 'B1'] : ['F1', 'G1'];
+      // Module parity picks the model voices for Learning Path
+      // books; textbook books have no module, so lesson parity
+      // stands in (Lesson 1 → the M1/B1 side, like Module 1).
+      const parity = data.module ?? data.lesson;
+      const preferred: VoiceCategory[] = parity % 2 === 1 ? ['M1', 'B1'] : ['F1', 'G1'];
       const map = await resolveVoicesForTexts(texts, prefs, preferred);
       if (!cancelled) setActiveVoiceMap(map);
     })();
@@ -756,6 +932,8 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
         else if (a.type === 'circle') n += a.items.length;
         else if (a.type === 'pattern') n += a.pairs.length;
         else if (a.type === 'dialogue') n += a.lines.filter((ln) => ln.learner).length;
+        else if (a.type === 'pick_picture') n += 1;
+        else if (a.type === 'colour_it') n += a.items.length;
       }
     }
     return n;
@@ -772,6 +950,8 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
   const current = data.pages[page];
   const ratio = totalChecks > 0 ? score / totalChecks : 0;
   const stars = ratio >= 0.9 ? 3 : ratio >= 0.6 ? 2 : ratio > 0 ? 1 : 0;
+  const isTextbook = data.source === 'textbook';
+  const pageCount = data.pages.length;
 
   return (
     <View style={{ backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: LINE, padding: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
@@ -779,12 +959,15 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
         <View style={{ alignItems: 'center', paddingVertical: 28 }}>
           <View style={{ borderWidth: 2.5, borderColor: GOLD, backgroundColor: CREAM, borderRadius: 16, paddingVertical: 22, paddingHorizontal: 28, alignItems: 'center', width: '100%' }}>
             <Text style={{ fontSize: 34, letterSpacing: 6 }}>{'★'.repeat(stars)}{'☆'.repeat(3 - stars)}</Text>
-            <Text style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 24, color: NAVY, marginTop: 8, textAlign: 'center' }}>
-              Well done! You finished Lesson {data.lesson}.
+            <Text style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 24, color: isTextbook ? NAVY_DEEP : NAVY, marginTop: 8, textAlign: 'center' }}>
+              {data.finishLine || `Well done! You finished Lesson ${data.lesson}.`}
             </Text>
             <Text style={{ fontSize: 15, color: SLATE, marginTop: 6, textAlign: 'center' }}>
               You scored {score} of {totalChecks} first tries.
             </Text>
+            {data.finishSub ? (
+              <Text style={{ fontSize: 13.5, color: SLATE, marginTop: 4, textAlign: 'center' }}>{data.finishSub}</Text>
+            ) : null}
           </View>
           <Text style={{ fontSize: 13.5, color: SLATE, marginTop: 16, textAlign: 'center' }}>
             Play it again any time — practice makes it stick!
@@ -792,7 +975,28 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
         </View>
       ) : (
         <>
-          {page === 0 ? (
+          {page === 0 && isTextbook ? (
+            // The traditional books' page header: gold-dark kicker,
+            // navy serif title, the navy video chip, then the gold
+            // rule — straight from book-1-workbook.html's CSS.
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: GOLD_DARK, fontWeight: '800', letterSpacing: 1.4, fontSize: 11, textTransform: 'uppercase' }}>
+                    Book {data.book} Workbook · {data.partTitle} · Lesson {data.lesson} — page 1
+                  </Text>
+                  <Text style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 25, color: NAVY_DEEP, lineHeight: 30, marginVertical: 4 }}>
+                    {data.lessonTitle}
+                  </Text>
+                  <Text style={{ color: SLATE, fontSize: 14 }}>{data.goal}</Text>
+                </View>
+                <View style={{ backgroundColor: NAVY_DEEP, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 }}>
+                  <Text style={{ color: GOLD, fontWeight: '800', fontSize: 12 }}>▶ Workbook Video {data.workbookCode}</Text>
+                </View>
+              </View>
+              <View style={{ borderBottomWidth: 2.5, borderBottomColor: GOLD, marginTop: 10 }} />
+            </View>
+          ) : page === 0 ? (
             <View style={{ backgroundColor: NAVY, borderRadius: 14, padding: 16 }}>
               <Text style={{ color: GOLD, fontWeight: '800', letterSpacing: 1.4, fontSize: 11, textTransform: 'uppercase' }}>
                 Lesson {data.lesson} of 8 · Stage {data.stage} · Module {data.module}
@@ -804,10 +1008,12 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ backgroundColor: NAVY, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 }}>
-                <Text style={{ color: GOLD, fontWeight: '800', fontSize: 12.5 }}>Lesson {data.lesson} · {current.title}</Text>
+              <View style={{ backgroundColor: isTextbook ? NAVY_DEEP : NAVY, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 }}>
+                <Text style={{ color: GOLD, fontWeight: '800', fontSize: 12.5 }}>
+                  {isTextbook ? `${data.code} · ${current.title}` : `Lesson ${data.lesson} · ${current.title}`}
+                </Text>
               </View>
-              <Text style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 19, color: NAVY, flex: 1 }} numberOfLines={1}>
+              <Text style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 19, color: isTextbook ? NAVY_DEEP : NAVY, flex: 1 }} numberOfLines={1}>
                 {data.lessonTitle}
               </Text>
             </View>
@@ -815,9 +1021,11 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
 
           {page === 0 ? (
             <>
-              <View style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center' }}>
-                <WbImage uri={data.scene} height={190} width={340} />
-              </View>
+              {data.scene ? (
+                <View style={{ marginTop: 12, borderRadius: 12, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center' }}>
+                  <WbImage uri={data.scene} height={190} width={340} />
+                </View>
+              ) : null}
               <View style={{ backgroundColor: CREAM, borderWidth: 2, borderColor: GOLD, borderRadius: 12, padding: 12, marginTop: 12 }}>
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#8A6D00' }}>
                   Tip: a touch pen is lovely for these pages — fingers work too.
@@ -830,6 +1038,7 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
             <ActBlock
               key={ai}
               title={a.heading}
+              note={a.type === 'say_it' ? a.note : undefined}
               ins={
                 a.type === 'word_cards'
                   ? 'Tap a card to hear the word.'
@@ -840,12 +1049,18 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
                       : a.type === 'phonics'
                         ? 'Say the letter, say the sound — then listen and tap.'
                         : a.type === 'word_build'
-                          ? 'Look at the picture. Build the word with the letters.'
+                          ? isTextbook
+                            ? 'Trace with your finger or pen: tap the letters in order to build the word.'
+                            : 'Look at the picture. Build the word with the letters.'
                           : a.type === 'circle'
                             ? 'Tap the correct sentence.'
                             : a.type === 'pattern'
                               ? 'Read the dark sentence. Then build the new one.'
-                              : 'Take turns. Listen, then say your lines.'
+                              : a.type === 'pick_picture'
+                                ? 'Tap the right picture.'
+                                : a.type === 'colour_it'
+                                  ? 'Read the words. Tap a colour to colour each picture.'
+                                  : 'Take turns. Listen, then say your lines.'
               }
             >
               {a.type === 'word_cards' ? <WordCards words={a.words} say={say} /> : null}
@@ -868,12 +1083,16 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
                 </View>
               ) : null}
               {a.type === 'dialogue' ? <DialogueGame lines={a.lines} say={say} onCheck={onCheck} /> : null}
+              {a.type === 'pick_picture' ? <PickPicture prompt={a.prompt} options={a.options} answer={a.answer} say={say} onCheck={onCheck} /> : null}
+              {a.type === 'colour_it' ? <ColourIt items={a.items} say={say} onCheck={onCheck} /> : null}
             </ActBlock>
           ))}
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, borderTopWidth: 1, borderTopColor: '#EEF2F6', paddingTop: 12 }}>
             <Text style={{ fontSize: 12, color: '#8FA1B3', fontWeight: '700', flex: 1 }}>
-              Lesson {data.lesson} · Page {page + 1} of 3 — {current.title}
+              {isTextbook
+                ? `${data.code} · Page ${page + 1} of ${pageCount} — ${current.title}`
+                : `Lesson ${data.lesson} · Page ${page + 1} of ${pageCount} — ${current.title}`}
             </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {page > 0 ? (
@@ -884,7 +1103,7 @@ function WorkbookFlow({ data, onComplete }: { data: WorkbookData; onComplete?: (
                   <Text style={{ fontWeight: '800', color: SLATE }}>‹ Back</Text>
                 </Pressable>
               ) : null}
-              {page < 2 ? (
+              {page < pageCount - 1 ? (
                 <Pressable
                   onPress={() => setPage((p) => p + 1)}
                   style={{ paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: GOLD, borderBottomWidth: 3, borderBottomColor: GOLD_DARK }}
@@ -919,8 +1138,13 @@ export default function WorkbookGame({
   onComplete?: () => void;
 }) {
   const [playKey, setPlayKey] = useState(0);
+  // Learning Path workbooks always have exactly 3 pages; textbook
+  // workbooks have 2–3 pages per lesson.
   const valid =
-    data && Array.isArray(data.pages) && data.pages.length === 3 && typeof data.lessonTitle === 'string';
+    data &&
+    Array.isArray(data.pages) &&
+    (data.source === 'textbook' ? data.pages.length >= 2 && data.pages.length <= 3 : data.pages.length === 3) &&
+    typeof data.lessonTitle === 'string';
   if (!valid) {
     return (
       <Text className="text-center font-sans text-slate-500 py-10">
