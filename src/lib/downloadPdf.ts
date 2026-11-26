@@ -23,10 +23,17 @@ export type PdfBlock =
   | { kind: 'paragraphs'; texts: string[] }
   | { kind: 'dialogue'; lines: PdfDialogueLine[] }
   | { kind: 'questions'; items: PdfQuestion[] }
-  | { kind: 'answers'; items: string[] };
+  | { kind: 'answers'; items: string[] }
+  // Round 81: label/value tables for the manager reports, and an
+  // explicit page break so the all-students document gives every
+  // student their own page.
+  | { kind: 'table'; rows: [string, string][] }
+  | { kind: 'pagebreak' };
 
 export interface PdfSection {
   heading?: string;
+  /** Start this section on a fresh printed page. */
+  pageBreakBefore?: boolean;
   blocks: PdfBlock[];
 }
 
@@ -71,6 +78,15 @@ function blockHtml(block: PdfBlock): string {
         .join('\n');
     case 'answers':
       return `<ol class="answers">${block.items.map((a) => `<li>${escapeHtml(a)}</li>`).join('')}</ol>`;
+    case 'table':
+      return `<table class="kv">${block.rows
+        .map(
+          (r) =>
+            `<tr><td class="k">${escapeHtml(r[0])}</td><td class="v">${escapeHtml(r[1])}</td></tr>`
+        )
+        .join('')}</table>`;
+    case 'pagebreak':
+      return `<div class="pagebreak"></div>`;
   }
 }
 
@@ -82,7 +98,8 @@ function documentHtml(spec: PdfDocumentSpec): string {
   const sections = spec.sections
     .map((s) => {
       const heading = s.heading ? `<h2>${escapeHtml(s.heading)}</h2>` : '';
-      return `${heading}\n${s.blocks.map(blockHtml).join('\n')}`;
+      const body = `${heading}\n${s.blocks.map(blockHtml).join('\n')}`;
+      return s.pageBreakBefore ? `<div class="pagebreak"></div>\n${body}` : body;
     })
     .join('\n');
   return `<!DOCTYPE html>
@@ -145,6 +162,21 @@ function documentHtml(spec: PdfDocumentSpec): string {
   ul.options li { margin: 2px 0; }
   ol.answers { margin: 0 0 0 18px; padding: 0; }
   ol.answers li { margin: 3px 0; }
+  table.kv { width: 100%; border-collapse: collapse; margin: 4px 0 12px; }
+  table.kv td { padding: 5px 8px; border-bottom: 1px solid #E9E2D4; vertical-align: top; }
+  table.kv td.k {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10.5pt;
+    color: #6B7686;
+    width: 46%;
+  }
+  table.kv td.v {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #0A192F;
+  }
+  .pagebreak { page-break-before: always; height: 0; }
   .footer {
     position: fixed;
     bottom: 0;

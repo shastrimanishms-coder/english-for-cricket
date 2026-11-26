@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ElegantCard, GoldButton } from '../components/ui/Elegant';
 import { routeSignedInUser } from '../lib/routeSignedInUser';
+import { rememberSavedAccount } from '../lib/savedAccounts';
 import { supabase } from '../lib/supabase';
 
 export default function LoginScreen() {
@@ -75,10 +76,10 @@ export default function LoginScreen() {
 
         const { data: profileData, error: profileError } = await supabase
           .from('user_profiles')
-          .select('role')
+          .select('role, display_name')
           .eq('id', authData.user.id)
           .single();
-        
+
         setLoading(false);
 
         if (profileError || !profileData) {
@@ -87,6 +88,20 @@ export default function LoginScreen() {
         }
 
         const userRole = profileData.role;
+
+        // Switch Account (Round 81): remember this device for learner
+        // accounts — identifier only, never the password — so a
+        // sibling can switch back by re-entering just the password.
+        if (userRole === 'individual_learner') {
+          await rememberSavedAccount({
+            kind: 'auth',
+            displayName:
+              (profileData.display_name as string | null) ||
+              email.trim().split('@')[0] ||
+              email.trim(),
+            identifier: email.trim().toLowerCase(),
+          });
+        }
         if (userRole === 'super_admin' || userRole === 'content_manager') {
           router.replace('/admin');
         } else if (userRole === 'manager') {
@@ -130,6 +145,15 @@ export default function LoginScreen() {
         const sessionData = { ...data };
         delete sessionData.hashed_pin;
         await AsyncStorage.setItem('student_session', JSON.stringify(sessionData));
+
+        // Switch Account (Round 81): remember the username (never the
+        // PIN) so this student can be picked from the switch list and
+        // re-enter just the PIN.
+        await rememberSavedAccount({
+          kind: 'sub_account',
+          displayName: data.display_name || username.trim(),
+          identifier: username.trim().toLowerCase(),
+        });
 
         showAlert('Welcome!', `Hi ${data.display_name}! Routing to Learner Dashboard...`);
         router.replace('/learner');

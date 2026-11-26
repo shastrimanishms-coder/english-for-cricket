@@ -14,6 +14,7 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppSessionLogger from '../components/AppSessionLogger';
 import '../global.css';
 
 export default function RootLayout() {
@@ -49,6 +50,8 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
     <View className="flex-1 bg-surface-background">
+      {/* Whole-app active-time stream (Round 81); renders nothing. */}
+      <AppSessionLogger />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -59,6 +62,7 @@ export default function RootLayout() {
         {/* Auth Routes */}
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="switch-account" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="update-password" />

@@ -292,6 +292,17 @@ export default function LearningProgress() {
             Track lesson completion, accuracy, and earned badges for all your students.
           </Text>
 
+          {/* Round 81: the full per-student report (active time by
+              section, counts, accuracies, PDF export) lives on its
+              own screen. */}
+          <Pressable
+            onPress={() => router.push('/manager/reports')}
+            className="flex-row items-center gap-2 self-start bg-navy px-4 py-2.5 rounded-full mb-6 active:opacity-90"
+          >
+            <Ionicons name="document-text" size={15} color="#D4AF37" />
+            <Text className="font-sans font-bold text-white text-sm">Student Reports & PDF Export</Text>
+          </Pressable>
+
           {/* Report period: the figures below (playtime, lessons,
               accuracy) cover just this period. Badges are earned
               once, so they always show all-time. */}

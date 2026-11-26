@@ -47,6 +47,7 @@ import {
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import { getStudentIdentity } from '../../lib/studentIdentity';
+import { useActivityLogger } from '../../lib/useActivityLogger';
 import type { VoiceCategory } from '../../lib/voiceStudio';
 import { scoreMessage, scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
@@ -934,6 +935,12 @@ export default function LessonPlayer() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lesson, setLesson] = useState<Lesson | null>(null);
+
+  // Active time in this lesson (Round 81): the engine accrues only
+  // while the student is visibly interacting, and feeds the
+  // 'lesson_slide' stream the admin/manager reports read.
+  useActivityLogger({ activityType: 'lesson_slide', targetId: lesson?.id ?? null });
+
   const [slides, setSlides] = useState<Slide[]>([]);
   // Play order for this run. Starts as every slide in order; a scored
   // slide answered wrong is appended to the end and comes back, again
@@ -1301,20 +1308,14 @@ export default function LessonPlayer() {
         console.log('Lesson completion not recorded:', completionError.message);
       }
 
-      // Same identity in activity_logs so admin/manager stats can unify both
-      // populations. PIN-student inserts may be blocked by the current
-      // activity_logs RLS (no session to attach); Phase 2 adds an RPC.
-      const { error: activityError } = await supabase.from('activity_logs').insert([
-        {
-          student_id: identity.studentId,
-          activity_type: 'lesson_slide',
-          target_id: lesson.id,
-          duration_seconds: duration,
-        },
-      ]);
-      if (activityError) {
-        console.log('Lesson activity not logged:', activityError.message);
-      }
+      // activity_logs time for lessons is recorded by the
+      // useActivityLogger hook below (Round 81): active seconds only,
+      // for both identity kinds via the log_activity RPC. The old
+      // direct insert here wrote the full wall-clock duration at
+      // completion — counting idle time as study and double-counting
+      // once the hook existed — so it was removed. The
+      // lesson_completions row above keeps its duration_seconds,
+      // which the completion screen displays.
 
       // Badge awarding (lesson/module conditions). Runs whether the
       // writes above landed or failed soft, and itself fails soft. The

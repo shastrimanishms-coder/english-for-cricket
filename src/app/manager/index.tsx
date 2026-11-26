@@ -97,6 +97,20 @@ export default function ManagerDashboard() {
               </Text>
             </Pressable>
 
+            {/* Student Reports Card (Round 81) */}
+            <Pressable
+              onPress={() => router.push('/manager/reports')}
+              className="flex-1 min-w-[260px] md:min-w-[300px] bg-white p-6 rounded-[20px] shadow-sm border border-inkline active:opacity-90"
+            >
+              <View className="w-14 h-14 rounded-full bg-navy items-center justify-center mb-4">
+                <Ionicons name="document-text" size={26} color="#D4AF37" />
+              </View>
+              <Text className="font-display text-xl font-semibold text-navy mb-2">Student Reports</Text>
+              <Text className="font-sans text-slate-500">
+                Active time, progress and accuracy per student — print or save as PDF for parents.
+              </Text>
+            </Pressable>
+
             {/* Settings Card */}
             <Pressable
               onPress={() => router.push('/manager/settings')}

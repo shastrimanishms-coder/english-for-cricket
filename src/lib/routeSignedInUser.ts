@@ -1,3 +1,4 @@
+import { rememberSavedAccount } from './savedAccounts';
 import { supabase } from './supabase';
 
 /**
@@ -25,9 +26,23 @@ export async function routeSignedInUser(
 
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('role, display_name')
       .eq('id', session.user.id)
       .single();
+
+    // Switch Account (Round 81): a Google sign-in lands back here
+    // rather than in the login form, so remember learner accounts on
+    // this path too — identifier only, never a credential.
+    if (profile?.role === 'individual_learner' && session.user.email) {
+      await rememberSavedAccount({
+        kind: 'auth',
+        displayName:
+          (profile.display_name as string | null) ||
+          session.user.email.split('@')[0] ||
+          session.user.email,
+        identifier: session.user.email.toLowerCase(),
+      });
+    }
 
     if (profile?.role === 'super_admin' || profile?.role === 'content_manager') {
       replace('/admin');

@@ -23,6 +23,7 @@ import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
 import { playDing, playRecordedLine } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
+import { useActivityLogger } from '../../lib/useActivityLogger';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
 import type { VoiceCategory } from '../../lib/voiceStudio';
 
@@ -196,6 +197,12 @@ export default function SmartReading() {
   const [shelfFilter, setShelfFilter] = useState('all');
 
   const [story, setStory] = useState<Story | null>(null);
+
+  // Active time in the reader (Round 81): accrues only while a story
+  // is open — browsing the shelf does not count as reading time. The
+  // hook's engine gates accrual on visibility, focus and interaction.
+  useActivityLogger({ activityType: 'reading', targetId: story?.id ?? null });
+
   const [mode, setMode] = useState<'listen' | 'aloud' | null>(null);
   const [pageIdx, setPageIdx] = useState(0);
   const [sentIdx, setSentIdx] = useState(0);

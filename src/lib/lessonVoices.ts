@@ -200,6 +200,22 @@ export function voiceUrlForText(text: string | null | undefined): string | null 
   return activeVoiceMap.get(toSpeechText(text)) ?? null;
 }
 
+/**
+ * Clears the session caches that were resolved with ONE student's
+ * voice preferences (Round 81, Part 3 — Switch Account). The
+ * recording cache is keyed by text alone and stores the URL chosen
+ * under whoever was signed in when the line first resolved, so on a
+ * shared device the next student could otherwise keep hearing the
+ * previous student's chosen voices until the app is reloaded. Called
+ * whenever a session ends (Log Out / Switch Account). The line index
+ * is deliberately kept: it maps texts to their voice lines and holds
+ * no per-student data.
+ */
+export function resetVoiceSessionCaches(): void {
+  recordingCache.clear();
+  activeVoiceMap = null;
+}
+
 // ------------------------------------------------------- resolution gate
 //
 // Screens that start speaking the moment they open (Smart Reading's

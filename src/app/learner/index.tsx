@@ -8,8 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MicroLabel } from '../../components/ui/Elegant';
 import RewardsCard from '../../components/ui/RewardsCard';
 import { evaluateStreakBadges } from '../../lib/badgeAwards';
+import { endCurrentSession } from '../../lib/sessionEnd';
 import { getStudentIdentity } from '../../lib/studentIdentity';
-import { supabase } from '../../lib/supabase';
 import { useAppLogo } from '../../lib/useAppLogo';
 
 // The header mark (Round 80): the full English for Cricket lockup
@@ -129,12 +129,22 @@ export default function LearnerDashboard() {
   }, [studentId]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    // PIN students have no Supabase session - their session lives in
-    // AsyncStorage, so it must be cleared explicitly or "logout" would
-    // leave them effectively still signed in on this device.
-    await AsyncStorage.removeItem('student_session');
+    // endCurrentSession signs out the Supabase session AND clears the
+    // PIN student's AsyncStorage session (without that, "logout"
+    // would leave a PIN student effectively still signed in on this
+    // device), and clears the voice caches resolved for this student.
+    await endCurrentSession();
     router.replace('/');
+  };
+
+  // Switch Account (Round 81, Part 3): families share one device, so
+  // switching ends the session exactly like Log Out — nothing of this
+  // student's session, caches or preferences carries over — but lands
+  // on the switch list, where the next student picks their name and
+  // re-enters only their password or PIN.
+  const handleSwitchAccount = async () => {
+    await endCurrentSession();
+    router.replace('/switch-account');
   };
 
   // This function now handles routing dynamically based on the card clicked
@@ -186,14 +196,25 @@ export default function LearnerDashboard() {
             />
           )}
 
-          <Pressable
-            onPress={handleLogout}
-            className="rounded-full border border-white/25 px-4 py-2 active:bg-white/15"
-          >
-            <Text className="font-sans text-xs font-bold uppercase tracking-[1.5px] text-white">
-              Log Out
-            </Text>
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handleSwitchAccount}
+              className="flex-row items-center gap-1.5 rounded-full border border-white/25 px-4 py-2 active:bg-white/15"
+            >
+              <Ionicons name="swap-horizontal" size={13} color="#FFFFFF" />
+              <Text className="font-sans text-xs font-bold uppercase tracking-[1.5px] text-white">
+                Switch Account
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleLogout}
+              className="rounded-full border border-white/25 px-4 py-2 active:bg-white/15"
+            >
+              <Text className="font-sans text-xs font-bold uppercase tracking-[1.5px] text-white">
+                Log Out
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
 
