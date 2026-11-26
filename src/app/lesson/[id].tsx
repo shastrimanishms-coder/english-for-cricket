@@ -47,6 +47,7 @@ import {
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import { getStudentIdentity } from '../../lib/studentIdentity';
+import { syncWordBankEnrolments } from '../../lib/wordBank';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import type { VoiceCategory } from '../../lib/voiceStudio';
 import { scoreMessage, scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
@@ -1307,6 +1308,12 @@ export default function LessonPlayer() {
       if (completionError) {
         console.log('Lesson completion not recorded:', completionError.message);
       }
+
+      // Word Bank enrolment (Round 92): this lesson's words join
+      // the student's bank. Fire-and-forget and idempotent
+      // server-side; the bank also re-syncs on every visit, so a
+      // missed call here is never lost.
+      syncWordBankEnrolments(identity);
 
       // activity_logs time for lessons is recorded by the
       // useActivityLogger hook below (Round 81): active seconds only,

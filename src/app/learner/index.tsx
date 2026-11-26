@@ -10,6 +10,7 @@ import RewardsCard from '../../components/ui/RewardsCard';
 import { evaluateStreakBadges } from '../../lib/badgeAwards';
 import { endCurrentSession } from '../../lib/sessionEnd';
 import { getStudentIdentity } from '../../lib/studentIdentity';
+import { syncWordBank } from '../../lib/wordBank';
 import { useAppLogo } from '../../lib/useAppLogo';
 
 // The header mark (Round 80): the full English for Cricket lockup
@@ -55,6 +56,16 @@ const LEARNING_MODULES: {
     description: 'Play the workbook pages for every lesson and every printed textbook on screen — the same pages as the paper books, with no printing needed.',
     cta: 'open workbooks',
     icon: 'journal-outline',
+  },
+  {
+    // Round 92: spaced-repetition word review. The card carries a
+    // live due count (loaded with the identity below) — words from
+    // finished lessons, coming back at growing intervals.
+    id: 'wordbank',
+    title: 'My Word Bank',
+    description: 'Words from your finished lessons come back at just the right time, so they stay in your memory for good.',
+    cta: 'review words',
+    icon: 'bookmarks-outline',
   },
   {
     id: 'games',
@@ -106,6 +117,9 @@ export default function LearnerDashboard() {
   const [studentName, setStudentName] = useState('Champion');
   const [studentId, setStudentId] = useState<string | null>(null);
   const [showPlacementPrompt, setShowPlacementPrompt] = useState(false);
+  // Word Bank due count for the card (null = not loaded / bank not
+  // available yet, in which case the card shows no count line).
+  const [wordBankDue, setWordBankDue] = useState<number | null>(null);
 
   // Greet the actual student: PIN students carry their display name in the
   // local session blob, email learners in user_profiles. Falls back to the
@@ -120,6 +134,11 @@ export default function LearnerDashboard() {
       if (identity) {
         await evaluateStreakBadges(identity);
         setStudentId(identity.studentId);
+        // Word Bank (Round 92): the sync enrols words from lessons
+        // finished since the last visit and returns the due count
+        // for the card. Fails soft (null) before migration 40.
+        const bank = await syncWordBank(identity);
+        if (bank) setWordBankDue(bank.due);
         // First-login placement prompt: show until the test is done on
         // this device or the learner skips it. The test itself lives
         // in the Profile ("Find Your Start") and can be retaken there
@@ -174,6 +193,9 @@ export default function LearnerDashboard() {
         break;
       case 'workbooks':
         router.push('/learner/workbooks' as any);
+        break;
+      case 'wordbank':
+        router.push('/learner/wordbank' as any);
         break;
       case 'speaking':
         router.push('/learner/speaking');
@@ -319,6 +341,13 @@ export default function LearnerDashboard() {
                     <Text className="mb-5 flex-1 font-sans text-[15px] leading-relaxed text-slate-500">
                       {module.description}
                     </Text>
+                    {module.id === 'wordbank' && wordBankDue !== null ? (
+                      <Text className="mb-4 font-sans text-[14px] font-bold text-gold-dark">
+                        {wordBankDue > 0
+                          ? `🔔 ${wordBankDue} word${wordBankDue === 1 ? '' : 's'} to review today`
+                          : 'All caught up for today ✓'}
+                      </Text>
+                    ) : null}
                     <Text className="font-sans text-[13px] font-bold uppercase tracking-[1.5px] text-gold-dark">
                       {module.cta} ›
                     </Text>

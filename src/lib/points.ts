@@ -32,7 +32,8 @@ export type PointKind =
   | 'extra_speaking'
   | 'extra_reading'
   | 'study_day'
-  | 'streak_week';
+  | 'streak_week'
+  | 'word_review';
 
 export const LEVELS = [
   { name: 'Rookie', xp: 0, emoji: '🌱' },
