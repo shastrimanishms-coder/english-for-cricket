@@ -572,6 +572,26 @@ export default function StudentProfile() {
           </Pressable>
         </ElegantCard>
 
+        {/* Help & Support (Round 99): the Support page used to be
+            reachable only from the logged-out home page, so signed-in
+            learners could not find it. This card is its front door
+            from inside the app. */}
+        <ElegantCard className="p-6">
+          <Text className="font-display text-xl font-semibold text-navy mb-4">Help & Support</Text>
+          <Pressable
+            onPress={() => router.push('/support')}
+            className="flex-row items-center justify-between py-3"
+          >
+            <View className="flex-1 pr-3">
+              <Text className="font-sans text-base font-bold text-navy">💬 Contact Support</Text>
+              <Text className="font-sans text-sm text-slate-500">
+                Questions, problems or a bug to report? Send us a message and we will get back to you.
+              </Text>
+            </View>
+            <Text className="text-gold font-bold text-lg">›</Text>
+          </Pressable>
+        </ElegantCard>
+
         {/* My Voices (migration 23): pick the named human voice for
             each kind of speaker. Samples play the actor's approved
             introduction recording. */}

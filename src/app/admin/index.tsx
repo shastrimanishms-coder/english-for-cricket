@@ -8,7 +8,6 @@ import CurriculumManager from '../../components/admin/CurriculumManager';
 import DownloadsManager from '../../components/admin/DownloadsManager';
 import GamesManager from '../../components/admin/GamesManager';
 import HelpCenterManager from '../../components/admin/HelpCenterManager';
-import PageManager from '../../components/admin/PageManager';
 import PageTranslationsManager from '../../components/admin/PageTranslationsManager';
 import SpeakingManager from '../../components/admin/SpeakingManager';
 import ReadingManager from '../../components/admin/ReadingManager';
@@ -81,7 +80,11 @@ const ADMIN_MENU: AdminMenuItem[] = [
   },
   { id: 'badges', label: 'Gamification & Badges', icon: '🏆' },
   { id: 'organizations', label: 'Users & Organizations', icon: '🏛️' },
-  { id: 'pages', label: 'Static Pages & Legal', icon: '📄' },
+  // Round 99: the old 'pages' tab ("Static Pages & Legal", PageManager)
+  // was removed — Pages & Translations below edits every served page
+  // (terms, privacy, support text and the help texts) including the
+  // English master, which the public renderer applies over the pages
+  // table. PageManager.tsx stays in the codebase, unreachable.
   { id: 'page_translations', label: 'Pages & Translations', icon: '🌐' },
   { id: 'support_faqs', label: 'Support & FAQs', icon: '❓' },
   { id: 'settings', label: 'System Settings', icon: '⚙️' },
@@ -603,9 +606,6 @@ export default function SuperAdminDashboard() {
 
       case 'organizations':
         return <UsersManager />;
-
-      case 'pages':
-        return <PageManager />;
 
       case 'page_translations':
         return <PageTranslationsManager />;
