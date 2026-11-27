@@ -32,6 +32,13 @@ const EXPECTED = {
   'image-storage.php': 4013,
 };
 
+// Round 100: generate the static language pages (7 landing pages +
+// 21 document pages) into dist/ BEFORE stamping, so they join the
+// service worker's precache inventory like every other shell page.
+execFileSync('node', [path.join(__dirname, 'generate-lang-pages.js'), distDir], {
+  stdio: 'inherit',
+});
+
 execFileSync('node', [path.join(__dirname, 'stamp-dist.js'), distDir], {
   stdio: 'inherit',
 });
@@ -64,6 +71,25 @@ const indexHtml = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8');
 if (!/\.css/.test(indexHtml) || !/_expo\/static\/js/.test(indexHtml)) {
   console.error('VERIFY FAIL index.html: stylesheet or bundle reference missing');
   ok = false;
+}
+if (!/hreflang="ja"/.test(indexHtml) || !/hreflang="x-default"/.test(indexHtml)) {
+  console.error('VERIFY FAIL index.html: Round 100 hreflang set missing');
+  ok = false;
+}
+// Round 100: all 28 static language pages must be in the export.
+const LANGS = ['ja', 'hi', 'ur', 'ps', 'sw', 'de', 'zu'];
+const DOC_PATHS = ['support', 'terms-and-conditions', 'privacy-policy'];
+for (const lang of LANGS) {
+  const pages = [
+    path.join(lang, 'index.html'),
+    ...DOC_PATHS.map((p) => path.join(lang, p, 'index.html')),
+  ];
+  for (const rel of pages) {
+    if (!fs.existsSync(path.join(distDir, rel))) {
+      console.error(`VERIFY FAIL language page missing: ${rel}`);
+      ok = false;
+    }
+  }
 }
 if (!ok) process.exit(1);
 

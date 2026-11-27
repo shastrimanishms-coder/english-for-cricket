@@ -1,10 +1,125 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://englishforcricket.com/</loc>
-    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ja/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/hi/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ur/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ps/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/sw/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/de/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/zu/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://englishforcricket.com/register</loc>
@@ -20,19 +135,361 @@
   </url>
   <url>
     <loc>https://englishforcricket.com/support</loc>
-    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://englishforcricket.com/ja/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/hi/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ur/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ps/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/sw/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/de/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/zu/support/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/support"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/support/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/support/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/support/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/support/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/support/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/support/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/support/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/support"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://englishforcricket.com/p/terms-and-conditions</loc>
-    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ja/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/hi/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ur/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ps/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/sw/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/de/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/zu/terms-and-conditions/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/terms-and-conditions/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/terms-and-conditions"/>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://englishforcricket.com/p/privacy-policy</loc>
-    <lastmod>2026-11-23</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ja/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/hi/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ur/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/ps/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/sw/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/de/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://englishforcricket.com/zu/privacy-policy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://englishforcricket.com/p/privacy-policy"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://englishforcricket.com/ja/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://englishforcricket.com/hi/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ur" href="https://englishforcricket.com/ur/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="ps" href="https://englishforcricket.com/ps/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="sw" href="https://englishforcricket.com/sw/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://englishforcricket.com/de/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="zu" href="https://englishforcricket.com/zu/privacy-policy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://englishforcricket.com/p/privacy-policy"/>
+    <lastmod>2026-11-28</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
