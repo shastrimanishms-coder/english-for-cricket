@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform } from 'react-native';
+import {
+  LESSON_EXAMPLE,
+  LESSON_FORMAT_LINES,
+  validateLessonPackage,
+  type LessonPkg,
+} from '../../lib/contentPackages';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
+import ContentUploadDoor from './ContentUploadDoor';
 
 interface Module {
   id: string;
@@ -312,6 +319,119 @@ export default function CurriculumManager() {
     </Pressable>
   );
 
+  // ------------------------------------------------------------------
+  // Round 97: lesson upload door. Structure (stages / modules /
+  // lessons) is still managed with the forms above; a lesson's
+  // SLIDES now arrive as one complete package. Installing replaces
+  // the lesson's slides wholesale (or creates the lesson), then the
+  // Word Bank catalogue re-derives the lesson's words via the
+  // rebuild_word_bank_for_lesson RPC (migration 43).
+  // ------------------------------------------------------------------
+  const resolveLessonModule = (pkg: LessonPkg): { module: Module | null; error?: string } => {
+    if (pkg.module_id) {
+      const m = modules.find((x) => x.id === pkg.module_id);
+      return m ? { module: m } : { module: null, error: `Module id ${pkg.module_id} was not found.` };
+    }
+    if (pkg.stage != null && pkg.module != null) {
+      const stage = stages.find((s) => s.order_index === pkg.stage);
+      if (!stage) return { module: null, error: `Stage ${pkg.stage} was not found.` };
+      const m = modules.find((x) => x.stage_id === stage.id && x.order_index % 100 === pkg.module);
+      return m
+        ? { module: m }
+        : { module: null, error: `Module ${pkg.module} was not found in stage ${pkg.stage}.` };
+    }
+    return { module: null, error: 'The package does not say which module the lesson belongs to.' };
+  };
+
+  const planLesson = async (items: LessonPkg[]) => {
+    const pkg = items[0];
+    const { module, error } = resolveLessonModule(pkg);
+    if (!module) return { errors: [error ?? 'Module not found.'], lines: [] as string[] };
+    const lines: string[] = [];
+    if (pkg.lesson_id) {
+      const { data } = await supabase
+        .from('curriculum_lessons')
+        .select('id, title')
+        .eq('id', pkg.lesson_id)
+        .maybeSingle();
+      if (!data) {
+        return {
+          errors: [
+            `lesson_id ${pkg.lesson_id} does not match an existing lesson. Remove "lesson_id" from the package to create a new lesson instead.`,
+          ],
+          lines: [] as string[],
+        };
+      }
+      lines.push(
+        `Replace the slides of "${(data as { title: string }).title}" - all current slides are removed and the package's ${pkg.slides.length} slides are installed. The lesson moves to module "${module.title}" if it is not there already.`
+      );
+    } else {
+      lines.push(`Create lesson "${pkg.title}" in module "${module.title}" with ${pkg.slides.length} slides.`);
+    }
+    lines.push("After install, the Word Bank catalogue re-derives this lesson's words (Migration 43).");
+    return { errors: [] as string[], lines };
+  };
+
+  const installLesson = async (items: LessonPkg[]): Promise<string[]> => {
+    const pkg = items[0];
+    const { module, error } = resolveLessonModule(pkg);
+    if (!module) throw new Error(error ?? 'Module not found.');
+    const results: string[] = [];
+    let lessonId = pkg.lesson_id;
+    if (lessonId) {
+      const { error: upErr } = await supabase
+        .from('curriculum_lessons')
+        .update({ title: pkg.title, module_id: module.id })
+        .eq('id', lessonId);
+      if (upErr) throw upErr;
+      const { error: delErr } = await supabase.from('lesson_slides').delete().eq('lesson_id', lessonId);
+      if (delErr) throw delErr;
+      results.push(`Updated lesson "${pkg.title}" - slides replaced.`);
+    } else {
+      const { count } = await supabase
+        .from('curriculum_lessons')
+        .select('id', { count: 'exact', head: true })
+        .eq('module_id', module.id);
+      const { data, error: insErr } = await supabase
+        .from('curriculum_lessons')
+        .insert([{ title: pkg.title, description: pkg.description, module_id: module.id, order_index: count ?? 0 }])
+        .select('id')
+        .single();
+      if (insErr) throw insErr;
+      lessonId = (data as { id: string }).id;
+      results.push(`Created lesson "${pkg.title}" in "${module.title}".`);
+    }
+    const slideRows = pkg.slides.map((s, i) => ({
+      lesson_id: lessonId as string,
+      slide_type: s.slide_type,
+      prompt_text: s.prompt_text,
+      media_url: s.media_url,
+      audio_url: s.audio_url,
+      correct_answer: s.correct_answer,
+      options: s.options,
+      order_index: i,
+    }));
+    const { error: slideErr } = await supabase.from('lesson_slides').insert(slideRows);
+    if (slideErr) throw slideErr;
+    results.push(`Installed ${slideRows.length} slides.`);
+    const { data: wb, error: wbErr } = await supabase.rpc('rebuild_word_bank_for_lesson', {
+      p_lesson_id: lessonId,
+    });
+    if (wbErr) {
+      results.push(
+        'Word Bank: the automatic word update needs Migration 43 - run Migration43-Word-Bank-Rebuild.sql in the Supabase SQL editor once, and the catalogue will catch up on the next lesson upload.'
+      );
+    } else {
+      const r = (wb ?? {}) as { words?: number; added?: number; updated?: number };
+      results.push(
+        `Word Bank: ${r.words ?? 0} words for this lesson (${r.added ?? 0} new, ${r.updated ?? 0} refreshed).`
+      );
+    }
+    await fetchModules();
+    if (selectedModule && selectedModule.id === module.id) await fetchLessons(module.id);
+    return results;
+  };
+
   return (
     <View className="space-y-8 gap-8">
       {/* Header Area */}
@@ -530,6 +650,19 @@ export default function CurriculumManager() {
           lessons.map((l, i) => renderItemRow(l, i === lessons.length - 1))
         )}
       </View>
+
+      {/* Round 97: lesson packages upload here (slides included);
+          the forms above keep managing structure only. */}
+      <ContentUploadDoor
+        title="📤 Upload a lesson package"
+        blurb="A lesson's slides are no longer built in the admin - one JSON package carries a complete lesson (title, placement and ALL its slides). Pick a file, check the plan, then install. Stages, modules and lessons themselves are still created and edited with the forms above."
+        formatLines={LESSON_FORMAT_LINES}
+        exampleJson={JSON.stringify(LESSON_EXAMPLE, null, 2)}
+        exampleFileName="lesson-package-example.json"
+        validate={validateLessonPackage}
+        plan={planLesson}
+        install={installLesson}
+      />
     </View>
   );
 }

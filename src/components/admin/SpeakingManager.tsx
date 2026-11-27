@@ -8,12 +8,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {
+  SPEAKING_EXAMPLE,
+  SPEAKING_FORMAT_LINES,
+  validateSpeakingPackage,
+  type SpeakingPkg,
+} from '../../lib/contentPackages';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 import AdminDropdown from './AdminDropdown';
 import ContentTagging from './ContentTagging';
+import ContentUploadDoor from './ContentUploadDoor';
 import GroupedContentList from './GroupedContentList';
 import SentenceVoices from './SentenceVoices';
 import {
@@ -133,24 +140,6 @@ export default function SpeakingManager() {
 
   const categoryIdsFor = (row: ScenarioRow): string[] =>
     memberships[row.id] ?? (row.category_id ? [row.category_id] : []);
-
-  const openCreateForm = () => {
-    setEditId(null);
-    setTitle('');
-    setCategory('Interview');
-    setEmoji('🎙️');
-    setDescription('');
-    setOtherName('');
-    setTurns([
-      { speaker: 'other', text: '' },
-      { speaker: 'learner', text: '' },
-    ]);
-    setLessonId(null);
-    setStageId(null);
-    setModuleId(null);
-    setCategoryIds([]);
-    setShowForm(true);
-  };
 
   const openEditForm = (row: ScenarioRow) => {
     setEditId(row.id);
@@ -294,15 +283,120 @@ export default function SpeakingManager() {
   const learnerLineCount = (row: ScenarioRow) =>
     (Array.isArray(row.turns) ? row.turns : []).filter(t => t.speaker === 'learner').length;
 
+  // ------------------------------------------------------------------
+  // Round 97: upload door. New scenarios arrive as packages; the
+  // form below is now edit-only. Plan resolves placement + category
+  // names against live data; install re-resolves and writes.
+  // ------------------------------------------------------------------
+  interface ResolvedSpeaking extends SpeakingPkg {
+    resolvedStageId: string | null;
+    resolvedModuleId: string | null;
+    resolvedCategoryIds: string[];
+    existingId: string | null;
+  }
+
+  const resolveSpeaking = (items: SpeakingPkg[]) => {
+    const errors: string[] = [];
+    const flatCats = flattenCategoryTree(speakingCats);
+    const resolved: ResolvedSpeaking[] = items.map((s) => {
+      let stageId = s.stage_id;
+      if (!stageId && s.stage != null) {
+        stageId = taxonomy?.stages.find((st) => st.order_index === s.stage)?.id ?? null;
+        if (!stageId) errors.push(`"${s.title}": stage ${s.stage} was not found.`);
+      }
+      let moduleId: string | null = null;
+      if (s.module != null) {
+        if (!stageId) {
+          errors.push(`"${s.title}": module ${s.module} needs its stage.`);
+        } else {
+          moduleId =
+            taxonomy?.modules.find(
+              (m) => m.stage_id === stageId && m.order_index % 100 === s.module
+            )?.id ?? null;
+          if (!moduleId) errors.push(`"${s.title}": module ${s.module} was not found in stage ${s.stage}.`);
+        }
+      }
+      const catIds: string[] = [];
+      for (const name of s.categories) {
+        const hit = flatCats.find(({ cat }) => cat.name.trim().toLowerCase() === name.toLowerCase());
+        if (!hit) {
+          errors.push(`"${s.title}": category "${name}" does not exist in the Speaking tree - create it in the Categories Manager first.`);
+        } else {
+          catIds.push(hit.cat.id);
+        }
+      }
+      const existing = scenarios.find(
+        (r) =>
+          r.title.trim().toLowerCase() === s.title.toLowerCase() &&
+          (r.stage_id ?? null) === (stageId ?? null)
+      );
+      return {
+        ...s,
+        resolvedStageId: stageId,
+        resolvedModuleId: moduleId,
+        resolvedCategoryIds: catIds,
+        existingId: existing?.id ?? null,
+      };
+    });
+    const lines = resolved.map((r) =>
+      r.existingId
+        ? `Update "${r.title}" - replace its ${r.turns.length} lines.`
+        : `Create "${r.title}" - ${r.turns.length} lines.`
+    );
+    return { errors, resolved, lines };
+  };
+
+  const planSpeaking = async (items: SpeakingPkg[]) => {
+    const { errors, lines } = resolveSpeaking(items);
+    return { errors, lines };
+  };
+
+  const installSpeaking = async (items: SpeakingPkg[]): Promise<string[]> => {
+    const { errors, resolved } = resolveSpeaking(items);
+    if (errors.length > 0) throw new Error(errors[0]);
+    const results: string[] = [];
+    let nextOrder = scenarios.reduce((mx, r) => Math.max(mx, r.order_index ?? 0), 0);
+    for (const r of resolved) {
+      const payload = {
+        title: r.title,
+        category: r.type,
+        emoji: r.emoji,
+        description: r.description || null,
+        other_name: r.partner_name,
+        turns: r.turns,
+        ...(taggingAvailable
+          ? { lesson_id: r.lesson_id, category_id: primaryCategoryId(r.resolvedCategoryIds, speakingCats) }
+          : {}),
+        ...(stageTagging ? { stage_id: r.resolvedStageId, module_id: r.resolvedModuleId } : {}),
+      };
+      let id = r.existingId;
+      if (id) {
+        const { error } = await supabase.from('speaking_scenarios').update(payload).eq('id', id);
+        if (error) throw error;
+        results.push(`Updated "${r.title}".`);
+      } else {
+        nextOrder += 1;
+        const { data, error } = await supabase
+          .from('speaking_scenarios')
+          .insert([{ ...payload, order_index: nextOrder }])
+          .select('id')
+          .single();
+        if (error) throw error;
+        id = (data as { id: string }).id;
+        results.push(`Created "${r.title}".`);
+      }
+      if (taggingAvailable) {
+        await setItemCategories('speaking', id, r.resolvedCategoryIds, speakingCats);
+      }
+    }
+    await fetchData();
+    return results;
+  };
+
   return (
     <View className="space-y-8 gap-8">
       <View className="flex-row justify-between items-center flex-wrap gap-4">
         <Text className="font-display text-3xl font-semibold text-navy">Speaking Practice CMS</Text>
-        {!showForm && !tableMissing && (
-          <Pressable onPress={openCreateForm} className="px-5 py-3 bg-gold rounded-full border-b-4 border-gold-dark">
-            <Text className="text-navy font-bold text-sm">+ New Scenario</Text>
-          </Pressable>
-        )}
       </View>
 
       <View className="bg-navy p-5 rounded-[20px]">
@@ -310,11 +404,24 @@ export default function SpeakingManager() {
         <Text className="text-slate-300 text-sm">
           These scenarios power the learner&apos;s Speaking Practice area (Interviews &amp; Small
           Talk). The app plays the other person; the student speaks their own lines and gets a
-          speech score. Lesson speaking stays separate — Speak &amp; Repeat slides live in the
-          Slide Builder. Talking with an AI partner is planned for a future update; these scripted
-          scenarios are ready for it.
+          speech score. Lesson speaking stays separate — Speak &amp; Repeat slides arrive inside
+          lesson packages (Modules &amp; Lessons). Talking with an AI partner is planned for a
+          future update; these scripted scenarios are ready for it.
         </Text>
       </View>
+
+      {!tableMissing && !showForm ? (
+        <ContentUploadDoor
+          title="📤 Upload a speaking package"
+          blurb="New scenarios are no longer typed in here - they arrive as one JSON package file (the format the Content Studio will export). Pick a file, check the plan, then install. Existing scenarios below can still be edited, categorised and published as before."
+          formatLines={SPEAKING_FORMAT_LINES}
+          exampleJson={JSON.stringify(SPEAKING_EXAMPLE, null, 2)}
+          exampleFileName="speaking-package-example.json"
+          validate={validateSpeakingPackage}
+          plan={planSpeaking}
+          install={installSpeaking}
+        />
+      ) : null}
 
       {tableMissing ? (
         <View className="bg-amber-50 border border-amber-200 rounded-xl p-6">
@@ -329,7 +436,7 @@ export default function SpeakingManager() {
       ) : showForm ? (
         <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
           <Text className="font-display text-xl font-semibold text-navy">
-            {editId ? 'Edit Scenario' : 'Create New Scenario'}
+            Edit Scenario
           </Text>
 
           <View className="flex-col md:flex-row gap-4">
@@ -523,7 +630,7 @@ export default function SpeakingManager() {
           descriptionOf={(row) => row.description}
           itemNoun="scenarios"
           searchPlaceholder="Search scenarios by title…"
-          emptyMessage="No scenarios yet."
+          emptyMessage="No scenarios yet. Upload a speaking package above to add the first ones."
           framed={false}
           bulkAssign={{
             onAssign: async (ids, categoryId) => {

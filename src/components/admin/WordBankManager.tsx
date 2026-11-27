@@ -82,6 +82,11 @@ export default function WordBankManager() {
   const [moduleId, setModuleId] = useState('');
   const [lessonId, setLessonId] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Round 97: the list is grouped by teaching place (Learning Path
+  // Stage -> Module -> Lesson; Textbooks Book -> Lesson), collapsed
+  // by default. Open group ids live here; any search or filter
+  // switches back to the flat list (see flatMode below).
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [formExample, setFormExample] = useState('');
@@ -265,6 +270,125 @@ export default function WordBankManager() {
   const enabledCount = useMemo(() => words.filter((w) => w.is_enabled).length, [words]);
   const visible = filtered.slice(0, visibleCount);
 
+  // --- Round 97: grouping -----------------------------------------------------
+  // The catalogue's 2,600+ words were one endless flat list. They
+  // are now grouped by WHERE each word is taught: Learning Path ->
+  // Stage -> Module -> Lesson (the word's lesson_id attribution),
+  // and Textbooks -> Book -> Lesson (word_bank_sources). A word
+  // taught in both series appears under both - same word_key, and
+  // its On/Off toggle and Edit act on the same catalogue row.
+  // Groups start collapsed; the existing filters narrow the groups;
+  // a text search switches to the flat list (below) so matches are
+  // never buried inside a closed group.
+  // Grouped view is the default browse state. ANY narrowing - a
+  // text search or any filter (source, stage, module, lesson) -
+  // switches to the flat list, so a filtered result is never
+  // buried inside a closed group.
+  const flatMode =
+    search.trim().length > 0 || !!sourceFilter || !!stageId || !!moduleId || !!lessonId;
+
+  interface WordGroupNode {
+    id: string;
+    label: string;
+    count: number;
+    depth: number;
+    rows?: WordRow[];
+    children?: WordGroupNode[];
+  }
+
+  const grouped = useMemo(() => {
+    const byOrder = (a: { order_index: number }, b: { order_index: number }) =>
+      a.order_index - b.order_index;
+    const sections: WordGroupNode[] = [];
+
+    // Learning Path: Stage -> Module -> Lesson.
+    const lpChildren: WordGroupNode[] = [];
+    let lpTotal = 0;
+    const knownLessonIds = new Set((taxonomy?.lessons || []).map((l) => l.id));
+    if (taxonomy) {
+      for (const stage of [...taxonomy.stages].sort(byOrder)) {
+        const stageNodes: WordGroupNode[] = [];
+        let stageCount = 0;
+        for (const mod of taxonomy.modules.filter((m) => m.stage_id === stage.id).sort(byOrder)) {
+          const lessonNodes: WordGroupNode[] = [];
+          let modCount = 0;
+          for (const lesson of taxonomy.lessons.filter((l) => l.module_id === mod.id).sort(byOrder)) {
+            const rows = filtered.filter((w) => w.lesson_id === lesson.id);
+            if (rows.length === 0) continue;
+            lessonNodes.push({
+              id: `lp-l:${lesson.id}`,
+              label: `Lesson ${lesson.order_index + 1} · ${lesson.title}`,
+              count: rows.length,
+              depth: 3,
+              rows,
+            });
+            modCount += rows.length;
+          }
+          if (modCount === 0) continue;
+          stageNodes.push({ id: `lp-m:${mod.id}`, label: mod.title, count: modCount, depth: 2, children: lessonNodes });
+          stageCount += modCount;
+        }
+        if (stageCount === 0) continue;
+        lpChildren.push({
+          id: `lp-s:${stage.id}`,
+          label: `Stage ${stage.order_index} · ${stage.title}`,
+          count: stageCount,
+          depth: 1,
+          children: stageNodes,
+        });
+        lpTotal += stageCount;
+      }
+    }
+    const orphanRows = filtered.filter((w) => w.lesson_id && !knownLessonIds.has(w.lesson_id));
+    if (orphanRows.length > 0) {
+      lpChildren.push({ id: 'lp-other', label: 'Other lessons', count: orphanRows.length, depth: 1, rows: orphanRows });
+      lpTotal += orphanRows.length;
+    }
+    if (lpTotal > 0) {
+      sections.push({ id: 'sec:lp', label: '📚 Learning Path', count: lpTotal, depth: 0, children: lpChildren });
+    }
+
+    // Textbooks: Book -> Lesson.
+    const bookNodes: WordGroupNode[] = [];
+    let tbTotal = 0;
+    for (let b = 1; b <= 5; b++) {
+      const perLesson = new Map<number, { title: string | null; rows: WordRow[] }>();
+      for (const w of filtered) {
+        for (const s of textbookSourcesOf(w)) {
+          if (s.book_no !== b || s.book_lesson_no == null) continue;
+          const entry = perLesson.get(s.book_lesson_no) || { title: s.lesson_title, rows: [] };
+          if (!entry.rows.includes(w)) entry.rows.push(w);
+          perLesson.set(s.book_lesson_no, entry);
+        }
+      }
+      const lessonNodes: WordGroupNode[] = [...perLesson.entries()]
+        .sort((a, b2) => a[0] - b2[0])
+        .map(([no, e]) => ({
+          id: `tb-l:${b}:${no}`,
+          label: `Lesson ${no}${e.title ? ` · ${e.title}` : ''}`,
+          count: e.rows.length,
+          depth: 2,
+          rows: e.rows,
+        }));
+      const bookCount = lessonNodes.reduce((a, n) => a + n.count, 0);
+      if (bookCount === 0) continue;
+      bookNodes.push({ id: `tb-b:${b}`, label: `Book ${b}`, count: bookCount, depth: 1, children: lessonNodes });
+      tbTotal += bookCount;
+    }
+    if (tbTotal > 0) {
+      sections.push({ id: 'sec:tb', label: '📖 Textbooks', count: tbTotal, depth: 0, children: bookNodes });
+    }
+    return sections;
+  }, [filtered, taxonomy, textbookSourcesOf]);
+
+  const toggleGroup = (id: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   // --- writes -------------------------------------------------------------------
   const applyLocal = (key: string, patch: Partial<WordRow>) =>
     setWords((prev) => prev.map((w) => (w.word_key === key ? { ...w, ...patch } : w)));
@@ -311,6 +435,202 @@ export default function WordBankManager() {
     }
     applyLocal(row.word_key, patch);
     setEditingKey(null);
+  };
+
+  // One word row - shared by the flat (search) list and the grouped
+  // list. keyPrefix keeps React keys unique when the same word
+  // renders under both its Learning Path lesson and a textbook
+  // lesson; the toggle and editor act on the same catalogue row.
+  const renderWordRow = (row: WordRow, keyPrefix: string) => {
+    const editing = editingKey === row.word_key;
+    return (
+      <View
+        key={`${keyPrefix}${row.word_key}`}
+        className={`bg-white border rounded-2xl p-3 ${
+          row.is_enabled ? 'border-inkline' : 'border-inkline opacity-70'
+        }`}
+      >
+        <View className="flex-row items-center gap-3">
+          {row.image_url ? (
+            <Image
+              source={{ uri: row.image_url }}
+              style={{ width: 44, height: 44, borderRadius: 10 }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View
+              style={{ width: 44, height: 44, borderRadius: 10 }}
+              className="bg-pitch-light items-center justify-center"
+            >
+              <Text style={{ fontSize: 22 }}>{row.emoji || '⭐'}</Text>
+            </View>
+          )}
+          <View className="flex-1">
+            <Text className="font-sans font-bold text-navy text-base">
+              {row.emoji ? `${row.emoji} ` : ''}
+              {row.word}
+            </Text>
+            <Text className="text-slate-400 text-xs" numberOfLines={1}>
+              {row.example || '(no example sentence)'}
+            </Text>
+            <Text className="text-slate-400 text-[11px]" numberOfLines={1}>
+              {sourceLabel(row)}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => void toggleEnabled(row)}
+            disabled={togglingKey === row.word_key}
+            className={`px-3.5 py-2 rounded-full border ${
+              row.is_enabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-100 border-slate-300'
+            }`}
+          >
+            <Text className={`text-xs font-bold ${row.is_enabled ? 'text-white' : 'text-slate-500'}`}>
+              {row.is_enabled ? 'On' : 'Off'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => (editing ? setEditingKey(null) : startEdit(row))}
+            className="px-3.5 py-2 rounded-full bg-navy"
+          >
+            <Text className="text-xs font-bold text-white">{editing ? 'Close' : 'Edit'}</Text>
+          </Pressable>
+        </View>
+
+        {editing ? (
+          <View className="mt-3 pt-3 border-t border-inkline">
+            <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
+              The word (cannot be changed)
+            </Text>
+            <Text className="font-sans font-bold text-navy mb-1">{row.word}</Text>
+            <Text className="text-slate-400 text-xs mb-3">
+              Recordings are matched by the exact word text, so the word itself stays as
+              the lessons teach it. To retire a word, switch it off instead.
+            </Text>
+
+            <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
+              Example sentence
+            </Text>
+            <TextInput
+              value={formExample}
+              onChangeText={setFormExample}
+              placeholder="The example sentence students see and hear"
+              multiline
+              className="bg-canvas border border-inkline rounded-xl px-3 py-2.5 mb-3 font-sans text-sm"
+            />
+
+            <View className="flex-row gap-3 mb-3">
+              <View style={{ width: 90 }}>
+                <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
+                  Emoji
+                </Text>
+                <TextInput
+                  value={formEmoji}
+                  onChangeText={setFormEmoji}
+                  placeholder="⭐"
+                  className="bg-canvas border border-inkline rounded-xl px-3 py-2.5 font-sans text-sm"
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
+                  Picture URL
+                </Text>
+                <TextInput
+                  value={formImageUrl}
+                  onChangeText={setFormImageUrl}
+                  placeholder="https://…"
+                  autoCapitalize="none"
+                  className="bg-canvas border border-inkline rounded-xl px-3 py-2.5 font-sans text-sm"
+                />
+              </View>
+              {formImageUrl.trim() ? (
+                <Image
+                  source={{ uri: formImageUrl.trim() }}
+                  style={{ width: 52, height: 52, borderRadius: 10, marginTop: 14 }}
+                  resizeMode="cover"
+                />
+              ) : null}
+            </View>
+
+            <View className="flex-row items-center gap-3 mb-4">
+              <Pressable
+                onPress={() => setFormEnabled((v) => !v)}
+                className={`px-3.5 py-2 rounded-full border ${
+                  formEnabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-100 border-slate-300'
+                }`}
+              >
+                <Text className={`text-xs font-bold ${formEnabled ? 'text-white' : 'text-slate-500'}`}>
+                  {formEnabled ? 'On' : 'Off'}
+                </Text>
+              </Pressable>
+              <Text className="text-slate-500 text-sm flex-1">
+                Switched on, this word joins students&rsquo; banks, reviews and books.
+              </Text>
+            </View>
+
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => void saveEdit(row)}
+                disabled={saving}
+                className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full"
+              >
+                <Text className="text-navy font-bold">{saving ? 'Saving…' : 'Save changes'}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setEditingKey(null)}
+                className="px-6 py-3 bg-white border border-inkline rounded-full"
+              >
+                <Text className="font-bold text-slate-600">Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderGroup = (node: WordGroupNode): React.ReactNode => {
+    const open = openGroups.has(node.id);
+    const headerPad = node.depth === 0 ? 'px-4 py-3.5' : node.depth === 1 ? 'px-4 py-3' : 'px-4 py-2.5';
+    const headerBg =
+      node.depth === 0
+        ? 'bg-navy'
+        : node.depth === 1
+          ? 'bg-slate-100'
+          : node.depth === 2
+            ? 'bg-slate-50'
+            : 'bg-white';
+    const headerText =
+      node.depth === 0
+        ? 'text-white font-display font-semibold text-base'
+        : node.depth === 3
+          ? 'text-navy font-sans font-semibold text-sm'
+          : 'text-navy font-sans font-bold text-sm';
+    return (
+      <View
+        key={node.id}
+        className="bg-white border border-inkline rounded-2xl overflow-hidden"
+        style={node.depth > 0 ? { marginLeft: node.depth * 10 } : undefined}
+      >
+        <Pressable onPress={() => toggleGroup(node.id)} className={`flex-row items-center justify-between ${headerPad} ${headerBg}`}>
+          <Text className={headerText}>
+            {open ? '▾' : '▸'}  {node.label}
+            <Text className={node.depth === 0 ? 'text-slate-300 font-normal text-sm' : 'text-slate-400 font-normal text-sm'}>
+              {'   ·   '}
+              {node.count} word{node.count === 1 ? '' : 's'}
+            </Text>
+          </Text>
+          <Text className={`text-xs font-bold uppercase tracking-wider ${node.depth === 0 ? 'text-gold' : 'text-gold-dark'}`}>
+            {open ? 'Hide' : 'Show'}
+          </Text>
+        </Pressable>
+        {open ? (
+          <View className={node.rows ? 'p-2 gap-2' : 'p-2 gap-2 bg-slate-50'}>
+            {node.rows ? node.rows.map((r) => renderWordRow(r, `${node.id}:`)) : null}
+            {node.children ? node.children.map((c) => renderGroup(c)) : null}
+          </View>
+        ) : null}
+      </View>
+    );
   };
 
   // --- render -------------------------------------------------------------------
@@ -449,170 +769,26 @@ export default function WordBankManager() {
           </View>
         </View>
         <Text className="text-slate-400 text-sm mt-3">
-          Showing {visible.length} of {filtered.length} matching word
-          {filtered.length === 1 ? '' : 's'}
-          {lessonId
-            ? ` · this lesson teaches ${wordsPerLesson.get(lessonId) || 0} words`
-            : ''}
-          .
+          {flatMode
+            ? `Showing ${visible.length} of ${filtered.length} matching word${filtered.length === 1 ? '' : 's'}${lessonId ? ` · this lesson teaches ${wordsPerLesson.get(lessonId) || 0} words` : ''}.`
+            : `${filtered.length} matching word${filtered.length === 1 ? '' : 's'}, grouped by where each word is taught - tap a stage, module or lesson to open its words.`}
         </Text>
       </View>
 
-      {/* Rows */}
-      <View className="gap-2">
-        {visible.map((row) => {
-          const editing = editingKey === row.word_key;
-          return (
-            <View
-              key={row.word_key}
-              className={`bg-white border rounded-2xl p-3 ${
-                row.is_enabled ? 'border-inkline' : 'border-inkline opacity-70'
-              }`}
-            >
-              <View className="flex-row items-center gap-3">
-                {row.image_url ? (
-                  <Image
-                    source={{ uri: row.image_url }}
-                    style={{ width: 44, height: 44, borderRadius: 10 }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={{ width: 44, height: 44, borderRadius: 10 }}
-                    className="bg-pitch-light items-center justify-center"
-                  >
-                    <Text style={{ fontSize: 22 }}>{row.emoji || '⭐'}</Text>
-                  </View>
-                )}
-                <View className="flex-1">
-                  <Text className="font-sans font-bold text-navy text-base">
-                    {row.emoji ? `${row.emoji} ` : ''}
-                    {row.word}
-                  </Text>
-                  <Text className="text-slate-400 text-xs" numberOfLines={1}>
-                    {row.example || '(no example sentence)'}
-                  </Text>
-                  <Text className="text-slate-400 text-[11px]" numberOfLines={1}>
-                    {sourceLabel(row)}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => void toggleEnabled(row)}
-                  disabled={togglingKey === row.word_key}
-                  className={`px-3.5 py-2 rounded-full border ${
-                    row.is_enabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-100 border-slate-300'
-                  }`}
-                >
-                  <Text className={`text-xs font-bold ${row.is_enabled ? 'text-white' : 'text-slate-500'}`}>
-                    {row.is_enabled ? 'On' : 'Off'}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => (editing ? setEditingKey(null) : startEdit(row))}
-                  className="px-3.5 py-2 rounded-full bg-navy"
-                >
-                  <Text className="text-xs font-bold text-white">{editing ? 'Close' : 'Edit'}</Text>
-                </Pressable>
-              </View>
-
-              {editing ? (
-                <View className="mt-3 pt-3 border-t border-inkline">
-                  <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
-                    The word (cannot be changed)
-                  </Text>
-                  <Text className="font-sans font-bold text-navy mb-1">{row.word}</Text>
-                  <Text className="text-slate-400 text-xs mb-3">
-                    Recordings are matched by the exact word text, so the word itself stays as
-                    the lessons teach it. To retire a word, switch it off instead.
-                  </Text>
-
-                  <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
-                    Example sentence
-                  </Text>
-                  <TextInput
-                    value={formExample}
-                    onChangeText={setFormExample}
-                    placeholder="The example sentence students see and hear"
-                    multiline
-                    className="bg-canvas border border-inkline rounded-xl px-3 py-2.5 mb-3 font-sans text-sm"
-                  />
-
-                  <View className="flex-row gap-3 mb-3">
-                    <View style={{ width: 90 }}>
-                      <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
-                        Emoji
-                      </Text>
-                      <TextInput
-                        value={formEmoji}
-                        onChangeText={setFormEmoji}
-                        placeholder="⭐"
-                        className="bg-canvas border border-inkline rounded-xl px-3 py-2.5 font-sans text-sm"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
-                        Picture URL
-                      </Text>
-                      <TextInput
-                        value={formImageUrl}
-                        onChangeText={setFormImageUrl}
-                        placeholder="https://…"
-                        autoCapitalize="none"
-                        className="bg-canvas border border-inkline rounded-xl px-3 py-2.5 font-sans text-sm"
-                      />
-                    </View>
-                    {formImageUrl.trim() ? (
-                      <Image
-                        source={{ uri: formImageUrl.trim() }}
-                        style={{ width: 52, height: 52, borderRadius: 10, marginTop: 14 }}
-                        resizeMode="cover"
-                      />
-                    ) : null}
-                  </View>
-
-                  <View className="flex-row items-center gap-3 mb-4">
-                    <Pressable
-                      onPress={() => setFormEnabled((v) => !v)}
-                      className={`px-3.5 py-2 rounded-full border ${
-                        formEnabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-100 border-slate-300'
-                      }`}
-                    >
-                      <Text className={`text-xs font-bold ${formEnabled ? 'text-white' : 'text-slate-500'}`}>
-                        {formEnabled ? 'On' : 'Off'}
-                      </Text>
-                    </Pressable>
-                    <Text className="text-slate-500 text-sm flex-1">
-                      Switched on, this word joins students&rsquo; banks, reviews and books.
-                    </Text>
-                  </View>
-
-                  <View className="flex-row gap-3">
-                    <Pressable
-                      onPress={() => void saveEdit(row)}
-                      disabled={saving}
-                      className="px-6 py-3 bg-gold border-b-4 border-gold-dark rounded-full"
-                    >
-                      <Text className="text-navy font-bold">{saving ? 'Saving…' : 'Save changes'}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setEditingKey(null)}
-                      className="px-6 py-3 bg-white border border-inkline rounded-full"
-                    >
-                      <Text className="font-bold text-slate-600">Cancel</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
-      </View>
+      {/* Rows: grouped by teaching place (Round 97) in the
+          default browse state; any search or filter switches to
+          the flat paginated list. */}
+      {flatMode ? (
+        <View className="gap-2">{visible.map((row) => renderWordRow(row, 'flat:'))}</View>
+      ) : (
+        <View className="gap-3">{grouped.map((node) => renderGroup(node))}</View>
+      )}
 
       {filtered.length === 0 ? (
         <View className="py-12 items-center">
           <Text className="text-slate-400">No words match these filters.</Text>
         </View>
-      ) : visibleCount < filtered.length ? (
+      ) : flatMode && visibleCount < filtered.length ? (
         <Pressable
           onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
           className="self-center mt-5 px-8 py-3.5 bg-white border border-inkline rounded-full"

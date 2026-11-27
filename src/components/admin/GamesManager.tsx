@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, Alert, ActivityIndicator, Pressable, Platform, ScrollView, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import {
+  GAMES_EXAMPLE,
+  GAMES_FORMAT_LINES,
+  validateGamesPackage,
+  type GamePkg,
+} from '../../lib/contentPackages';
 import { contentTypeForFileName } from '../../lib/fileTypes';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import AnimatedButton from '../ui/AnimatedButton';
 import AdminDropdown from './AdminDropdown';
 import ContentTagging from './ContentTagging';
+import ContentUploadDoor from './ContentUploadDoor';
 import GroupedContentList from './GroupedContentList';
 import BuiltinGame from '../games/BuiltinGame';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
@@ -311,6 +318,103 @@ export default function GamesManager() {
     setCategoryIds([]);
   };
 
+  // ------------------------------------------------------------------
+  // Round 97: upload door. New built-in games arrive as packages;
+  // the form below is now edit-only. Workbook-engine games stay out
+  // of this door entirely (validator rejects them by name).
+  // ------------------------------------------------------------------
+  interface ResolvedGame extends GamePkg {
+    resolvedStageId: string | null;
+    resolvedModuleId: string | null;
+    resolvedCategoryIds: string[];
+    existingId: string | null;
+  }
+
+  const resolveGames = (items: GamePkg[]) => {
+    const errors: string[] = [];
+    const flatCats = flattenCategoryTree(categories);
+    const resolved: ResolvedGame[] = items.map((g) => {
+      let stageId = g.stage_id;
+      if (!stageId && g.stage != null) {
+        stageId = taxonomy?.stages.find((st) => st.order_index === g.stage)?.id ?? null;
+        if (!stageId) errors.push(`"${g.title}": stage ${g.stage} was not found.`);
+      }
+      let moduleId: string | null = null;
+      if (g.module != null) {
+        if (!stageId) {
+          errors.push(`"${g.title}": module ${g.module} needs its stage.`);
+        } else {
+          moduleId =
+            taxonomy?.modules.find(
+              (m) => m.stage_id === stageId && m.order_index % 100 === g.module
+            )?.id ?? null;
+          if (!moduleId) errors.push(`"${g.title}": module ${g.module} was not found in stage ${g.stage}.`);
+        }
+      }
+      const catIds: string[] = [];
+      for (const name of g.categories) {
+        const hit = flatCats.find(({ cat }) => cat.name.trim().toLowerCase() === name.toLowerCase());
+        if (!hit) {
+          errors.push(`"${g.title}": category "${name}" does not exist in the Games tree - create it in the Categories Manager first.`);
+        } else {
+          catIds.push(hit.cat.id);
+        }
+      }
+      const existing = games.find((r) => r.title.trim().toLowerCase() === g.title.toLowerCase());
+      return {
+        ...g,
+        resolvedStageId: stageId,
+        resolvedModuleId: moduleId,
+        resolvedCategoryIds: catIds,
+        existingId: existing?.id ?? null,
+      };
+    });
+    const lines = resolved.map((r) =>
+      r.existingId
+        ? `Update "${r.title}" (${r.engine}) - replace its details and data.`
+        : `Create "${r.title}" (${r.engine}).`
+    );
+    return { errors, resolved, lines };
+  };
+
+  const planGames = async (items: GamePkg[]) => {
+    const { errors, lines } = resolveGames(items);
+    return { errors, lines };
+  };
+
+  const installGames = async (items: GamePkg[]): Promise<string[]> => {
+    const { errors, resolved } = resolveGames(items);
+    if (errors.length > 0) throw new Error(errors[0]);
+    const results: string[] = [];
+    for (const r of resolved) {
+      const payload: any = {
+        title: r.title,
+        description: r.description,
+        engine: r.engine,
+        data: r.data,
+        thumbnail_url: r.thumbnail_url,
+        game_url: '',
+        category_id: primaryCategoryId(r.resolvedCategoryIds, categories),
+        ...(taggingAvailable ? { lesson_id: r.lesson_id } : {}),
+        ...(stageTagging ? { stage_id: r.resolvedStageId, module_id: r.resolvedModuleId } : {}),
+      };
+      let id = r.existingId;
+      if (id) {
+        const { error } = await supabase.from('games').update(payload).eq('id', id);
+        if (error) throw error;
+        results.push(`Updated "${r.title}".`);
+      } else {
+        const { data, error } = await supabase.from('games').insert([payload]).select('id').single();
+        if (error) throw error;
+        id = (data as { id: string }).id;
+        results.push(`Created "${r.title}".`);
+      }
+      await setItemCategories('games', id, r.resolvedCategoryIds, categories);
+    }
+    await fetchData();
+    return results;
+  };
+
   const visibleGames = games.filter((g) => {
     if (fCategory && !categoryIdsFor(g).includes(fCategory)) return false;
     if (fStage && g.stage_id !== fStage) return false;
@@ -326,10 +430,26 @@ export default function GamesManager() {
         <Text className="font-display text-3xl font-semibold text-navy">Games & Arcade CMS</Text>
       </View>
 
-      {/* Editor Form */}
+      {/* Round 97: new games arrive through the upload door; the
+          form below opens only when editing an existing game. */}
+      {!editId ? (
+        <ContentUploadDoor
+          title="📤 Upload a games package"
+          blurb="New built-in games are no longer created here - they arrive as one JSON package file (the format the Content Studio will export). Pick a file, check the plan, then install. Workbook games keep their own import in the Workbooks tab. Existing games below can still be edited, categorised and deleted as before."
+          formatLines={GAMES_FORMAT_LINES}
+          exampleJson={JSON.stringify(GAMES_EXAMPLE, null, 2)}
+          exampleFileName="games-package-example.json"
+          validate={validateGamesPackage}
+          plan={planGames}
+          install={installGames}
+        />
+      ) : null}
+
+      {/* Editor Form (existing games only) */}
+      {editId ? (
       <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm space-y-6 gap-6">
         <Text className="font-display text-xl font-semibold text-navy">
-          {editId ? 'Edit Game Module' : 'Upload New Game'}
+          Edit Game Module
         </Text>
         
         <View>
@@ -442,6 +562,7 @@ export default function GamesManager() {
           </View>
         </View>
       </View>
+      ) : null}
 
       {/* Built-in game preview */}
       {previewGame ? (

@@ -8,11 +8,18 @@ import {
   View,
 } from 'react-native';
 import { countCoveredSentences } from '../../lib/adminVoiceUploads';
+import {
+  READING_EXAMPLE,
+  READING_FORMAT_LINES,
+  validateReadingPackage,
+  type ReadingPkg,
+} from '../../lib/contentPackages';
 import { fetchTaxonomy, type Taxonomy } from '../../lib/curriculumTaxonomy';
 import { showAlert } from '../../lib/showAlert';
 import { supabase } from '../../lib/supabase';
 import { useLessonTagging } from '../../lib/useLessonTagging';
 import ContentTagging from './ContentTagging';
+import ContentUploadDoor from './ContentUploadDoor';
 import GroupedContentList from './GroupedContentList';
 import SentenceVoices from './SentenceVoices';
 import {
@@ -131,21 +138,6 @@ export default function ReadingManager() {
 
   const categoryIdsFor = (row: StoryRow): string[] =>
     memberships[row.id] ?? (row.category_id ? [row.category_id] : []);
-
-  const openCreateForm = () => {
-    setEditId(null);
-    setTitle('');
-    setEmoji('📖');
-    setDescription('');
-    setLevel('');
-    setCategoryIds([]);
-    setLessonId(null);
-    setStageId(null);
-    setModuleId(null);
-    setPages(['']);
-    setQuestionsText('');
-    setShowForm(true);
-  };
 
   const openEditForm = (row: StoryRow) => {
     setEditId(row.id);
@@ -281,6 +273,118 @@ export default function ReadingManager() {
     }
   };
 
+  // ------------------------------------------------------------------
+  // Round 97: upload door. New stories arrive as packages; the form
+  // below is now edit-only. Questions are STRUCTURED data in the
+  // package and convert to the stored { q, options, answer } shape
+  // (answer 0-based) here - never the :: text format.
+  // ------------------------------------------------------------------
+  interface ResolvedReading extends ReadingPkg {
+    resolvedStageId: string | null;
+    resolvedModuleId: string | null;
+    resolvedCategoryIds: string[];
+    existingId: string | null;
+  }
+
+  const resolveReading = (items: ReadingPkg[]) => {
+    const errors: string[] = [];
+    const flatCats = flattenCategoryTree(categories);
+    const resolved: ResolvedReading[] = items.map((s) => {
+      let stageId = s.stage_id;
+      if (!stageId && s.stage != null) {
+        stageId = taxonomy?.stages.find((st) => st.order_index === s.stage)?.id ?? null;
+        if (!stageId) errors.push(`"${s.title}": stage ${s.stage} was not found.`);
+      }
+      let moduleId: string | null = null;
+      if (s.module != null) {
+        if (!stageId) {
+          errors.push(`"${s.title}": module ${s.module} needs its stage.`);
+        } else {
+          moduleId =
+            taxonomy?.modules.find(
+              (m) => m.stage_id === stageId && m.order_index % 100 === s.module
+            )?.id ?? null;
+          if (!moduleId) errors.push(`"${s.title}": module ${s.module} was not found in stage ${s.stage}.`);
+        }
+      }
+      const catIds: string[] = [];
+      for (const name of s.categories) {
+        const hit = flatCats.find(({ cat }) => cat.name.trim().toLowerCase() === name.toLowerCase());
+        if (!hit) {
+          errors.push(`"${s.title}": category "${name}" does not exist in the Smart Reading tree - create it in the Categories Manager first.`);
+        } else {
+          catIds.push(hit.cat.id);
+        }
+      }
+      const existing = stories.find(
+        (r) =>
+          r.title.trim().toLowerCase() === s.title.toLowerCase() &&
+          (r.stage_id ?? null) === (stageId ?? null)
+      );
+      return {
+        ...s,
+        resolvedStageId: stageId,
+        resolvedModuleId: moduleId,
+        resolvedCategoryIds: catIds,
+        existingId: existing?.id ?? null,
+      };
+    });
+    const lines = resolved.map((r) =>
+      r.existingId
+        ? `Update "${r.title}" - replace its ${r.pages.length} pages and ${r.questions.length} questions.`
+        : `Create "${r.title}" - ${r.pages.length} pages, ${r.questions.length} questions.`
+    );
+    return { errors, resolved, lines };
+  };
+
+  const planReading = async (items: ReadingPkg[]) => {
+    const { errors, lines } = resolveReading(items);
+    return { errors, lines };
+  };
+
+  const installReading = async (items: ReadingPkg[]): Promise<string[]> => {
+    const { errors, resolved } = resolveReading(items);
+    if (errors.length > 0) throw new Error(errors[0]);
+    const results: string[] = [];
+    let nextOrder = stories.reduce((mx, r) => Math.max(mx, r.order_index ?? 0), 0);
+    for (const r of resolved) {
+      const payload: any = {
+        title: r.title,
+        emoji: r.emoji,
+        description: r.description,
+        level: r.level,
+        category_id: primaryCategoryId(r.resolvedCategoryIds, categories),
+        pages: r.pages,
+        questions: r.questions.map((q) => ({
+          q: q.question,
+          options: [...q.options],
+          answer: q.correct - 1,
+        })),
+        ...(taggingAvailable ? { lesson_id: r.lesson_id } : {}),
+        ...(stageTagging ? { stage_id: r.resolvedStageId, module_id: r.resolvedModuleId } : {}),
+      };
+      let id = r.existingId;
+      if (id) {
+        const { error } = await supabase.from('reading_stories').update(payload).eq('id', id);
+        if (error) throw error;
+        results.push(`Updated "${r.title}".`);
+      } else {
+        nextOrder += 1;
+        const { data, error } = await supabase
+          .from('reading_stories')
+          .insert([{ ...payload, order_index: nextOrder }])
+          .select('id')
+          .single();
+        if (error) throw error;
+        id = (data as { id: string }).id;
+        results.push(`Created "${r.title}".`);
+      }
+      await setItemCategories('reading', id, r.resolvedCategoryIds, categories);
+    }
+    await fetchData();
+    return results;
+  };
+
   if (tableMissing) {
     return (
       <View className="bg-amber-50 border border-amber-200 rounded-xl p-6">
@@ -296,16 +400,24 @@ export default function ReadingManager() {
     <View className="gap-6">
       <View className="flex-row justify-between items-center">
         <Text className="font-display text-3xl font-semibold text-navy">Smart Reading Stories</Text>
-        {!showForm ? (
-          <Pressable onPress={openCreateForm} className="px-4 py-2.5 bg-navy rounded-full">
-            <Text className="text-white font-bold text-sm">+ New Story</Text>
-          </Pressable>
-        ) : null}
       </View>
+
+      {!showForm ? (
+        <ContentUploadDoor
+          title="📤 Upload a reading package"
+          blurb="New stories are no longer typed in here - they arrive as one JSON package file (the format the Content Studio will export), with questions as structured data. Pick a file, check the plan, then install. Existing stories below can still be edited, categorised and published as before."
+          formatLines={READING_FORMAT_LINES}
+          exampleJson={JSON.stringify(READING_EXAMPLE, null, 2)}
+          exampleFileName="reading-package-example.json"
+          validate={validateReadingPackage}
+          plan={planReading}
+          install={installReading}
+        />
+      ) : null}
 
       {showForm ? (
         <View className="bg-white p-6 rounded-[20px] border border-inkline shadow-sm gap-5">
-          <Text className="font-display text-xl font-semibold text-navy">{editId ? 'Edit Story' : 'New Story'}</Text>
+          <Text className="font-display text-xl font-semibold text-navy">Edit Story</Text>
 
           <View className="flex-col md:flex-row gap-4">
             <View className="flex-2">
@@ -482,7 +594,7 @@ export default function ReadingManager() {
           descriptionOf={(row) => row.description}
           itemNoun="stories"
           searchPlaceholder="Search stories by title…"
-          emptyMessage="No stories yet. Add your first one above."
+          emptyMessage="No stories yet. Upload a reading package above to add the first ones."
           bulkAssign={{
             onAssign: async (ids, categoryId) => {
               const res = await bulkAddCategory('reading', ids, categoryId, stories, categories);

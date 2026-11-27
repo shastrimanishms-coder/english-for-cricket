@@ -42,7 +42,11 @@ const ADMIN_MENU: AdminMenuItem[] = [
     icon: '📚',
     subItems: [
       { id: 'curriculum', label: 'Modules & Lessons' },
-      { id: 'slide_builder', label: 'Interactive Slide Builder' },
+      // Round 97: the Interactive Slide Builder tab is hidden -
+      // lesson slides now arrive as uploaded packages (Modules &
+      // Lessons carries the upload door). The SlideBuilder component
+      // stays in the codebase (one-phase rule) and its render case
+      // below is simply unreachable from the menu.
     ]
   },
   { 
@@ -90,7 +94,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
 // session cannot read or write the other tables at all.
 const CONTENT_MANAGER_TABS = new Set([
   'curriculum',
-  'slide_builder',
+  // Round 97: 'slide_builder' removed with its menu entry (above).
   'downloads',
   'games',
   'workbooks',
