@@ -1,3 +1,9 @@
+import { isOfflineNow } from './connectivity';
+import {
+  enqueueProgress,
+  isNetworkError,
+  type ProgressQueueEntry,
+} from './progressQueue';
 import { supabase } from './supabase';
 import type { StudentIdentity } from './studentIdentity';
 
@@ -68,7 +74,14 @@ export function levelForXp(xp: number): LevelInfo {
   };
 }
 
-/** Award points once per (kind, ref). Returns true when the award landed. */
+/**
+ * Award points once per (kind, ref). Returns true when the award
+ * landed — or, since Round 93, when it was safely queued offline
+ * (the queue replays it on reconnect and the RPC's own once-per
+ * (kind, ref) rule makes the replay a no-op if it ever lands
+ * twice). A genuine server rejection still returns false, exactly
+ * as before.
+ */
 export async function awardPoints(
   identity: StudentIdentity,
   kind: PointKind,
@@ -76,6 +89,19 @@ export async function awardPoints(
   stars: number,
   ref?: string
 ): Promise<boolean> {
+  const entry: ProgressQueueEntry = {
+    type: 'award_points',
+    identity,
+    kind,
+    xp,
+    stars,
+    ref: ref ?? null,
+    queuedAt: Date.now(),
+  };
+  if (isOfflineNow()) {
+    await enqueueProgress(entry);
+    return true;
+  }
   try {
     const { error } = await supabase.rpc('award_points', {
       p_student_id: identity.studentId,
@@ -85,8 +111,17 @@ export async function awardPoints(
       p_stars: stars,
       p_ref: ref ?? null,
     });
-    return !error;
-  } catch {
+    if (!error) return true;
+    if (isNetworkError(error)) {
+      await enqueueProgress(entry);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    if (isNetworkError(err)) {
+      await enqueueProgress(entry);
+      return true;
+    }
     return false;
   }
 }

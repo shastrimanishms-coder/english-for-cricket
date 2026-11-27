@@ -1,6 +1,13 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { ActiveTimeTracker, createActiveTimeEnvironment } from './activeTime';
+import { isOfflineNow } from './connectivity';
+import {
+  enqueueProgress,
+  isNetworkError,
+  type ProgressQueueEntry,
+} from './progressQueue';
 import { getStudentIdentity, type StudentIdentity } from './studentIdentity';
 import { supabase } from './supabase';
 
@@ -31,6 +38,23 @@ async function writeActivity(
   targetId: string | null,
   durationSeconds: number
 ): Promise<void> {
+  // Offline (Round 93): the segment joins the progress queue and is
+  // replayed on reconnect — study time earned in a downloaded pack
+  // counts exactly like study time earned online. The queue entry
+  // carries the identity resolved for THIS flush, so a shared
+  // device can never pin one student's time to another.
+  const queueEntry: ProgressQueueEntry = {
+    type: 'log_activity',
+    identity,
+    activityType,
+    targetId,
+    durationSeconds,
+    queuedAt: Date.now(),
+  };
+  if (isOfflineNow()) {
+    await enqueueProgress(queueEntry);
+    return;
+  }
   try {
     const { error } = await supabase.rpc('log_activity', {
       p_student_id: identity.studentId,
@@ -40,6 +64,13 @@ async function writeActivity(
       p_duration_seconds: durationSeconds,
     });
     if (!error) return;
+    // A network failure is not a rejection: queue the segment
+    // instead of falling through to the direct insert (which would
+    // fail the same way) or dropping it.
+    if (isNetworkError(error)) {
+      await enqueueProgress(queueEntry);
+      return;
+    }
 
     // The RPC does not exist until migration 20261115000008 has been run
     // (or it rejected the call). Email learners keep the pre-RPC behaviour
@@ -56,9 +87,17 @@ async function writeActivity(
       },
     ]);
     if (insertError) {
+      if (isNetworkError(insertError)) {
+        await enqueueProgress(queueEntry);
+        return;
+      }
       console.log('Activity not logged:', insertError.message);
     }
   } catch (error) {
+    if (isNetworkError(error)) {
+      await enqueueProgress(queueEntry);
+      return;
+    }
     // Telemetry must never break the player.
     console.log('Activity logging failed:', error);
   }
@@ -116,12 +155,41 @@ export function useActivityLogger({ activityType, targetId, enabled = true }: Ac
         let check = roleCheckRef.current.get(identity.studentId);
         if (!check) {
           check = (async () => {
-            const { data: profile } = await supabase
-              .from('user_profiles')
-              .select('role')
-              .eq('id', identity.studentId)
-              .maybeSingle();
-            return profile?.role === 'individual_learner';
+            // The verdict is persisted per student (Round 93):
+            // offline, the profile query cannot answer, and
+            // without a stored verdict every offline segment
+            // would be dropped before it could join the progress
+            // queue — the student's offline study time would
+            // silently never count. Online the query runs as
+            // before and refreshes the stored verdict; the store
+            // is only ever the offline/failure fallback, keyed by
+            // student id so a shared device cannot mix verdicts.
+            const cacheKey = `efc_learner_role:${identity.studentId}`;
+            if (!isOfflineNow()) {
+              const { data: profile } = await supabase
+                .from('user_profiles')
+                .select('role')
+                .eq('id', identity.studentId)
+                .maybeSingle();
+              if (profile) {
+                const verdict = profile.role === 'individual_learner';
+                try {
+                  await AsyncStorage.setItem(cacheKey, verdict ? '1' : '0');
+                } catch {
+                  // The stored verdict is a nicety, never a blocker.
+                }
+                return verdict;
+              }
+              // No answer (a network wobble): fall through to the
+              // last known verdict rather than dropping the time.
+            }
+            try {
+              const cached = await AsyncStorage.getItem(cacheKey);
+              if (cached !== null) return cached === '1';
+            } catch {
+              // No stored verdict either: drop, as before.
+            }
+            return false;
           })();
           roleCheckRef.current.set(identity.studentId, check);
         }
@@ -143,6 +211,12 @@ export function useActivityLogger({ activityType, targetId, enabled = true }: Ac
     });
     trackerRef.current = tracker;
     tracker.start();
+    // Resolve the identity (and, for auth learners, the role
+    // verdict) once now, while the screen is fresh: online this
+    // persists the verdict the offline fallback above reads, so a
+    // screen opened later with no connection can still attribute
+    // its time instead of dropping it.
+    void resolveIdentity();
 
     return () => {
       // stop() emits the final remainder (>= 10s) through onFlush.

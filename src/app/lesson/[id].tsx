@@ -46,6 +46,9 @@ import {
   setActiveVoiceMap,
   voiceUrlForText,
 } from '../../lib/lessonVoices';
+import { isOfflineNow } from '../../lib/connectivity';
+import { getPackForLesson } from '../../lib/offlinePacks';
+import { recordLessonCompletion } from '../../lib/progressQueue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { syncWordBankEnrolments } from '../../lib/wordBank';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -935,6 +938,9 @@ export default function LessonPlayer() {
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Offline with no downloaded pack for this lesson (Round 93):
+  // a distinct, kind state rather than the generic error screen.
+  const [offlineBlocked, setOfflineBlocked] = useState(false);
   const [lesson, setLesson] = useState<Lesson | null>(null);
 
   // Active time in this lesson (Round 81): the engine accrues only
@@ -982,6 +988,7 @@ export default function LessonPlayer() {
     try {
       setLoading(true);
       setLoadError(null);
+      setOfflineBlocked(false);
 
       const { data: lessonData, error: lessonError } = await supabase
         .from('curriculum_lessons')
@@ -1017,7 +1024,26 @@ export default function LessonPlayer() {
       setQueue(loadedSlides.map((_, i) => i));
       setQueuePos(0);
     } catch (error: any) {
-      setLoadError(error.message || 'Something went wrong while loading this lesson.');
+      // Offline packs (Round 93): if the network could not deliver
+      // this lesson but the student downloaded its module, play the
+      // pack's copy — the same lesson and slide rows, in the same
+      // order, with the pack's recorded voices (see the voice
+      // prefetch below). If there is no pack and the device knows
+      // it is offline, say that plainly instead of showing a
+      // generic error.
+      const packed = await getPackForLesson(String(id)).catch(() => null);
+      if (packed) {
+        setLesson(packed.lesson as Lesson);
+        moduleNumberRef.current = packed.record.moduleOrderIndex % 100;
+        const packSlides = packed.slides as unknown as Slide[];
+        setSlides(packSlides);
+        setQueue(packSlides.map((_, i) => i));
+        setQueuePos(0);
+      } else if (isOfflineNow()) {
+        setOfflineBlocked(true);
+      } else {
+        setLoadError(error.message || 'Something went wrong while loading this lesson.');
+      }
     } finally {
       setLoading(false);
     }
@@ -1052,12 +1078,24 @@ export default function LessonPlayer() {
       const preferred: VoiceCategory[] =
         moduleNo === 0 ? [] : moduleNo % 2 === 1 ? ['M1', 'B1'] : ['F1', 'G1'];
       const map = await resolveVoicesForTexts(texts, prefs, preferred);
+      // Offline packs (Round 93): a downloaded pack carries the
+      // voice map it resolved at download time. It only ever fills
+      // gaps the live resolver left — and since the resolver tries
+      // every voice category, a gap means the live lookups failed
+      // (no connection), which is exactly when the pack's map is
+      // needed. Online behaviour is unchanged.
+      const packed = await getPackForLesson(String(id)).catch(() => null);
+      if (packed) {
+        for (const [key, url] of Object.entries(packed.record.audioIndex)) {
+          if (!map.has(key)) map.set(key, url);
+        }
+      }
       if (!cancelled) setActiveVoiceMap(map);
     })();
     return () => {
       cancelled = true;
     };
-  }, [slides]);
+  }, [slides, id]);
 
   // Release the lazily created player when the screen unmounts
   // (createAudioPlayer does not manage the lifecycle for us).
@@ -1294,19 +1332,23 @@ export default function LessonPlayer() {
 
       // lesson_completions exists only once migration 20261115000006 has been
       // run, so fail soft: log and continue to the completion screen.
-      const { error: completionError } = await supabase.from('lesson_completions').insert([
-        {
-          student_id: identity.studentId,
-          student_kind: identity.studentKind,
-          lesson_id: lesson.id,
-          module_id: lesson.module_id,
-          score_correct: correct,
-          score_total: total,
-          duration_seconds: duration,
-        },
-      ]);
-      if (completionError) {
-        console.log('Lesson completion not recorded:', completionError.message);
+      // Since Round 93 the write goes through the progress queue's
+      // recorder: online it is this same insert; offline (or on a
+      // network failure) the row is stored on the device and lands
+      // when the connection returns.
+      const completionOutcome = await recordLessonCompletion(identity, {
+        student_id: identity.studentId,
+        student_kind: identity.studentKind,
+        lesson_id: lesson.id,
+        module_id: lesson.module_id,
+        score_correct: correct,
+        score_total: total,
+        duration_seconds: duration,
+      });
+      if (completionOutcome === 'failed') {
+        console.log('Lesson completion not recorded.');
+      } else if (completionOutcome === 'queued') {
+        console.log('Lesson completion saved on this device — it will sync when you are back online.');
       }
 
       // Word Bank enrolment (Round 92): this lesson's words join
@@ -1804,6 +1846,41 @@ export default function LessonPlayer() {
     return (
       <SafeAreaView className="flex-1 bg-canvas items-center justify-center">
         <ActivityIndicator size="large" color="#0A192F" />
+      </SafeAreaView>
+    );
+  }
+
+  if (offlineBlocked) {
+    return (
+      <SafeAreaView className="flex-1 bg-canvas items-center justify-center p-6">
+        <Text className="text-5xl mb-4">📴</Text>
+        <Text className="font-display text-2xl font-semibold text-navy mb-2 text-center">
+          You are offline
+        </Text>
+        <Text className="text-slate-500 text-center mb-8 max-w-md">
+          This lesson is not downloaded on this device yet, so it cannot open without a
+          connection. While you are online, save a module in My Downloads and its lessons
+          will play anywhere — or reconnect and try again.
+        </Text>
+        <Pressable
+          onPress={() => router.push('/learner/my-downloads')}
+          className="px-6 py-3 bg-navy border-b-4 border-navy-deep rounded-full mb-3"
+        >
+          <Text className="text-white font-bold">📥 My Downloads</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            (async () => {
+              await fetchLessonData();
+            })();
+          }}
+          className="px-6 py-3"
+        >
+          <Text className="text-slate-500 font-bold">Try Again</Text>
+        </Pressable>
+        <Pressable onPress={() => router.back()} className="px-6 py-3">
+          <Text className="text-slate-500 font-bold">Go Back</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }

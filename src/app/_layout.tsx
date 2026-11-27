@@ -15,9 +15,18 @@ import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppSessionLogger from '../components/AppSessionLogger';
+import { initOfflineSupport } from '../lib/offlineSupport';
 import '../global.css';
 
 export default function RootLayout() {
+  // Offline support (Round 93): register the service worker that
+  // lets the installed app open offline, and arm the progress
+  // queue's replay triggers so offline-earned progress syncs on
+  // reconnect. Web + production only; fails soft everywhere.
+  useEffect(() => {
+    initOfflineSupport();
+  }, []);
+
   // A URL typed with ".html" on the end (e.g. /register.html) is
   // served the page's file by the host, but the router sees the .html
   // path and reports an unmatched route. Send the browser to the

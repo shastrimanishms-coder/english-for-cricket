@@ -61,6 +61,16 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <link rel="canonical" href={CANONICAL} />
         <meta name="theme-color" content="#0A192F" />
+        {/* Installable app (Round 93): the manifest + touch icon let
+            students add English for Cricket to their home screen,
+            and the service worker (public/sw.js, registered by
+            src/lib/offlineSupport.ts) lets it open offline. */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="English for Cricket" />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="English for Cricket" />
         <meta property="og:title" content={TITLE} />

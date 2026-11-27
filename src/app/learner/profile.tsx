@@ -554,6 +554,24 @@ export default function StudentProfile() {
           </Pressable>
         </ElegantCard>
 
+        {/* Offline Learning (Round 93): module packs that make the
+            lessons play with no connection. */}
+        <ElegantCard className="p-6">
+          <Text className="font-display text-xl font-semibold text-navy mb-4">Offline Learning</Text>
+          <Pressable
+            onPress={() => router.push('/learner/my-downloads')}
+            className="flex-row items-center justify-between py-3"
+          >
+            <View className="flex-1 pr-3">
+              <Text className="font-sans text-base font-bold text-navy">📥 My Downloads</Text>
+              <Text className="font-sans text-sm text-slate-500">
+                Save a module to this device while you are online, and its lessons — pictures and voices included — play anywhere, even with no connection.
+              </Text>
+            </View>
+            <Text className="text-gold font-bold text-lg">›</Text>
+          </Pressable>
+        </ElegantCard>
+
         {/* My Voices (migration 23): pick the named human voice for
             each kind of speaker. Samples play the actor's approved
             introduction recording. */}

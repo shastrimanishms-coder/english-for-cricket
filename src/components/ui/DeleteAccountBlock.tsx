@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import { clearOfflineDataForStudent } from '../../lib/offlineSupport';
 import { removeSavedAccount } from '../../lib/savedAccounts';
 import { endCurrentSession } from '../../lib/sessionEnd';
 import { showAlert } from '../../lib/showAlert';
@@ -98,6 +99,11 @@ export default function DeleteAccountBlock({
     setError('');
     setWorking(true);
     try {
+      // Capture whose device data this is BEFORE the account (and
+      // its session) disappears — the offline cleanup below needs
+      // the id, and afterwards it is unrecoverable.
+      const { data: userData } = await supabase.auth.getUser();
+      const deletingUserId = userData?.user?.id ?? null;
       const { data, error: rpcError } = await supabase.rpc('delete_my_account');
       if (rpcError) throw rpcError;
       const result = (data || {}) as { ok?: boolean; error?: string };
@@ -111,7 +117,11 @@ export default function DeleteAccountBlock({
       }
       // The account is gone. Clean this device: forget the saved
       // Switch Account entry, end the (now invalid) session, and
-      // land on the public home with the deletion notice.
+      // land on the public home with the deletion notice. Offline
+      // data goes too (Round 93): this student's queued progress
+      // can never land now, and the packs on this device were built
+      // with their voice choices.
+      if (deletingUserId) await clearOfflineDataForStudent(deletingUserId);
       await removeSavedAccount('auth', email);
       await endCurrentSession();
       router.replace('/?deleted=1');
