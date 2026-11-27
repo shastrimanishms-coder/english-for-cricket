@@ -18,6 +18,7 @@ import UsersManager from '../../components/admin/UsersManager';
 import VideosManager from '../../components/admin/VideosManager';
 import VoiceStudioManager from '../../components/admin/VoiceStudioManager';
 import WorkbooksManager from '../../components/admin/WorkbooksManager';
+import WordBankManager from '../../components/admin/WordBankManager';
 import { useRequireRole } from '../../hooks/useRequireRole';
 import { supabase } from '../../lib/supabase';
 
@@ -60,6 +61,7 @@ const ADMIN_MENU: AdminMenuItem[] = [
       { id: 'downloads', label: 'Downloads & Workbooks' },
       { id: 'games', label: 'Games & Arcade' },
       { id: 'workbooks', label: 'Workbooks' },
+      { id: 'wordbank', label: 'Word Bank' },
       { id: 'videos', label: 'Video Lectures' },
     ]
   },
@@ -92,6 +94,7 @@ const CONTENT_MANAGER_TABS = new Set([
   'downloads',
   'games',
   'workbooks',
+  'wordbank',
   'speaking',
   'reading',
 ]);
@@ -137,6 +140,7 @@ const TAB_PARENT_MENU: Record<string, string> = {
   downloads: 'assets',
   games: 'assets',
   workbooks: 'assets',
+  wordbank: 'assets',
   videos: 'assets',
   'voice-studio': 'contributors',
 };
@@ -571,6 +575,9 @@ export default function SuperAdminDashboard() {
 
       case 'workbooks':
         return <WorkbooksManager />;
+
+      case 'wordbank':
+        return <WordBankManager />;
 
       case 'videos':
         return <VideosManager />;
