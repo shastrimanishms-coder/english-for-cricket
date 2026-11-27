@@ -39,12 +39,18 @@ import type { WordStatus } from '../../lib/wordBankCore';
  * also what enrols the words of newly finished lessons — including
  * lessons finished before this feature existed) and starts a review
  * session. Below it, the Word Dictionary browses every word in the
- * course by stage, module and LESSON (Round 94): each word shows
- * its picture, its example, tap-to-hear in a recorded voice, and
- * the student's own status for the word: Not started yet / New /
- * Learning / Mastered. Tapping a LESSON opens its book popup —
- * Learn (a shuffled flashcard book) or Test (build and say each
- * word) — see wordbook-book.tsx.
+ * course by stage, module and LESSON (Round 94): tapping a LESSON
+ * bar opens its book popup — Learn (a shuffled flashcard book) or
+ * Test (build and say each word) — see wordbook-book.tsx.
+ *
+ * Round 95: the browse is a clean COLLAPSED tree — lesson bars only,
+ * no word cards rendered until the student asks. Each bar carries a
+ * separate "Words" expander; opening it reveals that lesson's word
+ * cards (picture shown in full, example, tap-to-hear in a recorded
+ * voice, and the student's own status: Not started yet / New /
+ * Learning / Mastered). Only one lesson is expanded at a time, so
+ * the page stays short. Word pictures everywhere in the Word Bank
+ * use contain fit on white — the whole picture, never cropped.
  *
  * Before migration 40 runs, every call here fails soft and the
  * screen shows its calm empty state.
@@ -120,6 +126,9 @@ export default function WordBank() {
   const [browse, setBrowse] = useState<Map<string, BrowseWord[]>>(new Map());
   const [browseLoading, setBrowseLoading] = useState<Set<string>>(new Set());
   const [popup, setPopup] = useState<LessonPopup | null>(null);
+  // Round 95: at most one lesson's word cards are expanded at a
+  // time, identified by lesson id (null = the clean tree).
+  const [expandedLesson, setExpandedLesson] = useState<string | null>(null);
   const prefsRef = useRef<VoicePrefs>({});
   const stopRef = useRef<(() => void) | null>(null);
 
@@ -285,8 +294,9 @@ export default function WordBank() {
               <View className="mb-4">
                 <MicroLabel className="mb-2">Word Dictionary</MicroLabel>
                 <Text className="font-sans text-slate-500">
-                  Every word in the course, stage by stage. Tap a word to hear it — or open a
-                  lesson to Learn or Test all of its words as a book.
+                  Every word in the course, stage by stage. Tap a lesson to Learn or Test all
+                  of its words as a book — or tap Words on a lesson to see its word cards and
+                  hear them.
                 </Text>
               </View>
               {stages.map((stage) => {
@@ -336,32 +346,63 @@ export default function WordBank() {
                                   <View>
                                     {/* Round 94: the module's words are
                                         grouped by LESSON. Tapping a
-                                        lesson header opens its book
-                                        popup (Learn / Test). */}
-                                    {groupWordsByLesson(words).map((group) => (
+                                        lesson bar opens its book popup
+                                        (Learn / Test). Round 95: bars
+                                        only — a separate "Words"
+                                        expander on each bar reveals
+                                        that lesson's cards (one lesson
+                                        expanded at a time). */}
+                                    {groupWordsByLesson(words).map((group) => {
+                                      const expanded = expandedLesson === group.lessonId;
+                                      return (
                                       <View key={group.lessonId} className="mb-5">
-                                        <Pressable
-                                          onPress={() =>
-                                            setPopup({
-                                              lessonId: group.lessonId,
-                                              lessonTitle: group.lessonTitle,
-                                              lessonOrder: group.lessonOrder,
-                                              wordCount: group.words.length,
-                                              moduleId: m.id,
-                                              moduleNo,
-                                              stageNo: stage.order_index,
-                                            })
-                                          }
-                                          className="flex-row items-center justify-between bg-pitch-light border border-gold rounded-[12px] px-4 py-3 mb-3"
-                                        >
-                                          <Text className="font-sans font-bold text-navy">
-                                            Lesson {group.lessonOrder + 1} · {group.lessonTitle}
-                                          </Text>
-                                          <Text className="font-sans text-[12px] font-bold text-gold-dark">
-                                            {group.words.length} words · Learn / Test ›
-                                          </Text>
-                                        </Pressable>
-                                        <View className="flex-row flex-wrap justify-between gap-y-3">
+                                        <View className="flex-row items-stretch bg-pitch-light border border-gold rounded-[12px] overflow-hidden">
+                                          <Pressable
+                                            onPress={() =>
+                                              setPopup({
+                                                lessonId: group.lessonId,
+                                                lessonTitle: group.lessonTitle,
+                                                lessonOrder: group.lessonOrder,
+                                                wordCount: group.words.length,
+                                                moduleId: m.id,
+                                                moduleNo,
+                                                stageNo: stage.order_index,
+                                              })
+                                            }
+                                            className="flex-1 flex-row items-center justify-between px-4 py-3"
+                                          >
+                                            <Text className="font-sans font-bold text-navy">
+                                              Lesson {group.lessonOrder + 1} · {group.lessonTitle}
+                                            </Text>
+                                            <Text className="font-sans text-[12px] font-bold text-gold-dark">
+                                              {group.words.length} words · Learn / Test ›
+                                            </Text>
+                                          </Pressable>
+                                          <Pressable
+                                            onPress={() =>
+                                              setExpandedLesson((prev) =>
+                                                prev === group.lessonId ? null : group.lessonId
+                                              )
+                                            }
+                                            accessibilityLabel={
+                                              expanded
+                                                ? `Hide the words of lesson ${group.lessonOrder + 1}`
+                                                : `Show the words of lesson ${group.lessonOrder + 1}`
+                                            }
+                                            className="flex-row items-center gap-1 px-3 border-l border-gold"
+                                          >
+                                            <Text className="font-sans text-[12px] font-bold text-navy">
+                                              Words
+                                            </Text>
+                                            <Ionicons
+                                              name={expanded ? 'chevron-up' : 'chevron-down'}
+                                              size={14}
+                                              color="#0A192F"
+                                            />
+                                          </Pressable>
+                                        </View>
+                                        {expanded ? (
+                                        <View className="flex-row flex-wrap justify-between gap-y-3 mt-3">
                                           {group.words.map((w) => {
                                             const st = STATUS_STYLE[w.status];
                                             return (
@@ -373,8 +414,8 @@ export default function WordBank() {
                                                 {w.imageUrl ? (
                                                   <Image
                                                     source={{ uri: w.imageUrl }}
-                                                    style={{ height: 96, width: '100%' }}
-                                                    resizeMode="cover"
+                                                    style={{ height: 96, width: '100%', backgroundColor: '#FFFFFF' }}
+                                                    resizeMode="contain"
                                                   />
                                                 ) : (
                                                   <View
@@ -406,8 +447,10 @@ export default function WordBank() {
                                             );
                                           })}
                                         </View>
+                                        ) : null}
                                       </View>
-                                    ))}
+                                      );
+                                    })}
                                   </View>
                                 )
                               ) : null}

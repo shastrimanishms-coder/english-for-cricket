@@ -86,8 +86,8 @@ function WordPicture({ word, height }: { word: DueWord; height: number }) {
     return (
       <Image
         source={{ uri: word.imageUrl }}
-        style={{ height, width: '100%', borderRadius: 16 }}
-        resizeMode="cover"
+        style={{ height, width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF' }}
+        resizeMode="contain"
       />
     );
   }
@@ -200,7 +200,7 @@ function HearTap({
               className={`w-[48%] bg-white border-2 ${border} rounded-[16px] overflow-hidden`}
             >
               {opt.imageUrl ? (
-                <Image source={{ uri: opt.imageUrl }} style={{ height: 104, width: '100%' }} resizeMode="cover" />
+                <Image source={{ uri: opt.imageUrl }} style={{ height: 104, width: '100%', backgroundColor: '#FFFFFF' }} resizeMode="contain" />
               ) : (
                 <View style={{ height: 104 }} className="bg-pitch-light items-center justify-center">
                   <Text style={{ fontSize: 44 }}>{opt.emoji || '⭐'}</Text>

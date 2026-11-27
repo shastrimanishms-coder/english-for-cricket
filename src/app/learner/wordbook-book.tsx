@@ -46,11 +46,13 @@ import { sessionStars } from '../../lib/wordBankCore';
  * A Word Bank lesson book (Round 94) — Shastri's design.
  *
  * LEARN: a flashcard book. One word per page — big picture, the
- * word, its example sentence, a listen button for each — with
- * Continue turning the page and a back arrow returning. The word
- * order is shuffled every time the book opens, and Replay at the
- * end shuffles again. Learn is pure study: it records NOTHING —
- * no ladder calls, no scores, no stars.
+ * word, its example sentence, and ONE Listen button (Round 95)
+ * that plays the word and then, when it ends, the sentence, as a
+ * single sequence — with Continue turning the page and a back
+ * arrow returning. The word order is shuffled every time the book
+ * opens, and Replay at the end shuffles again. Learn is pure
+ * study: it records NOTHING — no ladder calls, no scores, no
+ * stars.
  *
  * TEST: the same book as a check, shuffled every run. Each page
  * shows the picture ONLY (no word, no example anywhere), scrambled
@@ -73,6 +75,14 @@ import { sessionStars } from '../../lib/wordBankCore';
  */
 
 type SayFn = (text: string) => void;
+/** Round 95: play a word, then its sentence, as one sequence;
+ * onDone fires when the whole sequence has finished. */
+type SayPairFn = (wordText: string, sentenceText: string | undefined, onDone: () => void) => void;
+
+/** A word or sentence recording runs a few seconds at most; if a
+ * part has not reported its end within this long it is treated
+ * as stalled and the Listen sequence moves on without it. */
+const PAIR_PART_TIMEOUT_MS = 15000;
 
 function WordPicture({ word, height }: { word: BrowseWord; height: number }) {
   if (word.imageUrl) {
@@ -80,8 +90,8 @@ function WordPicture({ word, height }: { word: BrowseWord; height: number }) {
       <Image
         testID="book-picture-img"
         source={{ uri: word.imageUrl }}
-        style={{ height, width: '100%', borderRadius: 16 }}
-        resizeMode="cover"
+        style={{ height, width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF' }}
+        resizeMode="contain"
       />
     );
   }
@@ -117,19 +127,28 @@ function Progress({ index, total }: { index: number; total: number }) {
 
 function LearnPage({
   word,
-  say,
+  sayPair,
   onPrev,
   onNext,
   isFirst,
   isLast,
 }: {
   word: BrowseWord;
-  say: SayFn;
+  sayPair: SayPairFn;
   onPrev: () => void;
   onNext: () => void;
   isFirst: boolean;
   isLast: boolean;
 }) {
+  // Round 95: ONE Listen button. While the word → sentence
+  // sequence plays, the button shows its playing state and a
+  // re-tap cannot stack a second sequence.
+  const [playing, setPlaying] = useState(false);
+  const listen = () => {
+    if (playing) return;
+    setPlaying(true);
+    sayPair(word.word, word.example || undefined, () => setPlaying(false));
+  };
   return (
     <View>
       <View className="mb-5">
@@ -144,21 +163,14 @@ function LearnPage({
       {word.example ? (
         <Text className="font-sans text-lg text-slate-500 text-center mb-6">{word.example}</Text>
       ) : null}
-      <View className="flex-row justify-center gap-3 mb-7">
+      <View className="flex-row justify-center mb-7">
         <Pressable
-          onPress={() => say(word.word)}
-          className="px-6 py-3.5 bg-gold border-b-4 border-gold-dark rounded-full"
+          onPress={listen}
+          disabled={playing}
+          className={`px-8 py-3.5 bg-gold border-b-4 border-gold-dark rounded-full ${playing ? 'opacity-70' : ''}`}
         >
-          <Text className="text-navy font-bold">🔊 Hear the word</Text>
+          <Text className="text-navy font-bold">{playing ? '🔊 Listening…' : '🔊 Listen'}</Text>
         </Pressable>
-        {word.example ? (
-          <Pressable
-            onPress={() => say(word.example)}
-            className="px-6 py-3.5 bg-white border border-inkline rounded-full"
-          >
-            <Text className="font-bold text-slate-700">🔊 Hear the sentence</Text>
-          </Pressable>
-        ) : null}
       </View>
       <View className="flex-row items-center justify-between">
         <Pressable
@@ -501,6 +513,81 @@ export default function WordBook() {
     }
   }, []);
 
+  // Round 95: the Learn book's combined Listen sequence — the word
+  // first, then (when it ends) the example sentence. Each part
+  // resolves exactly as `say` does (recorded voice from the active
+  // map first, device voice as fallback) and falls back
+  // independently; a part that cannot play at all still ends, so
+  // the sequence always completes. pairSeqRef invalidates the
+  // chain when the page turns or the screen goes away, so a
+  // sentence never starts playing on the wrong page. Each part
+  // also carries a safety timer — the same caller's-timer pattern
+  // the lesson player pairs with playRecordedLine — so a recording
+  // that stalls (its player never reports the end) cannot wedge
+  // the sequence on the playing state.
+  const pairSeqRef = useRef(0);
+  const pairTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearPairTimer = useCallback(() => {
+    if (pairTimerRef.current) {
+      clearTimeout(pairTimerRef.current);
+      pairTimerRef.current = null;
+    }
+  }, []);
+  const sayPair = useCallback<SayPairFn>(
+    (wordText, sentenceText, onDone) => {
+      const seq = ++pairSeqRef.current;
+      const alive = () => pairSeqRef.current === seq;
+      clearPairTimer();
+      try {
+        stopRef.current?.();
+      } catch { /* nothing playing */ }
+      stopRef.current = null;
+      const finish = () => {
+        clearPairTimer();
+        if (alive()) onDone();
+      };
+      const playPart = (text: string, next: () => void) => {
+        let advanced = false;
+        const advance = () => {
+          if (advanced || !alive()) return;
+          advanced = true;
+          clearPairTimer();
+          next();
+        };
+        pairTimerRef.current = setTimeout(() => {
+          if (!alive()) return;
+          // Abandon the stalled part: silence it, then move on.
+          try {
+            stopRef.current?.();
+          } catch { /* nothing playing */ }
+          cancelSpeechCue();
+          advance();
+        }, PAIR_PART_TIMEOUT_MS);
+        const url = voiceUrlForText(text);
+        if (url) {
+          stopRef.current = playRecordedLine(url, advance);
+        } else {
+          speakWithCallback(text, advance);
+        }
+      };
+      if (sentenceText) {
+        playPart(wordText, () => playPart(sentenceText, finish));
+      } else {
+        playPart(wordText, finish);
+      }
+    },
+    [clearPairTimer]
+  );
+
+  const stopPair = useCallback(() => {
+    pairSeqRef.current++;
+    clearPairTimer();
+    try {
+      stopRef.current?.();
+    } catch { /* nothing playing */ }
+    stopRef.current = null;
+  }, [clearPairTimer]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -543,8 +630,14 @@ export default function WordBook() {
         // Recordings are a nicety; the device voice covers the rest.
       }
     })();
+    const pairSeq = pairSeqRef;
     return () => {
       cancelled = true;
+      pairSeq.current++;
+      if (pairTimerRef.current) {
+        clearTimeout(pairTimerRef.current);
+        pairTimerRef.current = null;
+      }
       setActiveVoiceMap(null);
       try {
         stopRef.current?.();
@@ -683,9 +776,15 @@ export default function WordBook() {
                   <LearnPage
                     key={`${current.wordKey}-${index}`}
                     word={current}
-                    say={say}
-                    onPrev={() => setIndex((i) => Math.max(0, i - 1))}
-                    onNext={() => setIndex((i) => i + 1)}
+                    sayPair={sayPair}
+                    onPrev={() => {
+                      stopPair();
+                      setIndex((i) => Math.max(0, i - 1));
+                    }}
+                    onNext={() => {
+                      stopPair();
+                      setIndex((i) => i + 1);
+                    }}
                     isFirst={index === 0}
                     isLast={index + 1 >= deck.length}
                   />
@@ -728,8 +827,8 @@ export default function WordBook() {
                         {r.imageUrl ? (
                           <Image
                             source={{ uri: r.imageUrl }}
-                            style={{ width: 36, height: 36, borderRadius: 8 }}
-                            resizeMode="cover"
+                            style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#FFFFFF' }}
+                            resizeMode="contain"
                           />
                         ) : (
                           <Text style={{ fontSize: 22 }}>{r.emoji || '⭐'}</Text>
