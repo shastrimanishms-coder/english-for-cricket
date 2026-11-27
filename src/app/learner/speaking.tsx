@@ -26,7 +26,7 @@ import {
   type CategoryNode,
 } from '../../lib/contentCategories';
 import { downloadPdf } from '../../lib/downloadPdf';
-import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import { scoreSpeechBest, type SpeechScore } from '../../lib/speechScoring';
 import {
   cancelSpeechCue,
   playDing,
@@ -455,12 +455,12 @@ export default function SpeakingPractice() {
   }, [mode, scenario, turnIndex, current, index]);
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       setCheckError(null);
       const target = activeTargetRef.current;
       if (!target.text) return;
-      const score = scoreSpeech(target.text, transcript);
-      setCheckResult({ transcript, score });
+      const score = scoreSpeechBest(target.text, alternatives);
+      setCheckResult({ transcript: score.heard, score });
       // Round 82: keep the score (fire-and-forget) so the manager
       // reports can show speaking accuracy and a practice-focus
       // list. Only the score and OUR OWN target phrase are stored —

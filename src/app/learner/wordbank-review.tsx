@@ -18,7 +18,7 @@ import {
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import type { VoiceCategory } from '../../lib/voiceStudio';
-import { scoreSpeech } from '../../lib/speechScoring';
+import { scoreSpeechBest } from '../../lib/speechScoring';
 import { newSpeakingSessionId } from '../../lib/speakingResults';
 import { cancelSpeechCue, playDing, playRecordedLine, speakWithCallback } from '../../lib/speechCue';
 import { getStudentIdentity, type StudentIdentity } from '../../lib/studentIdentity';
@@ -297,12 +297,12 @@ function SayWord({
   const decidedRef = useRef(false);
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       if (decidedRef.current) return;
       decidedRef.current = true;
-      const score = scoreSpeech(item.word.word, transcript);
+      const score = scoreSpeechBest(item.word.word, alternatives);
       if (score.accuracy >= 70) playDing();
-      setResult({ heard: transcript, accuracy: score.accuracy });
+      setResult({ heard: score.heard, accuracy: score.accuracy });
     },
     onError: () => {
       decidedRef.current = false;

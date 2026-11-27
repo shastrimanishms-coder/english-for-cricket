@@ -82,7 +82,7 @@ export function speechErrorMessage(error: SpeechCheckError): string {
     case 'no-speech':
       return "I couldn't hear anything that time — try again a little louder.";
     case 'network':
-      return 'The speech checker could not run in this browser — it needs an internet speech service, which some browsers (like Brave) block. Chrome works best. You can still record your voice or say the line out loud.';
+      return 'The speech checker needs an internet connection to hear you, and it could not connect that time. Please check your connection and try again. You can still record your voice or say the line out loud.';
     case 'unsupported':
       return "This device or browser can't check speech automatically.";
     default:
@@ -90,8 +90,28 @@ export function speechErrorMessage(error: SpeechCheckError): string {
   }
 }
 
+/**
+ * How long a session may produce NOTHING AT ALL - no result, no
+ * error, no end - before the hook gives up and reports 'no-speech'.
+ * Chrome's own silence timeout is much shorter than this, so on a
+ * healthy recogniser the watchdog never fires; it exists for the
+ * sessions where Chrome's online speech service stalls silently
+ * (a network hiccup can leave a session open with no result and
+ * no error), which otherwise leaves the learner staring at
+ * "Listening…" with a dead microphone button.
+ * Any interim result pushes the deadline out by the full span.
+ */
+export const SPEECH_NO_HEAR_TIMEOUT_MS = 15000;
+
 interface UseSpeechCheckOptions {
-  onFinal: (transcript: string) => void;
+  /**
+   * A finished recognition. `transcript` is the recogniser's top
+   * candidate; `alternatives` is every candidate it returned for
+   * the utterance (top first, always including `transcript`), so
+   * scorers can use scoreSpeechBest - a lone word is often the
+   * recogniser's second or third candidate, not its first.
+   */
+  onFinal: (transcript: string, alternatives: string[]) => void;
   onError: (error: SpeechCheckError) => void;
 }
 
@@ -123,6 +143,17 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
   // error the recogniser then reports is swallowed instead of being
   // shown to the learner as a failure.
   const deliberateRef = useRef(false);
+  // The no-hear watchdog (see SPEECH_NO_HEAR_TIMEOUT_MS). Armed when
+  // a session starts, re-armed by every result event, cleared by
+  // every terminal event.
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearWatchdog = useCallback(() => {
+    if (watchdogRef.current) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
+  }, []);
 
   const cleanupListeners = useCallback(() => {
     for (const sub of subscriptionsRef.current) {
@@ -145,6 +176,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
     })();
     return () => {
       live = false;
+      clearWatchdog();
       cleanupListeners();
       if (activeRef.current) {
         try {
@@ -155,7 +187,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
         activeRef.current = false;
       }
     };
-  }, [cleanupListeners]);
+  }, [cleanupListeners, clearWatchdog]);
 
   const start = useCallback(async () => {
     const mod = loadSpeechModule()?.ExpoSpeechRecognitionModule;
@@ -206,6 +238,7 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
     }
 
     cleanupListeners();
+    clearWatchdog();
     finalSeenRef.current = false;
     interimRef.current = '';
     deliberateRef.current = false;
@@ -220,54 +253,111 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
       }
     };
 
+    // Deliver the words that were heard as the session's result -
+    // the interim line, when no formal final ever carried them.
+    const deliverInterim = () => {
+      const heard = interimRef.current.trim();
+      if (!heard) return false;
+      finalSeenRef.current = true;
+      callbacksRef.current.onFinal(heard, [heard]);
+      return true;
+    };
+
+    // The no-hear watchdog: if the recogniser produces nothing at
+    // all for a long stretch, end the session honestly (the words
+    // heard so far, if any, still count) instead of hanging in
+    // "Listening…" forever. See SPEECH_NO_HEAR_TIMEOUT_MS.
+    const armWatchdog = () => {
+      clearWatchdog();
+      watchdogRef.current = setTimeout(() => {
+        watchdogRef.current = null;
+        if (!activeRef.current || finalSeenRef.current) return;
+        activeRef.current = false;
+        setListening(false);
+        cleanupListeners();
+        try {
+          loadSpeechModule()?.ExpoSpeechRecognitionModule?.abort();
+        } catch {
+          // Nothing to abort: fine.
+        }
+        if (!deliverInterim()) {
+          callbacksRef.current.onError('no-speech');
+        }
+      }, SPEECH_NO_HEAR_TIMEOUT_MS);
+    };
+
     addSub('result', (event: any) => {
-      const transcript: string = event?.results?.[0]?.transcript || '';
+      // Any sign of life pushes the no-hear deadline out.
+      armWatchdog();
+      // Every candidate the recogniser returned for this utterance,
+      // top first. On web the module packs the alternatives of the
+      // final segment into `results`; native events do the same.
+      const alternatives: string[] = [];
+      const results: any[] = Array.isArray(event?.results) ? event.results : [];
+      for (const r of results) {
+        const t = (r?.transcript || '').trim();
+        if (t && !alternatives.includes(t)) alternatives.push(t);
+      }
       if (event?.isFinal) {
         finalSeenRef.current = true;
         setInterim('');
         setListening(false);
         activeRef.current = false;
+        clearWatchdog();
         cleanupListeners();
-        if (transcript.trim()) {
-          callbacksRef.current.onFinal(transcript.trim());
+        if (alternatives.length > 0) {
+          callbacksRef.current.onFinal(alternatives[0], alternatives);
+        } else if (interimRef.current.trim()) {
+          // The formal final came back EMPTY but the learner was
+          // heard along the way (the interim line was on screen):
+          // those words are the honest result, not "nothing heard".
+          // A one-word answer lives or dies by this - a short
+          // utterance is exactly the case where some recognisers
+          // re-segment and emit an empty final.
+          deliverInterim();
         } else {
           callbacksRef.current.onError('no-speech');
         }
-      } else if (transcript) {
-        interimRef.current = transcript;
-        setInterim(transcript);
+      } else if (alternatives.length > 0) {
+        interimRef.current = alternatives[0];
+        setInterim(alternatives[0]);
       }
     });
     addSub('error', (event: any) => {
       setListening(false);
       activeRef.current = false;
+      clearWatchdog();
       cleanupListeners();
-      // An abort we requested ourselves is not a failure.
-      if (event?.error === 'aborted' && deliberateRef.current) return;
+      // An abort we requested ourselves is not a failure - but it
+      // must not silently eat words that were already heard either.
+      // When a session is stopped (the lesson's Stop button, moving
+      // on in Speaking Practice) before the formal final lands, a
+      // short answer often exists ONLY as the interim line; dropping
+      // it is precisely the "it never hears my single word" failure.
+      if (event?.error === 'aborted' && deliberateRef.current) {
+        if (!finalSeenRef.current) deliverInterim();
+        return;
+      }
       const mapped = mapErrorCode(event?.error);
       // A no-speech report that contradicts words already heard
       // (they were on screen as the interim line) is a browser
       // quirk, not silence: score the words.
       if (mapped === 'no-speech' && !finalSeenRef.current && interimRef.current.trim()) {
-        finalSeenRef.current = true;
-        callbacksRef.current.onFinal(interimRef.current.trim());
+        deliverInterim();
         return;
       }
       callbacksRef.current.onError(mapped);
     });
     addSub('end', () => {
       setListening(false);
+      clearWatchdog();
       if (activeRef.current && !finalSeenRef.current) {
         activeRef.current = false;
         cleanupListeners();
         // The session ended without a formal final result. If words
         // were heard along the way, they are the result; only true
         // silence is a no-speech error.
-        const heard = interimRef.current.trim();
-        if (heard) {
-          finalSeenRef.current = true;
-          callbacksRef.current.onFinal(heard);
-        } else {
+        if (!deliverInterim()) {
           callbacksRef.current.onError('no-speech');
         }
       }
@@ -280,14 +370,20 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
         lang: 'en-US',
         interimResults: true,
         continuous: false,
+        // Ask for the runner-up hearings too: scoreSpeechBest can
+        // only rescue a lone word ranked second or third if the
+        // recogniser actually returns it.
+        maxAlternatives: 3,
       });
+      armWatchdog();
     } catch {
       setListening(false);
       activeRef.current = false;
+      clearWatchdog();
       cleanupListeners();
       callbacksRef.current.onError('unknown');
     }
-  }, [cleanupListeners]);
+  }, [cleanupListeners, clearWatchdog]);
 
   const stop = useCallback(() => {
     deliberateRef.current = true;
@@ -307,8 +403,9 @@ export function useSpeechCheck({ onFinal, onError }: UseSpeechCheckOptions) {
     }
     setListening(false);
     activeRef.current = false;
+    clearWatchdog();
     cleanupListeners();
-  }, [cleanupListeners]);
+  }, [cleanupListeners, clearWatchdog]);
 
   return { supported, listening, interim, start, stop, abort };
 }

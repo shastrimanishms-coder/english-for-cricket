@@ -8,7 +8,7 @@ import {
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import type { VoiceCategory } from '../../lib/voiceStudio';
-import { scoreMessage, scoreSpeech } from '../../lib/speechScoring';
+import { scoreMessage, scoreSpeechBest } from '../../lib/speechScoring';
 import { cancelSpeechCue, playDing, playRecordedLine, speakWithCallback } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { speechErrorMessage, useSpeechCheck } from '../../lib/useSpeechCheck';
@@ -207,8 +207,8 @@ function SpeakRow({
   );
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
-      const score = scoreSpeech(text, transcript);
+    onFinal: (_transcript, alternatives) => {
+      const score = scoreSpeechBest(text, alternatives);
       if (score.passed) {
         playDing();
         setFeedback(scoreMessage(score.accuracy));

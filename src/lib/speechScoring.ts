@@ -251,6 +251,46 @@ export function scoreSpeech(target: string, transcript: string): SpeechScore {
   return { accuracy, passed: accuracy >= SPEECH_PASS_MARK, words, extraWords };
 }
 
+export interface BestSpeechScore extends SpeechScore {
+  /** The transcript that earned this score. */
+  heard: string;
+}
+
+/**
+ * Score a recognition result that came back with several candidate
+ * transcripts (the recogniser's alternatives) and keep the best.
+ *
+ * A recogniser ranks its candidates by how likely the phrase is in
+ * everyday language, not by what a child was asked to say - so for a
+ * lone curriculum word the right hearing is routinely candidate #2
+ * or #3 ("pitch" ranked below "page"). Scoring only the top
+ * candidate throws that hearing away and reports a failure the
+ * student did not earn. The alternatives are the recogniser's own
+ * hearings of the SAME utterance, so taking the best-scoring one
+ * invents nothing: it only stops the language model's ranking from
+ * overruling the student's voice. Sentence behaviour is unchanged -
+ * scoreSpeech itself is untouched; this only chooses which of the
+ * recogniser's own transcripts gets scored.
+ */
+export function scoreSpeechBest(target: string, transcripts: string[]): BestSpeechScore {
+  const unique: string[] = [];
+  for (const t of transcripts || []) {
+    const clean = (t || '').trim();
+    if (clean && !unique.includes(clean)) unique.push(clean);
+  }
+  if (unique.length === 0) {
+    return { ...scoreSpeech(target, ''), heard: '' };
+  }
+  let best: BestSpeechScore | null = null;
+  for (const heard of unique) {
+    const score = scoreSpeech(target, heard);
+    if (!best || score.accuracy > best.accuracy) {
+      best = { ...score, heard };
+    }
+  }
+  return best as BestSpeechScore;
+}
+
 /** Short, encouraging headline for a score. Never punitive - kids use this. */
 export function scoreMessage(accuracy: number): string {
   if (accuracy >= 90) return 'Excellent! That sounded great! 🌟';

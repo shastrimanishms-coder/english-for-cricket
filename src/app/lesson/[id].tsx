@@ -53,7 +53,7 @@ import { getStudentIdentity } from '../../lib/studentIdentity';
 import { syncWordBankEnrolments } from '../../lib/wordBank';
 import { useActivityLogger } from '../../lib/useActivityLogger';
 import type { VoiceCategory } from '../../lib/voiceStudio';
-import { scoreMessage, scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import { scoreMessage, scoreSpeechBest, type SpeechScore } from '../../lib/speechScoring';
 import { supabase } from '../../lib/supabase';
 import {
   cancelSpeechCue,
@@ -370,10 +370,10 @@ function GridSpeakSlide({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       const panel = panels[activeIdx];
       if (!panel) return;
-      const score = scoreSpeech(toSpeechText(panel.text), transcript);
+      const score = scoreSpeechBest(toSpeechText(panel.text), alternatives);
       setLastScore(score);
       setError(null);
       setPhase('feedback');
@@ -731,10 +731,10 @@ function SpeakRepeatSlide({
   const [error, setError] = useState<SpeechCheckError | null>(null);
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       setError(null);
-      const score = scoreSpeech(target, transcript);
-      onAnswered(slide, score.passed, { transcript, score });
+      const score = scoreSpeechBest(target, alternatives);
+      onAnswered(slide, score.passed, { transcript: score.heard, score });
     },
     onError: (speechError) => setError(speechError),
   });

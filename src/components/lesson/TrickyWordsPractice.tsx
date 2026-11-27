@@ -2,7 +2,7 @@ import * as Speech from 'expo-speech';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { awardPoints, POINTS } from '../../lib/points';
-import { scoreSpeech } from '../../lib/speechScoring';
+import { scoreSpeechBest } from '../../lib/speechScoring';
 import { speakWithCallback } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
@@ -54,11 +54,11 @@ export default function TrickyWordsPractice({ words, lessonId, onClose }: Props)
   );
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       if (!current || busyRef.current) return;
       busyRef.current = true;
-      const score = scoreSpeech(current.word, transcript);
-      setAttempt({ heard: transcript, accuracy: score.accuracy });
+      const score = scoreSpeechBest(current.word, alternatives);
+      setAttempt({ heard: score.heard, accuracy: score.accuracy });
       if (score.accuracy >= FIXED_AT) {
         (async () => {
           await markFixed(current.word);

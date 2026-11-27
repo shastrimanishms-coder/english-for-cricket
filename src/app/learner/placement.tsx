@@ -13,7 +13,7 @@ import {
   stageForBandScores,
   type PlacementResult,
 } from '../../lib/placementBank';
-import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import { scoreSpeechBest, type SpeechScore } from '../../lib/speechScoring';
 import { speakWithCallback } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { useSpeechCheck } from '../../lib/useSpeechCheck';
@@ -96,10 +96,10 @@ export default function PlacementTest() {
   );
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       if (!item || item.type !== 'speak' || feedback) return;
-      const score = scoreSpeech(item.line, transcript);
-      setSpeakResult({ score, transcript });
+      const score = scoreSpeechBest(item.line, alternatives);
+      setSpeakResult({ score, transcript: score.heard });
       answerWithFeedback(score.passed, null);
     },
     onError: () => undefined,

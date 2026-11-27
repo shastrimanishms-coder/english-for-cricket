@@ -18,7 +18,7 @@ import {
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import type { VoiceCategory } from '../../lib/voiceStudio';
-import { scoreSpeech } from '../../lib/speechScoring';
+import { scoreSpeechBest } from '../../lib/speechScoring';
 import { newSpeakingSessionId } from '../../lib/speakingResults';
 import { cancelSpeechCue, playDing, playRecordedLine, speakWithCallback } from '../../lib/speechCue';
 import { getStudentIdentity, type StudentIdentity } from '../../lib/studentIdentity';
@@ -227,13 +227,13 @@ function TestPage({
   const decidedRef = useRef(false);
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       if (decidedRef.current) return;
       decidedRef.current = true;
-      const score = scoreSpeech(word.word, transcript);
+      const score = scoreSpeechBest(word.word, alternatives);
       const passed = score.accuracy >= 70;
       if (passed) playDing();
-      setHeard(transcript);
+      setHeard(score.heard);
       setSpeak(passed ? 'passed' : 'failed');
     },
     onError: () => {

@@ -24,7 +24,7 @@ import {
   voiceUrlForText,
 } from '../../lib/lessonVoices';
 import { awardPoints, POINTS } from '../../lib/points';
-import { scoreSpeech, type SpeechScore } from '../../lib/speechScoring';
+import { scoreSpeechBest, type SpeechScore } from '../../lib/speechScoring';
 import { playDing, playRecordedLine } from '../../lib/speechCue';
 import { getStudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
@@ -581,13 +581,13 @@ export default function SmartReading() {
   };
 
   const speech = useSpeechCheck({
-    onFinal: (transcript) => {
+    onFinal: (_transcript, alternatives) => {
       if (!sentence) return;
-      const score = scoreSpeech(sentence, transcript);
+      const score = scoreSpeechBest(sentence, alternatives);
       const elapsedSec = Math.max(1, (Date.now() - micStartRef.current) / 1000);
       const words = sentence.split(/\s+/).filter(Boolean).length;
       const wpm = Math.round(words / (elapsedSec / 60));
-      setCurrentScore({ score, transcript });
+      setCurrentScore({ score, transcript: score.heard });
       setAloudResults((prev) => [...prev, { accuracy: score.accuracy, wpm }]);
     },
     onError: () => undefined,
