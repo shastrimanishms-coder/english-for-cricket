@@ -36,6 +36,7 @@ interface FAQ {
 // arrives already sorted into a subject area.
 const SUPPORT_TOPICS = [
   'General question',
+  'Report a bug',
   'Account and sign-in',
   'Lessons and the learning path',
   'Speaking practice and microphone',
@@ -43,7 +44,7 @@ const SUPPORT_TOPICS = [
   'Games, videos and downloads',
   'Smart Reading',
   'For parents, schools and clubs',
-  'Technical problem',
+  'Technical support',
 ] as const;
 
 // Learner-facing Help Center. Content is managed in the admin panel
