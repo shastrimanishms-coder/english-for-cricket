@@ -28,6 +28,7 @@ import { useSpeechCheck } from '../../lib/useSpeechCheck';
 import {
   awardWordBankSession,
   fetchBrowseModule,
+  fetchBrowseTextbook,
   recordWordReview,
   type BrowseWord,
 } from '../../lib/wordBank';
@@ -484,7 +485,13 @@ export default function WordBook() {
     mode?: string;
     moduleNo?: string;
     title?: string;
+    // Round 96: a textbook book names its source instead of a
+    // module — source 'textbook' + the book number. lessonId is
+    // then the synthetic textbook lesson key (see wordBank.ts).
+    source?: string;
+    bookNo?: string;
   }>();
+  const isTextbook = params.source === 'textbook' && !!params.bookNo;
   const mode = params.mode === 'test' ? 'test' : 'learn';
   const moduleNo = Number(params.moduleNo) || 1;
   useActivityLogger({ activityType: 'word_bank' });
@@ -595,8 +602,10 @@ export default function WordBook() {
       if (cancelled) return;
       setIdentity(idn);
       let words: BrowseWord[] = [];
-      if (idn && params.moduleId) {
-        const all = await fetchBrowseModule(idn, params.moduleId);
+      if (idn && (params.moduleId || isTextbook)) {
+        const all = isTextbook
+          ? await fetchBrowseTextbook(idn, Number(params.bookNo))
+          : await fetchBrowseModule(idn, params.moduleId as string);
         if (params.keys) {
           const wanted = new Set(params.keys.split(',').filter(Boolean));
           words = all.filter((w) => wanted.has(w.wordKey));
@@ -706,7 +715,11 @@ export default function WordBook() {
     router.replace({
       pathname: '/learner/wordbook-book',
       params: {
-        moduleId: params.moduleId ?? '',
+        // Round 96: a textbook book re-opens against its own source,
+        // never against a Learning Path module.
+        ...(isTextbook
+          ? { source: 'textbook', bookNo: params.bookNo ?? '' }
+          : { moduleId: params.moduleId ?? '' }),
         moduleNo: String(moduleNo),
         mode: 'learn',
         keys: missed.map((r) => r.wordKey).join(','),

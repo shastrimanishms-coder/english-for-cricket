@@ -40,9 +40,30 @@ interface WordRow {
   emoji: string;
   example: string;
   image_url: string;
-  lesson_id: string;
+  /** The Learning Path attribution lesson; NULL for textbook-only
+   * words since Round 96 (migration 42). */
+  lesson_id: string | null;
   is_enabled: boolean;
 }
+
+/** One teaching place of a word (word_bank_sources, Round 96). */
+interface SourceRow {
+  word_key: string;
+  source_kind: 'learning_path' | 'textbook';
+  book_no: number | null;
+  book_lesson_no: number | null;
+  lesson_title: string | null;
+}
+
+const SOURCE_FILTER_OPTIONS: { id: string; label: string }[] = [
+  { id: 'lp', label: 'Learning Path' },
+  { id: 'tb', label: 'Textbooks (all books)' },
+  { id: 'book:1', label: 'Book 1 · The Foundation' },
+  { id: 'book:2', label: 'Book 2 · The Rookie' },
+  { id: 'book:3', label: 'Book 3 · The Player' },
+  { id: 'book:4', label: 'Book 4 · The Strategist' },
+  { id: 'book:5', label: 'Book 5 · The Captain' },
+];
 
 const PAGE_SIZE = 50;
 const FETCH_PAGE = 1000;
@@ -52,9 +73,11 @@ export default function WordBankManager() {
   const [needsMigration, setNeedsMigration] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [words, setWords] = useState<WordRow[]>([]);
+  const [sources, setSources] = useState<SourceRow[]>([]);
   const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
 
   const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
   const [stageId, setStageId] = useState('');
   const [moduleId, setModuleId] = useState('');
   const [lessonId, setLessonId] = useState('');
@@ -96,6 +119,30 @@ export default function WordBankManager() {
         from += FETCH_PAGE;
       }
       setWords(all);
+      // Round 96: the words' teaching places (Learning Path +
+      // textbook). Before migration 42 the table does not exist —
+      // that read simply leaves the map empty and textbook-only
+      // rows (which cannot exist yet either) stay hidden, exactly
+      // the pre-Round 96 behaviour.
+      try {
+        const src: SourceRow[] = [];
+        let sFrom = 0;
+        for (;;) {
+          const { data, error } = await supabase
+            .from('word_bank_sources')
+            .select('word_key, source_kind, book_no, book_lesson_no, lesson_title')
+            .order('word_key', { ascending: true })
+            .range(sFrom, sFrom + FETCH_PAGE - 1);
+          if (error) break;
+          const rows = (data || []) as SourceRow[];
+          src.push(...rows);
+          if (rows.length < FETCH_PAGE) break;
+          sFrom += FETCH_PAGE;
+        }
+        setSources(src);
+      } catch {
+        setSources([]);
+      }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Could not load the word catalogue.');
     } finally {
@@ -123,9 +170,47 @@ export default function WordBankManager() {
 
   const wordsPerLesson = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const w of words) counts.set(w.lesson_id, (counts.get(w.lesson_id) || 0) + 1);
+    for (const w of words) {
+      if (w.lesson_id) counts.set(w.lesson_id, (counts.get(w.lesson_id) || 0) + 1);
+    }
     return counts;
   }, [words]);
+
+  const sourcesByKey = useMemo(() => {
+    const map = new Map<string, SourceRow[]>();
+    for (const s of sources) {
+      const list = map.get(s.word_key);
+      if (list) list.push(s);
+      else map.set(s.word_key, [s]);
+    }
+    return map;
+  }, [sources]);
+
+  const textbookSourcesOf = useCallback(
+    (row: WordRow) =>
+      (sourcesByKey.get(row.word_key) || []).filter((s) => s.source_kind === 'textbook'),
+    [sourcesByKey]
+  );
+
+  /** Where a word is taught, for the row subtitle: the Learning
+   * Path label when it has one (with a book marker when a textbook
+   * also teaches it), else its first textbook place. */
+  const sourceLabel = useCallback(
+    (row: WordRow) => {
+      const tb = textbookSourcesOf(row);
+      const tbLabel = (s: SourceRow) =>
+        `Book ${s.book_no} · Lesson ${s.book_lesson_no}${s.lesson_title ? ` · ${s.lesson_title}` : ''}`;
+      if (row.lesson_id && taxonomy) {
+        const lp = lessonPathLabel(taxonomy, row.lesson_id) || '';
+        return tb.length > 0 ? `${lp} · also in ${tbLabel(tb[0])}` : lp;
+      }
+      if (tb.length > 0) {
+        return tb.length > 1 ? `${tbLabel(tb[0])} (+${tb.length - 1} more)` : tbLabel(tb[0]);
+      }
+      return '';
+    },
+    [taxonomy, textbookSourcesOf]
+  );
 
   const moduleOptions = useMemo(
     () =>
@@ -147,19 +232,35 @@ export default function WordBankManager() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    // A textbook source filter stands alone (the Learning Path
+    // cascade does not apply to book words); the cascade filters
+    // Learning Path attribution, as before.
+    const tbActive = sourceFilter === 'tb' || sourceFilter.startsWith('book:');
     return words.filter((w) => {
       if (q && !w.word.toLowerCase().includes(q)) return false;
-      const lesson = lessonById.get(w.lesson_id);
-      if (!lesson) return false;
-      if (lessonId) return w.lesson_id === lessonId;
-      if (moduleId) return lesson.module_id === moduleId;
-      if (stageId) {
-        const mod = moduleById.get(lesson.module_id);
-        return mod?.stage_id === stageId;
+      const lesson = w.lesson_id ? lessonById.get(w.lesson_id) : undefined;
+      const tb = textbookSourcesOf(w);
+      // A word is listable when at least one teaching place is
+      // known (Round 96: textbook-only words have no LP lesson).
+      if (!lesson && tb.length === 0) return false;
+      if (sourceFilter === 'lp' && !lesson) return false;
+      if (sourceFilter === 'tb' && tb.length === 0) return false;
+      if (sourceFilter.startsWith('book:')) {
+        const bn = Number(sourceFilter.slice(5));
+        if (!tb.some((s) => s.book_no === bn)) return false;
+      }
+      if (!tbActive) {
+        if (lessonId) return w.lesson_id === lessonId;
+        if (moduleId) return lesson?.module_id === moduleId;
+        if (stageId) {
+          if (!lesson) return false;
+          const mod = moduleById.get(lesson.module_id);
+          return mod?.stage_id === stageId;
+        }
       }
       return true;
     });
-  }, [words, search, stageId, moduleId, lessonId, lessonById, moduleById]);
+  }, [words, search, sourceFilter, stageId, moduleId, lessonId, lessonById, moduleById, textbookSourcesOf]);
 
   const enabledCount = useMemo(() => words.filter((w) => w.is_enabled).length, [words]);
   const visible = filtered.slice(0, visibleCount);
@@ -263,7 +364,8 @@ export default function WordBankManager() {
       <Text className="text-slate-500 mb-1">
         {words.length.toLocaleString()} words in the catalogue · {enabledCount.toLocaleString()}{' '}
         switched on. These are the words students meet in My Word Bank — in review sessions and in
-        the Learn / Test lesson books.
+        the Learn / Test lesson books. Since Round 96 the catalogue also holds the five
+        textbooks&apos; Remember Words; use the Source filter to see them by book.
       </Text>
       <Text className="text-slate-400 text-sm mb-5">
         Switching a word off removes it from enrolment, reviews and the dictionary. Students keep
@@ -282,6 +384,21 @@ export default function WordBankManager() {
           className="bg-canvas border border-inkline rounded-xl px-4 py-3 mb-3 font-sans text-sm"
         />
         <View className="flex-row flex-wrap gap-3">
+          <View className="flex-1 min-w-[180px]">
+            <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
+              Source
+            </Text>
+            <AdminDropdown
+              value={sourceFilter}
+              options={SOURCE_FILTER_OPTIONS}
+              onChange={(id) => {
+                setSourceFilter(id);
+                setVisibleCount(PAGE_SIZE);
+              }}
+              placeholder="All sources"
+              noneLabel="All sources"
+            />
+          </View>
           <View className="flex-1 min-w-[180px]">
             <Text className="text-[11px] font-bold uppercase tracking-[1px] text-slate-400 mb-1">
               Stage
@@ -376,7 +493,7 @@ export default function WordBankManager() {
                     {row.example || '(no example sentence)'}
                   </Text>
                   <Text className="text-slate-400 text-[11px]" numberOfLines={1}>
-                    {taxonomy ? lessonPathLabel(taxonomy, row.lesson_id) || '' : ''}
+                    {sourceLabel(row)}
                   </Text>
                 </View>
                 <Pressable

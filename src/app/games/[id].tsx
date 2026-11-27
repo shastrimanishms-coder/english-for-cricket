@@ -13,6 +13,7 @@ import { WebView } from 'react-native-webview';
 import BuiltinGame from '../../components/games/BuiltinGame';
 import { evaluateGameBadge, type AwardedBadge } from '../../lib/badgeAwards';
 import { awardExtraIfTagged, awardWorkbookPractice } from '../../lib/extras';
+import { syncWordBankEnrolments } from '../../lib/wordBank';
 import { getStudentIdentity, type StudentIdentity } from '../../lib/studentIdentity';
 import { supabase } from '../../lib/supabase';
 import { useActivityLogger } from '../../lib/useActivityLogger';
@@ -133,6 +134,11 @@ export default function GamePlayer() {
       // through the untagged path instead (Round 86).
       if (game.engine === 'workbook' && !game.lesson_id) {
         await awardWorkbookPractice(identity, game.id);
+        // Round 96: a finished textbook workbook game enrols that
+        // lesson's Remember Words into the student's Word Bank
+        // (sync derives them from this completion; fire-and-forget,
+        // and the bank re-syncs on every visit regardless).
+        syncWordBankEnrolments(identity);
       }
     })();
   }, [game]);
@@ -146,6 +152,9 @@ export default function GamePlayer() {
     await awardExtraIfTagged(who, 'game', game.id, game.lesson_id);
     if (game.engine === 'workbook' && !game.lesson_id) {
       await awardWorkbookPractice(who, game.id);
+      // Round 96: see the open-award above — enrol the textbook
+      // lesson's words off the back of this completion.
+      syncWordBankEnrolments(who);
     }
   }, [game, identity]);
 

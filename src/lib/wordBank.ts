@@ -136,6 +136,64 @@ export async function recordWordReview(
   }
 }
 
+/**
+ * The five textbooks (Round 96), with the titles printed on their
+ * covers — the same five titles as the Learning Path stages.
+ */
+export const TEXTBOOK_BOOKS: { bookNo: number; title: string }[] = [
+  { bookNo: 1, title: 'The Foundation' },
+  { bookNo: 2, title: 'The Rookie' },
+  { bookNo: 3, title: 'The Player' },
+  { bookNo: 4, title: 'The Strategist' },
+  { bookNo: 5, title: 'The Captain' },
+];
+
+/** The synthetic lesson key a textbook lesson carries through the
+ * browse tree and the books (it is not a curriculum lesson id). */
+export function textbookLessonKey(bookNo: number, bookLessonNo: number): string {
+  return `tb-${bookNo}-${bookLessonNo}`;
+}
+
+/**
+ * One textbook's dictionary (Round 96): every word its Remember
+ * Words lists teach, per lesson, with the student's status —
+ * the sibling of fetchBrowseModule, shaped as BrowseWord[] so the
+ * browse tree and the Learn / Test books consume both alike.
+ * lessonId is the synthetic textbook key; lessonOrder is the
+ * lesson's position in the book (0-based, like a lesson order).
+ */
+export async function fetchBrowseTextbook(
+  identity: StudentIdentity | null,
+  bookNo: number
+): Promise<BrowseWord[]> {
+  if (!identity) return [];
+  try {
+    const { data, error } = await supabase.rpc('get_word_bank_browse_textbook', {
+      p_student_id: identity.studentId,
+      p_student_kind: identity.studentKind,
+      p_book_no: bookNo,
+    });
+    if (error || !Array.isArray(data)) return [];
+    return (data as Record<string, unknown>[]).map((row) => {
+      const lessonNo = Number(row.book_lesson_no) || 1;
+      return {
+        wordKey: String(row.word_key),
+        word: String(row.word),
+        emoji: String(row.emoji ?? ''),
+        example: String(row.example ?? ''),
+        imageUrl: String(row.image_url ?? ''),
+        lessonId: textbookLessonKey(bookNo, lessonNo),
+        lessonTitle: String(row.lesson_title ?? ''),
+        lessonOrder: lessonNo - 1,
+        status: (String(row.status) as WordStatus) || 'not_started',
+        step: row.step === null || row.step === undefined ? null : Number(row.step),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 /** One module's dictionary: every word it introduces, with status. */
 export async function fetchBrowseModule(
   identity: StudentIdentity | null,

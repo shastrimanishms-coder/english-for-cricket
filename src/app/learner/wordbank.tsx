@@ -26,7 +26,9 @@ import { supabase } from '../../lib/supabase';
 import { useSafeBack } from '../../lib/useSafeBack';
 import {
   fetchBrowseModule,
+  fetchBrowseTextbook,
   syncWordBank,
+  TEXTBOOK_BOOKS,
   type BrowseWord,
   type WordBankStatus,
 } from '../../lib/wordBank';
@@ -52,6 +54,13 @@ import type { WordStatus } from '../../lib/wordBankCore';
  * the page stays short. Word pictures everywhere in the Word Bank
  * use contain fit on white — the whole picture, never cropped.
  *
+ * Round 96: below the stages, a second tree — Textbooks -> Book ->
+ * Lesson — in exactly the same style (the bar markup is the shared
+ * LessonBar component), fed by get_word_bank_browse_textbook. A
+ * textbook lesson's book opens against the textbook source; its
+ * words enrol when the student finishes that lesson's digital
+ * workbook game.
+ *
  * Before migration 40 runs, every call here fails soft and the
  * screen shows its calm empty state.
  */
@@ -64,6 +73,9 @@ interface LessonPopup {
   moduleId: string;
   moduleNo: number;
   stageNo: number;
+  /** Round 96: set when the lesson is a textbook lesson — the
+   * book then opens against the textbook source, not a module. */
+  bookNo?: number;
 }
 
 interface StageRow {
@@ -113,6 +125,102 @@ const STATUS_STYLE: Record<WordStatus, { label: string; cls: string; text: strin
   mastered: { label: 'Mastered ⭐', cls: 'bg-emerald-500 border-emerald-600', text: 'text-white' },
 };
 
+/**
+ * One lesson's bar in the dictionary tree (Round 95 pattern,
+ * shared since Round 96 by the Learning Path tree and the
+ * Textbooks tree): the bar itself opens the lesson's book popup;
+ * the separate "Words" expander reveals the lesson's word cards.
+ */
+function LessonBar({
+  group,
+  expanded,
+  moduleNo,
+  onToggleWords,
+  onOpenBook,
+  playWord,
+}: {
+  group: LessonGroup;
+  expanded: boolean;
+  moduleNo: number;
+  onToggleWords: () => void;
+  onOpenBook: () => void;
+  playWord: (w: BrowseWord, moduleNo: number) => void;
+}) {
+  return (
+    <View className="mb-5">
+      <View className="flex-row items-stretch bg-pitch-light border border-gold rounded-[12px] overflow-hidden">
+        <Pressable
+          onPress={onOpenBook}
+          className="flex-1 flex-row items-center justify-between px-4 py-3"
+        >
+          <Text className="font-sans font-bold text-navy">
+            Lesson {group.lessonOrder + 1} · {group.lessonTitle}
+          </Text>
+          <Text className="font-sans text-[12px] font-bold text-gold-dark">
+            {group.words.length} words · Learn / Test ›
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onToggleWords}
+          accessibilityLabel={
+            expanded
+              ? `Hide the words of lesson ${group.lessonOrder + 1}`
+              : `Show the words of lesson ${group.lessonOrder + 1}`
+          }
+          className="flex-row items-center gap-1 px-3 border-l border-gold"
+        >
+          <Text className="font-sans text-[12px] font-bold text-navy">Words</Text>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#0A192F" />
+        </Pressable>
+      </View>
+      {expanded ? (
+        <View className="flex-row flex-wrap justify-between gap-y-3 mt-3">
+          {group.words.map((w) => {
+            const st = STATUS_STYLE[w.status];
+            return (
+              <Pressable
+                key={w.wordKey}
+                onPress={() => void playWord(w, moduleNo)}
+                className="w-[48%] md:w-[31%] bg-white border border-inkline rounded-[16px] overflow-hidden shadow-sm"
+              >
+                {w.imageUrl ? (
+                  <Image
+                    source={{ uri: w.imageUrl }}
+                    style={{ height: 96, width: '100%', backgroundColor: '#FFFFFF' }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View
+                    style={{ height: 96 }}
+                    className="bg-pitch-light items-center justify-center"
+                  >
+                    <Text style={{ fontSize: 40 }}>{w.emoji || '⭐'}</Text>
+                  </View>
+                )}
+                <View className="p-3">
+                  <Text className="font-sans font-bold text-navy text-base" numberOfLines={1}>
+                    {w.emoji ? `${w.emoji} ` : ''}
+                    {w.word} 🔊
+                  </Text>
+                  {w.example ? (
+                    <Text className="text-slate-400 text-xs mb-2" numberOfLines={2}>
+                      {w.example}
+                    </Text>
+                  ) : null}
+                  <View className={`self-start rounded-full border px-2.5 py-1 ${st.cls}`}>
+                    <Text className={`text-[11px] font-bold ${st.text}`}>{st.label}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+
 export default function WordBank() {
   const router = useRouter();
   const goBack = useSafeBack();
@@ -125,6 +233,11 @@ export default function WordBank() {
   const [openModules, setOpenModules] = useState<Set<string>>(new Set());
   const [browse, setBrowse] = useState<Map<string, BrowseWord[]>>(new Map());
   const [browseLoading, setBrowseLoading] = useState<Set<string>>(new Set());
+  // Round 96: the Textbooks tree — one lazy browse fetch per book,
+  // exactly like the module fetches above.
+  const [openBooks, setOpenBooks] = useState<Set<number>>(new Set());
+  const [tbBrowse, setTbBrowse] = useState<Map<number, BrowseWord[]>>(new Map());
+  const [tbLoading, setTbLoading] = useState<Set<number>>(new Set());
   const [popup, setPopup] = useState<LessonPopup | null>(null);
   // Round 95: at most one lesson's word cards are expanded at a
   // time, identified by lesson id (null = the clean tree).
@@ -209,6 +322,26 @@ export default function WordBank() {
       setBrowseLoading((prev) => {
         const next = new Set(prev);
         next.delete(m.id);
+        return next;
+      });
+    }
+  };
+
+  const toggleBook = async (bookNo: number) => {
+    const willOpen = !openBooks.has(bookNo);
+    setOpenBooks((prev) => {
+      const next = new Set(prev);
+      if (next.has(bookNo)) next.delete(bookNo);
+      else next.add(bookNo);
+      return next;
+    });
+    if (willOpen && !tbBrowse.has(bookNo) && identity) {
+      setTbLoading((prev) => new Set(prev).add(bookNo));
+      const words = await fetchBrowseTextbook(identity, bookNo);
+      setTbBrowse((prev) => new Map(prev).set(bookNo, words));
+      setTbLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(bookNo);
         return next;
       });
     }
@@ -352,105 +485,31 @@ export default function WordBank() {
                                         expander on each bar reveals
                                         that lesson's cards (one lesson
                                         expanded at a time). */}
-                                    {groupWordsByLesson(words).map((group) => {
-                                      const expanded = expandedLesson === group.lessonId;
-                                      return (
-                                      <View key={group.lessonId} className="mb-5">
-                                        <View className="flex-row items-stretch bg-pitch-light border border-gold rounded-[12px] overflow-hidden">
-                                          <Pressable
-                                            onPress={() =>
-                                              setPopup({
-                                                lessonId: group.lessonId,
-                                                lessonTitle: group.lessonTitle,
-                                                lessonOrder: group.lessonOrder,
-                                                wordCount: group.words.length,
-                                                moduleId: m.id,
-                                                moduleNo,
-                                                stageNo: stage.order_index,
-                                              })
-                                            }
-                                            className="flex-1 flex-row items-center justify-between px-4 py-3"
-                                          >
-                                            <Text className="font-sans font-bold text-navy">
-                                              Lesson {group.lessonOrder + 1} · {group.lessonTitle}
-                                            </Text>
-                                            <Text className="font-sans text-[12px] font-bold text-gold-dark">
-                                              {group.words.length} words · Learn / Test ›
-                                            </Text>
-                                          </Pressable>
-                                          <Pressable
-                                            onPress={() =>
-                                              setExpandedLesson((prev) =>
-                                                prev === group.lessonId ? null : group.lessonId
-                                              )
-                                            }
-                                            accessibilityLabel={
-                                              expanded
-                                                ? `Hide the words of lesson ${group.lessonOrder + 1}`
-                                                : `Show the words of lesson ${group.lessonOrder + 1}`
-                                            }
-                                            className="flex-row items-center gap-1 px-3 border-l border-gold"
-                                          >
-                                            <Text className="font-sans text-[12px] font-bold text-navy">
-                                              Words
-                                            </Text>
-                                            <Ionicons
-                                              name={expanded ? 'chevron-up' : 'chevron-down'}
-                                              size={14}
-                                              color="#0A192F"
-                                            />
-                                          </Pressable>
-                                        </View>
-                                        {expanded ? (
-                                        <View className="flex-row flex-wrap justify-between gap-y-3 mt-3">
-                                          {group.words.map((w) => {
-                                            const st = STATUS_STYLE[w.status];
-                                            return (
-                                              <Pressable
-                                                key={w.wordKey}
-                                                onPress={() => void playWord(w, moduleNo)}
-                                                className="w-[48%] md:w-[31%] bg-white border border-inkline rounded-[16px] overflow-hidden shadow-sm"
-                                              >
-                                                {w.imageUrl ? (
-                                                  <Image
-                                                    source={{ uri: w.imageUrl }}
-                                                    style={{ height: 96, width: '100%', backgroundColor: '#FFFFFF' }}
-                                                    resizeMode="contain"
-                                                  />
-                                                ) : (
-                                                  <View
-                                                    style={{ height: 96 }}
-                                                    className="bg-pitch-light items-center justify-center"
-                                                  >
-                                                    <Text style={{ fontSize: 40 }}>{w.emoji || '⭐'}</Text>
-                                                  </View>
-                                                )}
-                                                <View className="p-3">
-                                                  <Text className="font-sans font-bold text-navy text-base" numberOfLines={1}>
-                                                    {w.emoji ? `${w.emoji} ` : ''}
-                                                    {w.word} 🔊
-                                                  </Text>
-                                                  {w.example ? (
-                                                    <Text className="text-slate-400 text-xs mb-2" numberOfLines={2}>
-                                                      {w.example}
-                                                    </Text>
-                                                  ) : null}
-                                                  <View
-                                                    className={`self-start rounded-full border px-2.5 py-1 ${st.cls}`}
-                                                  >
-                                                    <Text className={`text-[11px] font-bold ${st.text}`}>
-                                                      {st.label}
-                                                    </Text>
-                                                  </View>
-                                                </View>
-                                              </Pressable>
-                                            );
-                                          })}
-                                        </View>
-                                        ) : null}
-                                      </View>
-                                      );
-                                    })}
+                                    {groupWordsByLesson(words).map((group) => (
+                                      <LessonBar
+                                        key={group.lessonId}
+                                        group={group}
+                                        expanded={expandedLesson === group.lessonId}
+                                        moduleNo={moduleNo}
+                                        onToggleWords={() =>
+                                          setExpandedLesson((prev) =>
+                                            prev === group.lessonId ? null : group.lessonId
+                                          )
+                                        }
+                                        onOpenBook={() =>
+                                          setPopup({
+                                            lessonId: group.lessonId,
+                                            lessonTitle: group.lessonTitle,
+                                            lessonOrder: group.lessonOrder,
+                                            wordCount: group.words.length,
+                                            moduleId: m.id,
+                                            moduleNo,
+                                            stageNo: stage.order_index,
+                                          })
+                                        }
+                                        playWord={playWord}
+                                      />
+                                    ))}
                                   </View>
                                 )
                               ) : null}
@@ -458,6 +517,80 @@ export default function WordBank() {
                           );
                         })
                       : null}
+                  </View>
+                );
+              })}
+
+              {/* Round 96: the Textbooks tree — the printed books'
+                  Remember Words, in the same collapsed style.
+                  Finishing a lesson's digital workbook game is
+                  what enrols its words. */}
+              <View className="mb-4 mt-2">
+                <MicroLabel className="mb-2">Textbooks</MicroLabel>
+                <Text className="font-sans text-slate-500">
+                  Every word from the printed books&apos; Remember Words lists, book by book.
+                  Finish a lesson&apos;s digital workbook and its words join your bank — then
+                  tap a lesson to Learn or Test its words, just like the stages above.
+                </Text>
+              </View>
+              {TEXTBOOK_BOOKS.map((book) => {
+                const open = openBooks.has(book.bookNo);
+                const words = tbBrowse.get(book.bookNo);
+                return (
+                  <View key={book.bookNo} className="mb-6">
+                    <Pressable
+                      onPress={() => void toggleBook(book.bookNo)}
+                      className="flex-row items-center justify-between bg-navy rounded-[16px] px-5 py-4"
+                    >
+                      <Text className="font-display text-lg font-semibold text-white">
+                        Book {book.bookNo} · {book.title}
+                      </Text>
+                      <Ionicons
+                        name={open ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color="#D4AF37"
+                      />
+                    </Pressable>
+                    {open ? (
+                      tbLoading.has(book.bookNo) ? (
+                        <View className="py-8 items-center">
+                          <ActivityIndicator color="#0A192F" />
+                        </View>
+                      ) : !words || words.length === 0 ? (
+                        <Text className="font-sans text-slate-400 px-2 py-3">
+                          No words here yet.
+                        </Text>
+                      ) : (
+                        <View className="mt-4">
+                          {groupWordsByLesson(words).map((group) => (
+                            <LessonBar
+                              key={group.lessonId}
+                              group={group}
+                              expanded={expandedLesson === group.lessonId}
+                              moduleNo={group.lessonOrder + 1}
+                              onToggleWords={() =>
+                                setExpandedLesson((prev) =>
+                                  prev === group.lessonId ? null : group.lessonId
+                                )
+                              }
+                              onOpenBook={() =>
+                                setPopup({
+                                  lessonId: group.lessonId,
+                                  lessonTitle: group.lessonTitle,
+                                  lessonOrder: group.lessonOrder,
+                                  wordCount: group.words.length,
+                                  moduleId: '',
+                                  moduleNo: group.lessonOrder + 1,
+                                  stageNo: book.bookNo,
+                                  bookNo: book.bookNo,
+                                })
+                              }
+                              playWord={playWord}
+                            />
+                          ))}
+                        </View>
+                      )
+                    ) : null}
                   </View>
                 );
               })}
@@ -484,6 +617,7 @@ export default function WordBank() {
             {popup ? (
               <View>
                 <Text className="font-display text-xl font-semibold text-navy mb-1">
+                  {popup.bookNo ? `Book ${popup.bookNo} · ` : ''}
                   Lesson {popup.lessonOrder + 1} · {popup.lessonTitle}
                 </Text>
                 <Text className="font-sans text-slate-500 mb-5">
@@ -497,11 +631,15 @@ export default function WordBank() {
                     router.push({
                       pathname: '/learner/wordbook-book',
                       params: {
-                        moduleId: p.moduleId,
+                        ...(p.bookNo
+                          ? { source: 'textbook', bookNo: String(p.bookNo) }
+                          : { moduleId: p.moduleId }),
                         lessonId: p.lessonId,
                         moduleNo: String(p.moduleNo),
                         mode: 'learn',
-                        title: `Lesson ${p.lessonOrder + 1} · ${p.lessonTitle}`,
+                        title: p.bookNo
+                          ? `Book ${p.bookNo} · Lesson ${p.lessonOrder + 1} · ${p.lessonTitle}`
+                          : `Lesson ${p.lessonOrder + 1} · ${p.lessonTitle}`,
                       },
                     } as any);
                   }}
@@ -519,11 +657,15 @@ export default function WordBank() {
                     router.push({
                       pathname: '/learner/wordbook-book',
                       params: {
-                        moduleId: p.moduleId,
+                        ...(p.bookNo
+                          ? { source: 'textbook', bookNo: String(p.bookNo) }
+                          : { moduleId: p.moduleId }),
                         lessonId: p.lessonId,
                         moduleNo: String(p.moduleNo),
                         mode: 'test',
-                        title: `Lesson ${p.lessonOrder + 1} · ${p.lessonTitle}`,
+                        title: p.bookNo
+                          ? `Book ${p.bookNo} · Lesson ${p.lessonOrder + 1} · ${p.lessonTitle}`
+                          : `Lesson ${p.lessonOrder + 1} · ${p.lessonTitle}`,
                       },
                     } as any);
                   }}
